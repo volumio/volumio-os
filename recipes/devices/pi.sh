@@ -101,10 +101,6 @@ write_device_bootloader() {
 
 # Will be called by the image builder for any customisation
 device_image_tweaks() {
-	# log "Custom dtoverlay pre and post" "ext"
-	# mkdir -p "${ROOTFSMNT}/opt/vc/bin/"
-	# cp -rp "${SRC}"/volumio/opt/vc/bin/* "${ROOTFSMNT}/opt/vc/bin/"
-
 	log "Fixing hostapd.conf" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/hostapd/hostapd.conf"
 		interface=wlan0
