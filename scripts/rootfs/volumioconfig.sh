@@ -6,6 +6,8 @@ set -eo pipefail
 # Reimport helpers in chroot
 # shellcheck source=./scripts/helpers.sh
 source /helpers.sh
+# shellcheck source=/dev/null
+source /etc/os-release
 CHROOT=yes
 export CHROOT
 
@@ -51,11 +53,33 @@ EOF
 
 export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true
 export LC_ALL=C LANGUAGE=C LANG=C
+log "Checking current arch: ${ARCH}" "dbg"
+DPKG_ARCH=$(dpkg --print-architecture)
+log "Running dpkg fixes for ${DISTRO_NAME} (${DISTRO_VER})"
 
-log "Running dpkg fixes for ${DISTRO_NAME}(${DISTRO_VER})"
-# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=924401
-log "Running base-passwd.preinst" "wrn"
-/var/lib/dpkg/info/base-passwd.preinst install
+case "${DISTRO_VER}" in
+12)
+  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=924401
+  log "Running base-passwd.preinst" "wrn"
+  /var/lib/dpkg/info/base-passwd.preinst install
+  # Configure (m)awk for samba-common-bins -> (ucf) 
+  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=551029
+  dpkg --configure "libgcc-s1:${DPKG_ARCH}" "libc6:${DPKG_ARCH}" "gcc-12-base:${DPKG_ARCH}" mawk
+  ;;
+10)
+  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=924401
+  log "Running base-passwd.preinst" "wrn"
+  /var/lib/dpkg/info/base-passwd.preinst install
+  ;;
+9)
+  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=890073
+  log "Running dash.preinst" "wrn"
+  /var/lib/dpkg/info/dash.preinst install
+  ;;
+*)
+  echo "No fixes"
+  ;;
+esac
 
 log "Configuring packages, this may take some time.." "info"
 start_dpkg_configure=$(date +%s)
@@ -478,7 +502,7 @@ log "Finished Volumio chroot configuration for ${DISTRO_NAME}" "okay"
 #------------------------------------------------------------
 
 log "Allowing UDEV To make rest calls to make usb detection work"
-echo "IPAddressAllow=127.0.0.1" >> /lib/systemd/system/udev.service
+echo "IPAddressAllow=127.0.0.1" >>/lib/systemd/system/udev.service
 
 log "Allowing UDEV to bring up HCI devices"
 sed -i 's/RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6/RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6 AF_BLUETOOTH/' /lib/systemd/system/udev.service
@@ -493,5 +517,3 @@ sed -i 's/RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6/RestrictAd
 #[Daemon]
 #Theme=volumio
 #EOF
-
-
