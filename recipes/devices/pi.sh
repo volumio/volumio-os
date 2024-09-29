@@ -272,6 +272,16 @@ device_chroot_tweaks_pre() {
 	## Lets update some packages from raspbian repos now
 	apt-get update && apt-get -y upgrade
 
+	# https://github.com/volumio/volumio3-os/issues/174
+	## Quick fix for dhcpcd in Raspbian vs Debian
+	log "Raspbian vs Debian dhcpcd debug "
+	apt-get remove dhcpcd -yy && apt-get autoremove
+	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
+	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd_9.4.1-24~deb12u4_all.deb
+	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
+	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
+	dpkg -i dhcpcd*.deb
+
 	NODE_VERSION=$(node --version)
 	log "Node version installed:" "dbg" "${NODE_VERSION}"
 	# drop the leading v
