@@ -48,17 +48,11 @@ UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="no"	# yes/no or empty. Replaces default pl
 # Modules that will be added to initramfs
 MODULES=("drm" "fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 # Packages that will be installed
-PACKAGES=( # Bluetooth packages
-	"bluez" "bluez-firmware" "pi-bluetooth"
-	# Foundation stuff
-	"raspberrypi-sys-mods"
+PACKAGES=(
 	# Framebuffer stuff
-	"fbset"	
-	# "rpi-eeprom"\ Needs raspberrypi-bootloader that we hold back
+	"fbset"
 	# GPIO stuff
-	"wiringpi"	
-	# Wireless firmware
-	"firmware-atheros" "firmware-ralink" "firmware-realtek" "firmware-brcm80211"
+	# "wiringpi"
 	# Install to disk tools
 	"liblzo2-2" "squashfs-tools"
 )
@@ -122,9 +116,9 @@ device_image_tweaks() {
 
 	log "Adding archive.raspberrypi debian repo" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/sources.list.d/raspi.list"
-		deb http://archive.raspberrypi.org/debian/ ${SUITE} main ui
+		deb http://archive.raspberrypi.org/debian/ ${SUITE} main
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
-		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main ui
+		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main
 	EOF
 
 	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files
@@ -274,11 +268,7 @@ device_chroot_tweaks_pre() {
 	log "Finished Kernel installation" "okay"
 
 	### Other Rpi specific stuff
-	log "Installing fake libraspberrypi0 package" "info"
-	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/libraspberrypi0/libraspberrypi0_1.20230509-buster-1_armhf.deb
-	dpkg -i libraspberrypi0_1.20230509-buster-1_armhf.deb
-	rm libraspberrypi0_1.20230509-buster-1_armhf.deb
-
+	
 	## Lets update some packages from raspbian repos now
 	apt-get update && apt-get -y upgrade
 
@@ -344,19 +334,45 @@ device_chroot_tweaks_pre() {
 	log "Updating LD_LIBRARY_PATH" "info"
 	ldconfig
 
+	# Fixing some Debian/sid quirks
+	if dpkg -l libraspberrypi0 &>/dev/null && [[ "$(dpkg --print-architecture)" = armhf ]]; then
+		log "Fixing linker ld-linux-armhf"
+		ln -s /lib/ld-linux-armhf.so.3 /lib/ld-linux.so.3 2>/dev/null || true
+		ln -s /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ld-linux.so.3 2>/dev/null || true
+	fi
+	
 	log "Symlinking vc bins" "info"
+	# Clean this up! > Quoting popcornmix "Code from here is no longer installed on latest RPiOS Bookworm images.If you are using code from here you should rethink your solution.Consider this repo closed."
 	# https://github.com/RPi-Distro/firmware/blob/debian/debian/libraspberrypi-bin.links
 	VC_BINS=("edidparser" "raspistill" "raspivid" "raspividyuv" "raspiyuv"
-		"tvservice" "vcdbg" "vcgencmd" "vchiq_test"
-		"dtoverlay" "dtoverlay-pre" "dtoverlay-post" "dtmerge")
+		"tvservice" "vcdbg" "vchiq_test"
+		"dtoverlay-pre" "dtoverlay-post")
+
 	for bin in "${VC_BINS[@]}"; do
-		ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
+		if [[ ! -f /usr/bin/${bin} && -f /opt/vc/bin/${bin} ]]; then
+			ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
+			log "Linked ${bin}"
+		else
+			log "${bin} wasn't linked!" "wrn"
+		fi
 	done
 
 	log "Fixing vcgencmd permissions" "info"
 	cat <<-EOF >/etc/udev/rules.d/10-vchiq.rules
 		SUBSYSTEM=="vchiq",GROUP="video",MODE="0660"
 	EOF
+
+	# All additional drivers
+	log "Adding Custom firmware from github" "info"
+	for key in "${!CustomFirmware[@]}"; do
+		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
+			log "Failed to get firmware:" "err" "${key}"
+			rm "$key.tar.gz"
+			continue
+		}
+		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
+		rm "$key.tar.gz"
+	done
 
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
 	if [ "$MAJOR_VERSION" -gt 6 ] || { [ "$MAJOR_VERSION" -eq 6 ] && { [ "$MINOR_VERSION" -gt 1 ] || [ "$MINOR_VERSION" -eq 1 ] && [ "$PATCH_VERSION" -ge 54 ]; }; }; then
