@@ -33,17 +33,17 @@ KIOSKMODE=no
 ## Partition info
 BOOT_START=0
 BOOT_END=96
-BOOT_TYPE=msdos    # msdos or gpt
-BOOT_USE_UUID=yes  # Add UUID to fstab
+BOOT_TYPE=msdos   # msdos or gpt
+BOOT_USE_UUID=yes # Add UUID to fstab
 INIT_TYPE="initv3"
 
 ## Plymouth theme management
-PLYMOUTH_THEME="volumio-player"	# Choices are: {volumio,volumio-logo,volumio-player}
-INIT_PLYMOUTH_DISABLE="no"		# yes/no or empty. Removes plymouth initialization in init if "yes" is selected
+PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
+INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
 ## TODO: for any KMS DRM panel mudule, which does not create frambuffer bridge, set this variable to yes, otherwise no
 ## Implement an if/else statement to handle this properly
-UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="no"	# yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
+UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="no" # yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
 
 # Modules that will be added to initramfs
 MODULES=("drm" "fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
@@ -149,8 +149,8 @@ device_image_tweaks() {
 	# BOOT_PATH=${ROOT_PATH}/boot
 
 	log "Copying custom initramfs script functions" "cfg"
-	[ -d ${ROOTFSMNT}/root/scripts ] || mkdir ${ROOTFSMNT}/root/scripts
-	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" ${ROOTFSMNT}/root/scripts
+	[ -d "${ROOTFSMNT}"/root/scripts ] || mkdir "${ROOTFSMNT}"/root/scripts
+	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" "${ROOTFSMNT}"/root/scripts
 }
 
 # Will be run in chroot (before other things)
@@ -218,12 +218,12 @@ device_chroot_tweaks_pre() {
 	# List of custom firmware -
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
-		[AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
-		[TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
-		[Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
-		[wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
-		[brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
-		[PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
+		# [AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
+		# [TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
+		# [Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
+		# [wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
+		# [brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
+		# [PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
 	)
 
 	### Kernel installation
@@ -234,17 +234,6 @@ device_chroot_tweaks_pre() {
 	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
 	echo y | SKIP_BACKUP=1 WANT_32BIT=1 WANT_64BIT=1 WANT_PI4=1 WANT_PI5=0 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 BRANCH=${KERNEL_BRANCH} /usr/bin/rpi-update "${KERNEL_COMMIT}"
-
-	log "Adding Custom firmware from github" "info"
-	for key in "${!CustomFirmware[@]}"; do
-		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
-			log "Failed to get firmware:" "err" "${key}"
-			rm "$key.tar.gz"
-			continue
-		}
-		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
-		rm "$key.tar.gz"
-	done
 
 	## Comment to keep RPi4/RPi5 64bit kernel
 	#if [ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]; then
@@ -533,9 +522,9 @@ device_chroot_tweaks_post() {
 # Will be called by the image builder post the chroot, before finalisation
 device_image_tweaks_post() {
 	log "Running device_image_tweaks_post" "ext"
-    # Plymouth systemd services OVERWRITE
+	# Plymouth systemd services OVERWRITE
 	if [[ "${UPDATE_PLYMOUTH_SERVICES}" == yes ]]; then
-        log "Updating plymouth systemd services" "info"
-        cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
+		log "Updating plymouth systemd services" "info"
+		cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
 	fi
 }
