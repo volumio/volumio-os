@@ -57,6 +57,29 @@ PACKAGES=(
 	"liblzo2-2" "squashfs-tools"
 )
 
+#Pi Specific
+RpiRepo="https://github.com/raspberrypi/rpi-firmware"
+RpiUpdateRepo="raspberrypi/rpi-update"
+declare -A PI_KERNELS=(
+	#[KERNEL_VERSION]="SHA|Branch|Rev"
+	[5.10.92]="ea9e10e531a301b3df568dccb3c931d52a469106|stable|1514"
+	[5.10.95]="770ca2c26e9cf341db93786d3f03c89964b1f76f|master|1521"
+	[5.15.84]="a99e144e939bf93bbd03e8066601a8d3eae640f7|stable|1613"
+	[5.15.92]="f5c4fc199c8d8423cb427e509563737d1ac21f3c|master|1627"
+	[6.1.19]="fa51258e0239eaf68d9dff9c156cec3a622fbacc|stable|1637"
+	[6.1.21]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1642"
+	[6.1.47]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1674"
+	[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
+	[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
+	[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"
+	[6.1.64]="01145f0eb166cbc68dd2fe63740fac04d682133e|master|1702"
+	[6.1.69]="ec8e8136d773de83e313aaf983e664079cce2815|master|1710"
+	[6.1.70]="fc9319fda550a86dc6c23c12adda54a0f8163f22|master|1712"
+	[6.1.77]="5fc4f643d2e9c5aa972828705a902d184527ae3f|master|1730"
+)
+# Version we want
+KERNEL_VERSION="6.1.69"
+
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
 write_device_files() {
@@ -121,10 +144,8 @@ device_image_tweaks() {
 		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main
 	EOF
 
-	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files
-	# and break Volumio. Installation may be triggered by manual or
-	# plugin installs explicitly or through dependencies like
-	# chromium, sense-hat, picamera,...
+	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files and break Volumio.
+	# Installation may be triggered by manual or plugin installs explicitly or through dependencies like chromium, sense-hat, picamera,...
 	# Using Pin-Priority < 0 prevents installation
 	log "Blocking raspberrypi-bootloader and raspberrypi-kernel" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/raspberrypi-kernel"
@@ -142,62 +163,14 @@ device_image_tweaks() {
 	EOF
 
 	log "Fetching rpi-update" "info"
-	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://raw.githubusercontent.com/volumioteam/rpi-update/master/rpi-update &&
+	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" "https://raw.githubusercontent.com/${RpiUpdateRepo}/master/rpi-update" &&
 		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
-	#TODO: Look into moving kernel stuff outside chroot using ROOT/BOOT_PATH to speed things up
-	# ROOT_PATH=${ROOTFSMNT}
-	# BOOT_PATH=${ROOT_PATH}/boot
-
-	log "Copying custom initramfs script functions" "cfg"
-	[ -d "${ROOTFSMNT}"/root/scripts ] || mkdir "${ROOTFSMNT}"/root/scripts
-	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" "${ROOTFSMNT}"/root/scripts
-}
-
-# Will be run in chroot (before other things)
-device_chroot_tweaks() {
-	log "Running device_image_tweaks" "ext"
-	# rpi-update needs binutils
-	log "Installing binutils for rpi-update" "ext"
-	apt-get update -qq && apt-get -yy install binutils
-}
-
-# Will be run in chroot - Pre initramfs
-# TODO Try and streamline this!
-device_chroot_tweaks_pre() {
-	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
-	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
-
-	## Define parameters
-	declare -A PI_KERNELS=(
-		#[KERNEL_VERSION]="SHA|Branch|Rev"
-		[5.10.92]="ea9e10e531a301b3df568dccb3c931d52a469106|stable|1514"
-		[5.10.95]="770ca2c26e9cf341db93786d3f03c89964b1f76f|master|1521"
-		[5.15.84]="a99e144e939bf93bbd03e8066601a8d3eae640f7|stable|1613"
-		[5.15.92]="f5c4fc199c8d8423cb427e509563737d1ac21f3c|master|1627"
-		[6.1.19]="fa51258e0239eaf68d9dff9c156cec3a622fbacc|stable|1637"
-		[6.1.21]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1642"
-		[6.1.47]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1674"
-		[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
-		[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
-		[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"
-		[6.1.64]="01145f0eb166cbc68dd2fe63740fac04d682133e|master|1702"
-		[6.1.69]="ec8e8136d773de83e313aaf983e664079cce2815|master|1710"
-		[6.1.70]="fc9319fda550a86dc6c23c12adda54a0f8163f22|master|1712"
-		[6.1.77]="5fc4f643d2e9c5aa972828705a902d184527ae3f|master|1730"
-	)
-	# Version we want
-	KERNEL_VERSION="6.1.69"
-
-	MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 1)
-	MINOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 2)
-	PATCH_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 3)
 
 	# For bleeding edge, check what is the latest on offer
 	# Things *might* break, so you are warned!
 	if [[ ${RPI_USE_LATEST_KERNEL:-no} == yes ]]; then
 		branch=master
 		log "Using bleeding edge Rpi kernel" "info" "$branch"
-		RpiRepo="https://github.com/raspberrypi/rpi-firmware"
 		RpiRepoApi=${RpiRepo/github.com/api.github.com\/repos}
 		RpiRepoRaw=${RpiRepo/github.com/raw.githubusercontent.com}
 		log "Fetching latest kernel details from ${RpiRepo}" "info"
@@ -215,6 +188,51 @@ device_chroot_tweaks_pre() {
 		log "[${KERNEL_VERSION}]=\"${RpiCommitDetails[0]}|${branch}|${RpiKerRev}\"" "dbg"
 	fi
 
+	### Kernel installation
+	IFS=\| read -r KERNEL_COMMIT KERNEL_BRANCH KERNEL_REV <<<"${PI_KERNELS[$KERNEL_VERSION]}"
+
+	# using rpi-update to fetch and install kernel and firmware
+	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
+	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
+	RpiUpdate_args=("UPDATE_SELF=0" "ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
+		"SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
+		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=0"
+		# "BRANCH=${KERNEL_BRANCH}"
+	)
+	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
+
+	log "Copying custom initramfs script functions" "cfg"
+	[[ -d "${ROOTFSMNT}"/root/scripts ]] || mkdir "${ROOTFSMNT}"/root/scripts
+	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" "${ROOTFSMNT}"/root/scripts
+}
+
+# Will be run in chroot (before other things)
+device_chroot_tweaks() {
+	log "Running device_image_tweaks" "ext"
+}
+
+# Will be run in chroot - Pre initramfs
+# TODO Try and streamline this!
+device_chroot_tweaks_pre() {
+	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
+	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
+
+	## Define parameters
+
+	## Reconfirm our kernel version
+	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
+	mapfile -t kver < <(ls -t /lib/modules | sort)
+	log "Found ${#kver[@]} kernel version(s)" "${kver[*]}"
+	ksemver=${kver[0]%%-*} && ksemver=${ksemver%%+*}
+	[[ ${ksemver} != "${KERNEL_VERSION}" ]] && [[ ${RPI_USE_RPI_UPDATE} == yes ]] &&
+		log "Installed kernel doesn't match requested version!" "wrn" "${ksemver} != ${KERNEL_VERSION}"
+	KERNEL_VERSION=${ksemver}
+	IFS=\. read -ra KERNEL_SEMVER <<<"${KERNEL_VERSION}"
+
+	MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 1)
+	MINOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 2)
+	PATCH_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 3)
+
 	# List of custom firmware -
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
@@ -225,15 +243,6 @@ device_chroot_tweaks_pre() {
 		# [brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
 		# [PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
 	)
-
-	### Kernel installation
-	IFS=\. read -ra KERNEL_SEMVER <<<"${KERNEL_VERSION}"
-	IFS=\| read -r KERNEL_COMMIT KERNEL_BRANCH KERNEL_REV <<<"${PI_KERNELS[$KERNEL_VERSION]}"
-
-	# using rpi-update to fetch and install kernel and firmware
-	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
-	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
-	echo y | SKIP_BACKUP=1 WANT_32BIT=1 WANT_64BIT=1 WANT_PI4=1 WANT_PI5=0 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 BRANCH=${KERNEL_BRANCH} /usr/bin/rpi-update "${KERNEL_COMMIT}"
 
 	## Comment to keep RPi4/RPi5 64bit kernel
 	#if [ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]; then
@@ -257,7 +266,6 @@ device_chroot_tweaks_pre() {
 	log "Finished Kernel installation" "okay"
 
 	### Other Rpi specific stuff
-	
 	## Lets update some packages from raspbian repos now
 	apt-get update && apt-get -y upgrade
 
@@ -339,7 +347,7 @@ device_chroot_tweaks_pre() {
 		ln -s /lib/ld-linux-armhf.so.3 /lib/ld-linux.so.3 2>/dev/null || true
 		ln -s /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ld-linux.so.3 2>/dev/null || true
 	fi
-	
+
 	log "Symlinking vc bins" "info"
 	# Clean this up! > Quoting popcornmix "Code from here is no longer installed on latest RPiOS Bookworm images.If you are using code from here you should rethink your solution.Consider this repo closed."
 	# https://github.com/RPi-Distro/firmware/blob/debian/debian/libraspberrypi-bin.links
