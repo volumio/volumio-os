@@ -10,6 +10,7 @@ CHROOT=yes
 export CHROOT
 export -f log
 export -f time_it
+export -f check_size
 
 # shellcheck source=/dev/null
 source /chroot_device_config.sh
@@ -238,7 +239,7 @@ cp -rp /sbin/mke2fs /sbin/mke2fsfull
 
 log "Creating initramfs 'volumio.initrd'" "info"
 mkinitramfs-custom.sh -o /tmp/initramfs-tmp
-log "Finished creating initramfs" "okay"
+log "Finished creating initramfs" "okay" "$(check_size "/boot/volumio.initrd")"
 
 log "Entering device_chroot_tweaks_post" "cfg"
 device_chroot_tweaks_post
