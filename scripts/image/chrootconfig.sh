@@ -101,7 +101,7 @@ Wants=mpd.socket
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/mpd --systemd
+ExecStart=/usr/bin/mpd --no-daemon
 ExecStartPre=-/usr/bin/sudo /bin/chown mpd:audio /var/log/mpd.log
 StartLimitBurst=15
 
@@ -133,9 +133,6 @@ RestrictNamespaces=yes
 WantedBy=multi-user.target
 Also=mpd.socket" >/usr/lib/systemd/system/mpd.service
 
-log "Copying MPD custom systemd file to /lib "
-cp -rfp /usr/lib/systemd/system/mpd.service /lib/systemd/system/mpd.service
-
 log "Disabling MPD Service"
 systemctl disable mpd.service
 
@@ -157,9 +154,6 @@ SocketMode=776
 
 [Install]
 WantedBy=sockets.target" >/usr/lib/systemd/system/mpd.socket
-
-log "Copying MPD custom socket systemd file to /lib"
-cp -rfp /usr/lib/systemd/system/mpd.service /lib/systemd/system/mpd.service
 
 log "Disabling MPD Socket Service"
 systemctl disable mpd.socket
