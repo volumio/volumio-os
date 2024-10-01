@@ -95,7 +95,7 @@ log "Copying Volumio rootfs" "info"
 log "Using working tmp dir:" "info" "${VOLMNT}"
 if [[ -d ${VOLMNT} ]]; then
   log "Volumio Temp Directory Exists - Cleaning it"
-  rm -rf "${VOLMNT:?}"/*
+  rm -rf ${VOLMNT:?}/*
 else
   log "Creating Volumio Temp Directory"
   mkdir -p "${VOLMNT}"
@@ -241,6 +241,7 @@ DEVICENAME="${DEVICENAME}"
 ARCH="${ARCH}"
 BUILD="${BUILD}"
 UINITRD_ARCH="${UINITRD_ARCH}"
+KERNEL_VERSION="${KERNEL_VERSION}"
 DEBUG_IMAGE="${DEBUG_IMAGE:-no}"
 KIOSKMODE="${KIOSKMODE:-no}"
 KIOSKBROWSER="${KIOSKBROWSER:-chromium}"

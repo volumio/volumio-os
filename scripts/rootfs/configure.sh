@@ -30,17 +30,9 @@ cp "${SRC}/volumio/etc/samba/smb.conf" "${ROOTFS}/etc/samba/smb.conf"
 #Udev confs file (NET)
 cp -r "${SRC}/volumio/etc/udev" "${ROOTFS}/etc/"
 
-#Polkit for USB mounts
-cp -r "${SRC}/volumio/etc/polkit-1/localauthority/50-local.d/50-mount-as-pi.pkla" \
-  "${ROOTFS}/etc/polkit-1/localauthority/50-local.d/50-mount-as-pi.pkla"
-
-#Inittab file
-cp "${SRC}/volumio/etc/inittab" "${ROOTFS}/etc/inittab"
-
-#MOTD
-# Seems to get overwritten later
-# rm -f "${ROOTFSMNT}/etc/motd" "${ROOTFSMNT}"/etc/update-motd.d/*
-# cp "${SRC}"/volumio/etc/update-motd.d/* "${ROOTFS}/etc/update-motd.d/"
+# errors cp: cannot create regular file './build/bookworm/armv8/root/etc/polkit-1/localauthority/50-local.d/50-mount-as-pi.pkla': No such file or directory
+# cp -r "${SRC}/volumio/etc/polkit-1/localauthority/50-local.d/50-mount-as-pi.pkla" \
+#   "${ROOTFS}/etc/polkit-1/localauthority/50-local.d/50-mount-as-pi.pkla"
 
 #SSH
 cp "${SRC}/volumio/etc/ssh/sshd_config" "${ROOTFS}/etc/ssh/sshd_config"
@@ -53,7 +45,12 @@ chmod 777 "${ROOTFS}/etc/mpd.conf"
 cp "${SRC}/volumio/etc/systemd/journald.conf" "${ROOTFS}/etc/systemd/journald.conf"
 
 #Volumio SystemD Services
-cp -r "${SRC}"/volumio/lib "${ROOTFS}"/
+# The amount of time I've spend debugging strange things only to realise we overwrite everything with these files.
+# cp -r "${SRC}"/volumio/lib "${ROOTFS}"/
+for service in "${SRC}"/volumio/lib/systemd/system/*.service; do
+  log "Copying ${service}" 
+  cp  "${service}" "${ROOTFS}"/lib/systemd/system/
+done
 
 # Network
 cp -r "${SRC}"/volumio/etc/network/* "${ROOTFS}"/etc/network
@@ -81,6 +78,10 @@ cp -rp "${SRC}"/volumio/usr/* "${ROOTFS}/usr/"
 #CPU TWEAK
 cp "${SRC}/volumio/bin/volumio_cpu_tweak" "${ROOTFS}/bin/volumio_cpu_tweak"
 chmod a+x "${ROOTFS}/bin/volumio_cpu_tweak"
+
+#Welcome
+cp "${SRC}/volumio/bin/welcome" "${ROOTFS}/bin/welcome"
+chmod a+x "${ROOTFS}/bin/welcome"
 
 #LAN HOTPLUG
 cp "${SRC}/volumio/etc/default/ifplugd" "${ROOTFS}/etc/default/ifplugd"
