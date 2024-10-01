@@ -4,12 +4,18 @@ DefaultDependencies=no
 # dracut-shutdown.service restores the initramfs when it is _stopped_
 # use Conflicts to make sure its ExecStop has run before we do
 Conflicts=dracut-shutdown.service
-After=plymouth-halt.service plymouth-reboot.service plymouth-poweroff.service plymouth-kexec.service dracut-shutdown.service
-ConditionPathExists=/run/initramfs/bin/sh
+After=plymouth-halt.service plymouth-reboot.service plymouth-poweroff.service plymouth-kexec.service dracut-shutdown.service mkinitcpio-generate-shutdown-ramfs.service
+ConditionPathExists=|/run/initramfs/bin/sh
+ConditionPathExists=|/run/initramfs/shutdown
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# Emit a blank message to force a dynamic load of all graphics libraries
+# required for rendering text since it's a non-trivially large set, too large
+# to manage manually in the initramfs. This will allow casper to render text
+# like the live media ejection message after the jump...
+ExecStart=-/bin/plymouth message --text=""
 ExecStart=-/bin/plymouth update-root-fs --new-root-dir=/run/initramfs
 Type=oneshot
 RemainAfterExit=yes
