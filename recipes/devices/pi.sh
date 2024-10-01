@@ -49,12 +49,8 @@ UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="no" # yes/no or empty. Replaces default pl
 MODULES=("drm" "fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 # Packages that will be installed
 PACKAGES=(
-	# Framebuffer stuff
-	"fbset"
 	# GPIO stuff
 	# "wiringpi"
-	# Install to disk tools
-	"liblzo2-2" "squashfs-tools"
 )
 
 #Pi Specific
@@ -229,10 +225,6 @@ device_chroot_tweaks_pre() {
 	KERNEL_VERSION=${ksemver}
 	IFS=\. read -ra KERNEL_SEMVER <<<"${KERNEL_VERSION}"
 
-	MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 1)
-	MINOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 2)
-	PATCH_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 3)
-
 	# List of custom firmware -
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
@@ -252,13 +244,8 @@ device_chroot_tweaks_pre() {
 	#fi
 
 	## Comment to keep RPi5 64bit 16k page size kernel
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v8_16k+" ]; then
-		log "Removing v8_16k+ (Pi5 16k) Kernel and modules" "info"
-		rm -rf /boot/kernel_2712.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}-v8_16k+"
-	fi
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]; then
-		log "Removing v8_16k+ (Pi5 16k) Kernel and modules" "info"
+	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]]; then
+		log "Removing v8-16k+ (Pi5 16k) Kernel and modules" "info"
 		rm -rf /boot/kernel_2712.img
 		rm -rf "/lib/modules/${KERNEL_VERSION}-v8-16k+"
 	fi
@@ -278,6 +265,17 @@ device_chroot_tweaks_pre() {
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
 	dpkg -i dhcpcd*.deb
+
+	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/nodejs"
+		Package: dhcpcd
+		Pin: release *
+		Pin-Priority: -1
+
+		Package: dhcpcd-base
+		Pin: release *
+		Pin-Priority: -1
+	EOF
 
 	NODE_VERSION=$(node --version)
 	log "Node version installed:" "dbg" "${NODE_VERSION}"
@@ -341,9 +339,9 @@ device_chroot_tweaks_pre() {
 	log "Updating LD_LIBRARY_PATH" "info"
 	ldconfig
 
-	# Fixing some Debian/sid quirks
-	if dpkg -l libraspberrypi0 &>/dev/null && [[ "$(dpkg --print-architecture)" = armhf ]]; then
-		log "Fixing linker ld-linux-armhf"
+	# libraspberrypi0 normally links this, so counter check and link if required
+	if [[ ! -f /lib/ld-linux.so.3 ]] && [[ "$(dpkg --print-architecture)" = armhf ]]; then
+		log "Linking /lib/ld-linux.so.3"
 		ln -s /lib/ld-linux-armhf.so.3 /lib/ld-linux.so.3 2>/dev/null || true
 		ln -s /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ld-linux.so.3 2>/dev/null || true
 	fi
@@ -382,7 +380,9 @@ device_chroot_tweaks_pre() {
 	done
 
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
-	if [ "$MAJOR_VERSION" -gt 6 ] || { [ "$MAJOR_VERSION" -eq 6 ] && { [ "$MINOR_VERSION" -gt 1 ] || [ "$MINOR_VERSION" -eq 1 ] && [ "$PATCH_VERSION" -ge 54 ]; }; }; then
+	if [[ "${KERNEL_SEMVER[0]}" -gt 6 ]] ||
+		[[ "${KERNEL_SEMVER[0]}" -eq 6 && "${KERNEL_SEMVER[1]}" -gt 1 ]] ||
+		[[ "${KERNEL_SEMVER[0]}" -eq 6 && "${KERNEL_SEMVER[1]}" -eq 1 && "${KERNEL_SEMVER[2]}" -ge 54 ]]; then
 		log "Rename gpiomem in udev rules" "info"
 		sed -i 's/bcm2835-gpiomem/gpiomem/g' /etc/udev/rules.d/99-com.rules
 	fi
