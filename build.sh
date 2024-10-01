@@ -32,9 +32,9 @@ log "Running Volumio Image Builder -" "info"
 function HELP() {
   cat <<-EOF
 Help documentation for Volumio Image Builder
-Basic usage: ./build.sh -b arm -d pi -v 2.0
+Basic usage: ./build.sh -b arm -d pi -v 3.0
 Switches:
-  -s <suite>    Picks a Debian release to target (Defaults to Buster)
+  -s <suite>    Picks a Debian release to target (Defaults to Bullseye)
   -b <arch>     Build a base rootfs with Multistrap.
                 Options for the target architecture are 
   'arm' (Raspbian armhf 32bit), 'armv7' (Debian armhf 32bit), 'armv8' (Debian arm64 64bit) 
@@ -46,8 +46,8 @@ $(printf "\t\t%s\n" "${DEVICE_LIST[@]}")
   -t <variant>  Volumio Variant type.
   -p <dir>      Optionally patch the builder. <dir> should contain a tree of
                 files you want to replace within the build tree. Experts only.
-Example: Build a Raspberry PI image from scratch, version 2.0 :
-         ./build.sh -b arm -d pi -v 2.0
+Example: Build a Raspberry PI image from scratch, version 3.0 :
+         ./build.sh -b arm -d pi -v 3.0
 EOF
   exit 1
 }
