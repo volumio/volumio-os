@@ -10,11 +10,6 @@ umask 0022
 export PATH='/usr/bin:/sbin:/bin'
 
 # Defaults
-# On Debian we can use either busybox or busybox-static, but on Ubuntu
-# and derivatives only busybox-initramfs will work.
-BUSYBOX_PACKAGES='busybox busybox-static'
-BUSYBOX_MIN_VERSION='1:1.22.0-17~'
-
 keep="n"
 CONFDIR="/etc/initramfs-tools"
 verbose="n"
@@ -30,6 +25,7 @@ Usage: mkinitramfs [option]... -o outfile [version]
 Options:
   -c compress	Override COMPRESS setting in initramfs.conf.
   -d confdir	Specify an alternative configuration directory.
+  -l level	Override COMPRESSLEVEL setting in initramfs.conf.
   -k		Keep temporary directory used to make the image.
   -o outfile	Write to outfile.
   -r root	Override ROOT setting in initramfs.conf.
@@ -44,7 +40,7 @@ usage_error() {
   exit 2
 }
 
-OPTIONS=$(getopt -o c:d:hko:r:v --long help -n "$0" -- "$@") || usage_error
+OPTIONS=$(getopt -o c:d:hl:ko:r:v --long help -n "$0" -- "$@") || usage_error
 
 eval set -- "$OPTIONS"
 
@@ -65,6 +61,10 @@ while true; do
   -h | --help)
     usage
     exit 0
+    ;;
+  -l)
+    compresslevel="$2"
+    shift 2
     ;;
   -o)
     outfile="$2"
@@ -136,7 +136,7 @@ done
 
 # Check busybox dependency
 if [ "${BUSYBOX}" = "y" ] && [ -z "${BUSYBOXDIR}" ]; then
-  echo >&2 "E: ${BUSYBOX_PACKAGES}, version ${BUSYBOX_MIN_VERSION} or later, is required but not installed"
+  echo >&2 "E: @BUSYBOX_PACKAGES@, version @BUSYBOX_MIN_VERSION@ or later, is required but not installed"
   exit 1
 fi
 
@@ -156,15 +156,13 @@ build_initramfs() {
   # And by "version" we really mean path to kernel modules
   # This is braindead, and exists to preserve the interface with mkinitrd
   if [ ${#} -ne 1 ]; then
-    echo "No version provided."
-    exit 2
+    version="$(uname -r)"
   else
     version="${1}"
   fi
 
   case "${version}" in
   /lib/modules/*/[!/]*) ;;
-
   /lib/modules/[!/]*)
     version="${version#/lib/modules/}"
     version="${version%%/*}"
@@ -184,25 +182,70 @@ build_initramfs() {
   unset COMPRESS
 
   if ! command -v "${compress}" >/dev/null 2>&1; then
+    echo "W: No ${compress} in ${PATH}, using gzip" >&2
     compress=gzip
-    [ "${verbose}" = y ] &&
-      echo "No ${compress} in ${PATH}, using gzip"
   fi
+
+  # Check that kernel supports selected compressor, and fall back to gzip.
+  # Exit if even gzip is not supported.
+  case "${compress}" in
+  gzip) kconfig_sym=CONFIG_RD_GZIP ;;
+  bzip2) kconfig_sym=CONFIG_RD_BZIP2 ;;
+  lzma) kconfig_sym=CONFIG_RD_LZMA ;;
+  xz) kconfig_sym=CONFIG_RD_XZ ;;
+  lzop) kconfig_sym=CONFIG_RD_LZO ;;
+  lz4) kconfig_sym=CONFIG_RD_LZ4 ;;
+  zstd) kconfig_sym=CONFIG_RD_ZSTD ;;
+  esac
+  while ! grep -q "^$kconfig_sym=y" "/boot/config-${version}"; do
+    if [ "${compress}" = gzip ]; then
+      echo "E: gzip compression ($kconfig_sym) not supported by kernel" >&2
+      exit 1
+    fi
+    echo "W: ${compress} compression ($kconfig_sym) not supported by kernel, using gzip" >&2
+    compress=gzip
+    kconfig_sym=CONFIG_RD_GZIP
+  done
+
+  if [ -z "${compresslevel:-}" ]; then
+    compresslevel=${COMPRESSLEVEL:-}
+  fi
+  case "${compress}" in
+  lz4) compresslevel="-${compresslevel:-9}" ;;
+  zstd) compresslevel="-${compresslevel:-9}" ;;
+  #gzip|xz|bzip2|lzma|lzop included
+  *)
+    # We're not using a compression level by default
+    compresslevel="${compresslevel:+-${compresslevel}}"
+    ;;
+  esac
+  unset COMPRESSLEVEL
 
   case "${compress}" in
   gzip) # If we're doing a reproducible build, use gzip -n
     if [ -n "${SOURCE_DATE_EPOCH}" ]; then
       compress="gzip -n"
-      # Otherwise, substitute pigz if it's available
+    # Otherwise, substitute pigz if it's available
     elif command -v pigz >/dev/null; then
       compress=pigz
     fi
-    compress="${compress} -9"
+    if [ -n "${compresslevel}" ]; then
+      compress="${compress} ${compresslevel}"
+    fi
     ;;
-  lz4) compress="lz4 -9 -l" ;;
-  xz) compress="xz --check=crc32" ;;
+  lz4) compress="lz4 ${compresslevel} -l" ;;
+  zstd)
+    compress="zstd -q ${compresslevel}"
+    # If we're not doing a reproducible build, enable multithreading
+    test -z "${SOURCE_DATE_EPOCH}" && compress="$compress -T0"
+    ;;
+  xz)
+    compress="xz ${compresslevel} --check=crc32"
+    # If we're not doing a reproducible build, enable multithreading
+    test -z "${SOURCE_DATE_EPOCH}" && compress="$compress --threads=0"
+    ;;
   bzip2 | lzma | lzop)
-    # no parameters needed
+    compress="${compress} ${compresslevel}"
     ;;
   *) echo "W: Unknown compression command ${compress}" >&2 ;;
   esac
@@ -225,12 +268,17 @@ build_initramfs() {
   # Prepare to clean up temporary files on exit
   DESTDIR=
   __TMPCPIOGZ=
+  __TMPMAINCPIO=
   __TMPEARLYCPIO=
+  # shellcheck disable=SC2317
   clean_on_exit() {
     if [ "${keep}" = "y" ]; then
-      echo "Working files in ${DESTDIR:-<not yet created>}, early initramfs in ${__TMPEARLYCPIO:-<not yet created>} and overlay in ${__TMPCPIOGZ:-<not yet created>}"
+      echo "Working files in ${DESTDIR:-<not yet created>}," \
+        "early initramfs in ${__TMPEARLYCPIO:-<not yet created>}," \
+        "main initramfs in ${__TMPMAINCPIO:-<not yet created>} and" \
+        "overlay in ${__TMPCPIOGZ:-<not yet created>}"
     else
-      for path in "${DESTDIR}" "${__TMPCPIOGZ}" "${__TMPEARLYCPIO}"; do
+      for path in "${DESTDIR}" "${__TMPCPIOGZ}" "${__TMPMAINCPIO}" "${__TMPEARLYCPIO}"; do
         test -z "${path}" || rm -rf "${path}"
       done
     fi
@@ -243,6 +291,7 @@ build_initramfs() {
   DESTDIR="$(mktemp -d "${TMPDIR:-/var/tmp}/mkinitramfs_XXXXXX")" || exit 1
   chmod 755 "${DESTDIR}"
   __TMPCPIOGZ="$(mktemp "${TMPDIR:-/var/tmp}/mkinitramfs-OL_XXXXXX")" || exit 1
+  __TMPMAINCPIO="$(mktemp "${TMPDIR:-/var/tmp}/mkinitramfs-MAIN_XXXXXX")" || exit 1
   __TMPEARLYCPIO="$(mktemp "${TMPDIR:-/var/tmp}/mkinitramfs-FW_XXXXXX")" || exit 1
 
   DPKG_ARCH=$(dpkg --print-architecture)
@@ -259,6 +308,7 @@ build_initramfs() {
   export MODULES
   export BUSYBOX
   export RESUME
+  export FSTYPE
 
   # Private, used by 'catenate_cpiogz'.
   export __TMPCPIOGZ
@@ -276,8 +326,10 @@ build_initramfs() {
     mkdir -p "${DESTDIR}/${d}"
   done
 
-  # Copy in modules.builtin and modules.order (not generated by depmod)
-  for x in modules.builtin modules.order; do
+  # Copy in modules.builtin, modules.builtin.modinfo and modules.order (not generated by depmod)
+  # and modules.builtin.bin (generated by depmod, but too late to avoid
+  # error messages as in #948257)
+  for x in modules.builtin modules.builtin.bin modules.builtin.modinfo modules.order; do
     if [ -f "${MODULESDIR}/${x}" ]; then
       cp -p "${MODULESDIR}/${x}" "${DESTDIR}${MODULESDIR}/${x}"
     fi
@@ -315,10 +367,13 @@ build_initramfs() {
   # Resolve hidden dependencies
   hidden_dep_add_modules
 
+  # Add firmware for built-in code
+  add_builtin_firmware
+
   # First file executed by linux
   cp -p /usr/share/initramfs-tools/init "${DESTDIR}/init"
 
-  # add existing boot scripts
+  # add existant boot scripts
   for b in $(cd /usr/share/initramfs-tools/scripts/ && find . \
     -regextype posix-extended -regex '.*/[[:alnum:]\._-]+$' -type f); do
     [ -d "${DESTDIR}/scripts/$(dirname "${b}")" ] ||
@@ -364,21 +419,30 @@ build_initramfs() {
     fi
   done
 
-  # workaround: libgcc always needed on old-abi arm
-  if [ "$DPKG_ARCH" = arm ] || [ "$DPKG_ARCH" = armeb ]; then
-    cp -a /lib/libgcc_s.so.1 "${DESTDIR}/lib/"
-  fi
-
   run_scripts /usr/share/initramfs-tools/hooks
   run_scripts "${CONFDIR}"/hooks
-
-  # Avoid double sleep when using older udev scripts
-  # shellcheck disable=SC2016
-  sed -i 's/^\s*sleep \$ROOTDELAY$/:/' "${DESTDIR}/scripts/init-top/udev"
 
   # cache boot run order
   for b in $(cd "${DESTDIR}/scripts" && find . -mindepth 1 -type d); do
     cache_run_scripts "${DESTDIR}" "/scripts/${b#./}"
+  done
+
+  # decompress modules for boot speed, if possible
+  find "${DESTDIR}/${MODULESDIR}" -name '*.ko.*' | while read -r ko; do
+    case "$ko" in
+    *.xz)
+      if ! command -v xz >/dev/null 2>&1; then
+        break
+      fi
+      xz -d "${ko}"
+      ;;
+    *.zst)
+      if ! command -v zstd >/dev/null 2>&1; then
+        break
+      fi
+      zstd -q -d --rm "${ko}"
+      ;;
+    esac
   done
 
   # generate module deps
@@ -386,7 +450,7 @@ build_initramfs() {
   rm -f "${DESTDIR}/lib/modules/${version}"/modules.*map
 
   # make sure that library search path is up to date
-  cp -ar /etc/ld.so.conf* "$DESTDIR"/etc/
+  cp -pPr /etc/ld.so.conf* "$DESTDIR"/etc/
   if ! ldconfig -r "$DESTDIR"; then
     [ "$(id -u)" != "0" ] &&
       echo "ldconfig might need uid=0 (root) for chroot()" >&2
@@ -403,31 +467,7 @@ build_initramfs() {
     copy_file DSDT "${CONFDIR}/DSDT.aml"
   fi
 
-  # Make sure there is a final sh in initramfs
-  if [ ! -e "${DESTDIR}/bin/sh" ]; then
-    copy_exec /bin/sh "${DESTDIR}/bin/"
-  fi
-
-  # dirty hack for armhf's double-linker situation; if we have one of
-  # the two known eglibc linkers, nuke both and re-create sanity
-  if [ "$DPKG_ARCH" = armhf ]; then
-    if [ -e "${DESTDIR}/lib/arm-linux-gnueabihf/ld-linux.so.3" ] ||
-      [ -e "${DESTDIR}/lib/ld-linux-armhf.so.3" ]; then
-      rm -f "${DESTDIR}/lib/arm-linux-gnueabihf/ld-linux.so.3"
-      rm -f "${DESTDIR}/lib/ld-linux-armhf.so.3"
-      cp -aL /lib/ld-linux-armhf.so.3 "${DESTDIR}/lib/"
-      ln -sf /lib/ld-linux-armhf.so.3 "${DESTDIR}/lib/arm-linux-gnueabihf/ld-linux.so.3"
-    fi
-  fi
-
   [ "${verbose}" = y ] && echo "Building cpio ${outfile} initramfs"
-
-  if [ -s "${__TMPEARLYCPIO}" ]; then
-    cat "${__TMPEARLYCPIO}" >"${outfile}" || exit 1
-  else
-    # truncate
-    true >"${outfile}"
-  fi
 
   (
     # preserve permissions if root builds the image, see #633582
@@ -444,10 +484,9 @@ build_initramfs() {
     fi
 
     # work around lack of "set -o pipefail" for the following pipe:
-    # cd "${DESTDIR}" && find . | LC_ALL=C sort | cpio --quiet $cpio_owner_root $cpio_reproducible -o -H newc | gzip >>"${outfile}" || exit 1
+    # cd "${DESTDIR}" && find . | LC_ALL=C sort | cpio --quiet $cpio_owner_root $cpio_reproducible -o -H newc >>"${outfile}" || exit 1
     ec1=1
     ec2=1
-    ec3=1
     exec 3>&1
     eval "$(
       # http://cfaj.freeshell.org/shell/cus-faq-2.html
@@ -460,28 +499,35 @@ build_initramfs() {
         LC_ALL=C sort
       } | {
         # shellcheck disable=SC2086
-        cpio --quiet $cpio_owner_root $cpio_reproducible -o -H newc 4>&-
+        cpio --quiet $cpio_owner_root $cpio_reproducible -o -H newc 4>&- >"${__TMPMAINCPIO}"
         echo "ec2=$?;" >&4
-      } | ${compress} >>"${outfile}"
-      echo "ec3=$?;" >&4
+      }
     )"
     if [ "$ec1" -ne 0 ]; then
-      echo "E: mkinitramfs failure find $ec1 cpio $ec2 $compress $ec3" >&2
+      echo "E: mkinitramfs failure find $ec1 cpio $ec2" >&2
       exit "$ec1"
     fi
     if [ "$ec2" -ne 0 ]; then
-      echo "E: mkinitramfs failure cpio $ec2 $compress $ec3" >&2
+      echo "E: mkinitramfs failure cpio $ec2" >&2
       exit "$ec2"
-    fi
-    if [ "$ec3" -ne 0 ]; then
-      echo "E: mkinitramfs failure $compress $ec3" >&2
-      exit "$ec3"
     fi
   ) || exit 1
 
-  if [ -s "${__TMPCPIOGZ}" ]; then
-    cat "${__TMPCPIOGZ}" >>"${outfile}" || exit 1
-  fi
+  {
+    if [ -s "${__TMPEARLYCPIO}" ]; then
+      cat "${__TMPEARLYCPIO}" || exit 1
+    fi
+
+    $compress -c "${__TMPMAINCPIO}" ||
+      {
+        echo "E: mkinitramfs failure $compress $?" >&2
+        exit 1
+      }
+
+    if [ -s "${__TMPCPIOGZ}" ]; then
+      cat "${__TMPCPIOGZ}" || exit 1
+    fi
+  } >"${outfile}" || exit 1
 
 }
 
@@ -496,6 +542,8 @@ build_volumio_initramfs() {
   num_ker_max=4
 
   log "Found ${#versions[@]} kernel version(s)" "${versions[*]}" "info"
+  CMP=${COMPRESS?}
+  log "Defauting to ${CMP} for initramfs compression"
   for ver in "${!versions[@]}"; do
     if [[ $ver -gt $num_ker_max ]]; then
       log "Using only ${num_ker_max} kernels" "wrn"
@@ -503,6 +551,8 @@ build_volumio_initramfs() {
       break
     fi
     log "Building intramsfs for Kernel[${ver}]: ${versions[ver]}" "info"
+    unset compresslevel
+    compress=${CMP}
     build_initramfs "${versions[ver]}"
     log "initramfs built for Kernel[${ver}]: ${versions[ver]} at ${DESTDIR}" "okay"
     if [[ $ver -eq 0 ]]; then
@@ -512,11 +562,7 @@ build_volumio_initramfs() {
       log "Copying modules from ${DESTDIR} to ${DESTDIR_VOL}"
       cp -rf "${DESTDIR}/lib/modules/${versions[ver]}" \
         "${DESTDIR_VOL}/lib/modules/${versions[ver]}"
-    fi
-    if [[ $ver -gt $num_ker_max-1 ]]; then
-      log "Using only ${num_ker_max} kernels" "wrn"
-      break
-    fi
+    fi    
   done
   # Set correct final tmp/mkinitramfs_XXXXXX
   DESTDIR=${DESTDIR_VOL}

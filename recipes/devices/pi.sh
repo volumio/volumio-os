@@ -520,14 +520,25 @@ device_chroot_tweaks_pre() {
 		${kernel_params[@]}
 	EOF
 
-	# Rerun depmod for new drivers
-	log "Finalising drivers installation with depmod on ${KERNEL_VERSION}+,-v7+, v7l+ and v8+" "info"
-	depmod "${KERNEL_VERSION}+"     # Pi 1, Zero, Compute Module
-	depmod "${KERNEL_VERSION}-v7+"  # Pi 2,3 CM3
-	depmod "${KERNEL_VERSION}-v7l+" # Pi 4 CM4
-	depmod "${KERNEL_VERSION}-v8+"  # Pi 4,5 CM4 64bit
-	#depmod "${KERNEL_VERSION}-v8-16k+"  # Pi 4,5 CM4 64bit
+	log "Finalise all kenerls with depmod and other tricks" "info"
+	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
+	# + 	--> Pi 1,Zero,ZeroW, and CM 1
+	# -v7+  --> Pi 2,3,3+,Zero 2W, CM3, and CM3+
+	# -v7l+ --> Pi 4,400, CM 4 (32bit)
+	# -v8+  --> Pi 3,3+,4,400, Zero 2W, CM 3,3+,4 (64bit)
 
+	## Reconfirm our final kernel lists - we may have deleted a few!
+	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
+	mapfile -t kver < <(ls -t /lib/modules | sort)
+	for ver in "${kver[@]}"; do
+		log "Running depmod on" "${ver}"
+		depmod "${ver}"
+		# Trick our non std kernel install with the right bits for intramfs creation
+		cat <<-EOF >"/boot/config-${ver}"
+			CONFIG_RD_ZSTD=y
+			CONFIG_RD_GZIP=y
+		EOF
+	done
 	log "Raspi Kernel and Modules installed" "okay"
 
 }
