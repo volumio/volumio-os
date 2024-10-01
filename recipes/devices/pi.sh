@@ -33,26 +33,32 @@ KIOSKMODE=no
 ## Partition info
 BOOT_START=0
 BOOT_END=96
-BOOT_TYPE=msdos   # msdos or gpt
-BOOT_USE_UUID=yes # Add UUID to fstab
+BOOT_TYPE=msdos    # msdos or gpt
+BOOT_USE_UUID=yes  # Add UUID to fstab
 INIT_TYPE="initv3"
 
 ## Plymouth theme management
-PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
-INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
+PLYMOUTH_THEME="volumio-player"	# Choices are: {volumio,volumio-logo,volumio-player}
+INIT_PLYMOUTH_DISABLE="no"		# yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
 ## TODO: for any KMS DRM panel mudule, which does not create frambuffer bridge, set this variable to yes, otherwise no
 ## Implement an if/else statement to handle this properly
-UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="no" # yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
+UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="yes"	# yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
 
 # Modules that will be added to initramfs
-MODULES=("drm" "fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
+MODULES=("drm" "drm_rp1_dsi" "panel_simple" "backlight" "v3d" "vc4" "fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 # Packages that will be installed
-PACKAGES=(
+PACKAGES=( # Bluetooth packages
+	"bluez" "bluez-firmware" "pi-bluetooth"
+	# Foundation stuff
+	"raspberrypi-sys-mods"
 	# Framebuffer stuff
-	"fbset"
+	"fbset"	
+	# "rpi-eeprom"\ Needs raspberrypi-bootloader that we hold back
 	# GPIO stuff
-	# "wiringpi"
+	# "wiringpi"	
+	# Wireless firmware
+	"firmware-atheros" "firmware-ralink" "firmware-realtek" "firmware-brcm80211"
 	# Install to disk tools
 	"liblzo2-2" "squashfs-tools"
 )
@@ -95,6 +101,10 @@ write_device_bootloader() {
 
 # Will be called by the image builder for any customisation
 device_image_tweaks() {
+	# log "Custom dtoverlay pre and post" "ext"
+	# mkdir -p "${ROOTFSMNT}/opt/vc/bin/"
+	# cp -rp "${SRC}"/volumio/opt/vc/bin/* "${ROOTFSMNT}/opt/vc/bin/"
+
 	log "Fixing hostapd.conf" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/hostapd/hostapd.conf"
 		interface=wlan0
@@ -116,9 +126,9 @@ device_image_tweaks() {
 
 	log "Adding archive.raspberrypi debian repo" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/sources.list.d/raspi.list"
-		deb http://archive.raspberrypi.org/debian/ ${SUITE} main
+		deb http://archive.raspberrypi.org/debian/ bookworm main
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
-		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main
+		#deb-src http://archive.raspberrypi.org/debian/ bookworm main
 	EOF
 
 	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files
@@ -141,16 +151,27 @@ device_image_tweaks() {
 		Pin-Priority: -1
 	EOF
 
+	log "Blocking raspberrypi dhcpd version" "info"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/raspberrypi-dhcpd"
+		Package: dhcpcd
+		Pin: release *
+		Pin-Priority: -1
+
+		Package: dhcpcd-base
+		Pin: release *
+		Pin-Priority: -1
+	EOF
+
 	log "Fetching rpi-update" "info"
-	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://raw.githubusercontent.com/volumioteam/rpi-update/master/rpi-update &&
+	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://raw.githubusercontent.com/raspberrypi/rpi-update/master/rpi-update &&
 		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
 	#TODO: Look into moving kernel stuff outside chroot using ROOT/BOOT_PATH to speed things up
 	# ROOT_PATH=${ROOTFSMNT}
 	# BOOT_PATH=${ROOT_PATH}/boot
 
 	log "Copying custom initramfs script functions" "cfg"
-	[ -d "${ROOTFSMNT}"/root/scripts ] || mkdir "${ROOTFSMNT}"/root/scripts
-	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" "${ROOTFSMNT}"/root/scripts
+	[ -d ${ROOTFSMNT}/root/scripts ] || mkdir ${ROOTFSMNT}/root/scripts
+	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" ${ROOTFSMNT}/root/scripts
 }
 
 # Will be run in chroot (before other things)
@@ -166,14 +187,9 @@ device_chroot_tweaks() {
 device_chroot_tweaks_pre() {
 	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
 	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
-
 	## Define parameters
 	declare -A PI_KERNELS=(
 		#[KERNEL_VERSION]="SHA|Branch|Rev"
-		[5.10.92]="ea9e10e531a301b3df568dccb3c931d52a469106|stable|1514"
-		[5.10.95]="770ca2c26e9cf341db93786d3f03c89964b1f76f|master|1521"
-		[5.15.84]="a99e144e939bf93bbd03e8066601a8d3eae640f7|stable|1613"
-		[5.15.92]="f5c4fc199c8d8423cb427e509563737d1ac21f3c|master|1627"
 		[6.1.19]="fa51258e0239eaf68d9dff9c156cec3a622fbacc|stable|1637"
 		[6.1.21]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1642"
 		[6.1.47]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1674"
@@ -184,9 +200,11 @@ device_chroot_tweaks_pre() {
 		[6.1.69]="ec8e8136d773de83e313aaf983e664079cce2815|master|1710"
 		[6.1.70]="fc9319fda550a86dc6c23c12adda54a0f8163f22|master|1712"
 		[6.1.77]="5fc4f643d2e9c5aa972828705a902d184527ae3f|master|1730"
+		[6.6.30]="3b768c3f4d2b9a275fafdb53978f126d7ad72a1a|master|1763"
+		[6.6.47]="a0d314ac077cda7cbacee1850e84a57af9919f94|master|1792"
 	)
 	# Version we want
-	KERNEL_VERSION="6.1.69"
+	KERNEL_VERSION="6.6.47"
 
 	MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 1)
 	MINOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 2)
@@ -218,12 +236,13 @@ device_chroot_tweaks_pre() {
 	# List of custom firmware -
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
-		# [AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
-		# [TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
-		# [Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
-		# [wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
-		# [brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
-		# [PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
+		[AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
+		[TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
+		[Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
+		[wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
+		[brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
+		[PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
+		[RPiUserlandTools]="https://github.com/volumio/volumio3-os-static-assets/raw/master/tools/rpi-softfp-vc.tar.gz"
 	)
 
 	### Kernel installation
@@ -233,7 +252,19 @@ device_chroot_tweaks_pre() {
 	# using rpi-update to fetch and install kernel and firmware
 	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
-	echo y | SKIP_BACKUP=1 WANT_32BIT=1 WANT_64BIT=1 WANT_PI4=1 WANT_PI5=0 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 BRANCH=${KERNEL_BRANCH} /usr/bin/rpi-update "${KERNEL_COMMIT}"
+	echo y | SKIP_BACKUP=1 WANT_32BIT=1 WANT_64BIT=1 WANT_PI4=1 WANT_PI5=1 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 SKIP_BOOTLOADER=1 /usr/bin/rpi-update "${KERNEL_COMMIT}"
+
+	log "Adding Custom firmware from github" "info"
+	for key in "${!CustomFirmware[@]}"; do
+		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
+			log "Failed to get firmware:" "err" "${key}"
+			rm "$key.tar.gz"
+			continue
+		}
+		log "Skipping extraction that causes ld-linux-armhf.so.3 issues" "wrn"
+		#tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
+		#rm "$key.tar.gz"
+	done
 
 	## Comment to keep RPi4/RPi5 64bit kernel
 	#if [ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]; then
@@ -257,19 +288,26 @@ device_chroot_tweaks_pre() {
 	log "Finished Kernel installation" "okay"
 
 	### Other Rpi specific stuff
-	
-	## Lets update some packages from raspbian repos now
-	apt-get update && apt-get -y upgrade
+	log "Installing fake libraspberrypi0 package" "info"
+	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/libraspberrypi0/libraspberrypi0_1.20230509-buster-1_armhf.deb
+	dpkg -i libraspberrypi0_1.20230509-buster-1_armhf.deb
+	rm libraspberrypi0_1.20230509-buster-1_armhf.deb
 
-	# https://github.com/volumio/volumio3-os/issues/174
-	## Quick fix for dhcpcd in Raspbian vs Debian
-	log "Raspbian vs Debian dhcpcd debug "
-	apt-get remove dhcpcd -yy && apt-get autoremove
-	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
-	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd_9.4.1-24~deb12u4_all.deb
+	log "Installing latest wiringpi package" "info"
+	wget -nv https://github.com/WiringPi/WiringPi/releases/download/3.10/wiringpi_3.10_armhf.deb
+	dpkg -i wiringpi_3.10_armhf.deb
+	rm wiringpi_3.10_armhf.deb
+
+	log "Installing Debian dhcpd package" "info"
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
-	dpkg -i dhcpcd*.deb
+	dpkg -i dhcpcd_9.4.1-24~deb12u4_all.deb
+	dpkg -i dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
+	rm dhcpcd_9.4.1-24~deb12u4_all.deb
+	rm dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
+
+	## Lets update some packages from raspbian repos now
+	apt-get update && apt-get -y upgrade
 
 	NODE_VERSION=$(node --version)
 	log "Node version installed:" "dbg" "${NODE_VERSION}"
@@ -333,45 +371,19 @@ device_chroot_tweaks_pre() {
 	log "Updating LD_LIBRARY_PATH" "info"
 	ldconfig
 
-	# Fixing some Debian/sid quirks
-	if dpkg -l libraspberrypi0 &>/dev/null && [[ "$(dpkg --print-architecture)" = armhf ]]; then
-		log "Fixing linker ld-linux-armhf"
-		ln -s /lib/ld-linux-armhf.so.3 /lib/ld-linux.so.3 2>/dev/null || true
-		ln -s /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ld-linux.so.3 2>/dev/null || true
-	fi
-	
 	log "Symlinking vc bins" "info"
-	# Clean this up! > Quoting popcornmix "Code from here is no longer installed on latest RPiOS Bookworm images.If you are using code from here you should rethink your solution.Consider this repo closed."
 	# https://github.com/RPi-Distro/firmware/blob/debian/debian/libraspberrypi-bin.links
 	VC_BINS=("edidparser" "raspistill" "raspivid" "raspividyuv" "raspiyuv"
 		"tvservice" "vcdbg" "vchiq_test"
 		"dtoverlay-pre" "dtoverlay-post")
-
 	for bin in "${VC_BINS[@]}"; do
-		if [[ ! -f /usr/bin/${bin} && -f /opt/vc/bin/${bin} ]]; then
-			ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
-			log "Linked ${bin}"
-		else
-			log "${bin} wasn't linked!" "wrn"
-		fi
+		ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
 	done
 
 	log "Fixing vcgencmd permissions" "info"
 	cat <<-EOF >/etc/udev/rules.d/10-vchiq.rules
 		SUBSYSTEM=="vchiq",GROUP="video",MODE="0660"
 	EOF
-
-	# All additional drivers
-	log "Adding Custom firmware from github" "info"
-	for key in "${!CustomFirmware[@]}"; do
-		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
-			log "Failed to get firmware:" "err" "${key}"
-			rm "$key.tar.gz"
-			continue
-		}
-		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
-		rm "$key.tar.gz"
-	done
 
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
 	if [ "$MAJOR_VERSION" -gt 6 ] || { [ "$MAJOR_VERSION" -eq 6 ] && { [ "$MINOR_VERSION" -gt 1 ] || [ "$MINOR_VERSION" -eq 1 ] && [ "$PATCH_VERSION" -ge 54 ]; }; }; then
@@ -522,9 +534,9 @@ device_chroot_tweaks_post() {
 # Will be called by the image builder post the chroot, before finalisation
 device_image_tweaks_post() {
 	log "Running device_image_tweaks_post" "ext"
-	# Plymouth systemd services OVERWRITE
-	if [[ "${UPDATE_PLYMOUTH_SERVICES}" == yes ]]; then
-		log "Updating plymouth systemd services" "info"
-		cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
+    # Plymouth systemd services OVERWRITE
+	if [[ "${UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM}" == yes ]]; then
+        log "Updating plymouth systemd services" "info"
+        cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
 	fi
 }
