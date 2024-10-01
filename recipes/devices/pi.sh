@@ -43,10 +43,12 @@ INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initializati
 
 ## TODO: for any KMS DRM panel mudule, which does not create frambuffer bridge, set this variable to yes, otherwise no
 ## Implement an if/else statement to handle this properly
-UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="no" # yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
+UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="yes" # yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
 
 # Modules that will be added to initramfs
-MODULES=("drm" "fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
+MODULES=(
+	"drm" "drm_rp1_dsi" "panel_simple" "backlight" "v3d" "vc4" # Modules for Direct Rendering Manager with Plymouth
+	"fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 # Packages that will be installed
 PACKAGES=(
 	# GPIO stuff
@@ -210,6 +212,9 @@ device_chroot_tweaks() {
 # Will be run in chroot - Pre initramfs
 # TODO Try and streamline this!
 device_chroot_tweaks_pre() {
+	# !Warning!
+	# This will break proper plymouth on DSI screens at boot time.
+	# initramfs plymouth hook will not copy drm gpu drivers for list!.
 	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
 	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
 
@@ -531,7 +536,7 @@ device_chroot_tweaks_post() {
 device_image_tweaks_post() {
 	log "Running device_image_tweaks_post" "ext"
 	# Plymouth systemd services OVERWRITE
-	if [[ "${UPDATE_PLYMOUTH_SERVICES}" == yes ]]; then
+	if [[ "${UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM}" == yes ]]; then
 		log "Updating plymouth systemd services" "info"
 		cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
 	fi
