@@ -52,7 +52,7 @@ MODULES=(
 # Packages that will be installed
 PACKAGES=(
 	# GPIO stuff
-	# "wiringpi"
+	# "wiringpi" # --> Not in repo, grabbing from github release
 )
 
 #Pi Specific
@@ -281,6 +281,10 @@ device_chroot_tweaks_pre() {
 		Pin: release *
 		Pin-Priority: -1
 	EOF
+
+	log "Installing WiringPi 3.10 package" "info"
+	wget -nv https://github.com/WiringPi/WiringPi/releases/download/3.10/wiringpi_3.10_armhf.deb
+	dpkg -i wiringpi_3.10_armhf.deb && rm wiringpi_3.10_armhf.deb
 
 	NODE_VERSION=$(node --version)
 	log "Node version installed:" "dbg" "${NODE_VERSION}"
