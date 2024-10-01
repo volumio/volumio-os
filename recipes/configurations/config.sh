@@ -7,13 +7,13 @@ declare -A SecureApt=(
   [lesbonscomptes.gpg]="https://www.lesbonscomptes.com/pages/lesbonscomptes.gpg"
   #TODO Not needed for arm64 and x86
   [raspbian.gpg]="https://archive.raspbian.org/raspbian.public.key"
-  [raspberrypi.gpg]="http://archive.raspberrypi.org/debian/raspberrypi.gpg.key"
+  [raspberrypi.gpg]="http://archive.raspberrypi.com/debian/raspberrypi.gpg.key"
 )
 
 # Repo locations that are utilised to create source.list in the rootfs
 declare -A APTSOURCE=(
   [Debian]="http://deb.debian.org/debian"
-  [Raspbian]="http://raspbian.raspberrypi.org/raspbian/"
+  [Raspbian]="http://raspbian.raspberrypi.com/raspbian/"
 )
 
 ## Path to the volumio repo

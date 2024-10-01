@@ -139,9 +139,9 @@ device_image_tweaks() {
 
 	log "Adding archive.raspberrypi debian repo" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/sources.list.d/raspi.list"
-		deb http://archive.raspberrypi.org/debian/ ${SUITE} main
+		deb http://archive.raspberrypi.com/debian/ ${SUITE} main
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
-		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main
+		#deb-src http://archive.raspberrypi.com/debian/ ${SUITE} main
 	EOF
 
 	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files and break Volumio.
