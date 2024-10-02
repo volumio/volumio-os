@@ -6,6 +6,6 @@ Before=sysinit.target
 ConditionPathExists=!/etc/initrd-release
 
 [Service]
-ExecStart=-/bin/plymouth update-root-fs --read-write
+ExecStart=-/usr/bin/plymouth update-root-fs --read-write
 Type=oneshot
 RemainAfterExit=yes

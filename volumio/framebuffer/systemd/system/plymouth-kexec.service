@@ -9,7 +9,7 @@ ConditionKernelCommandLine=splash
 ConditionVirtualization=!container
 
 [Service]
-ExecStart=/sbin/plymouthd --mode=shutdown --attach-to-session
-ExecStartPost=-/bin/plymouth show-splash
+ExecStart=/usr/sbin/plymouthd --mode=shutdown --attach-to-session
+ExecStartPost=-/usr/bin/plymouth show-splash
 Type=forking
 RemainAfterExit=yes
