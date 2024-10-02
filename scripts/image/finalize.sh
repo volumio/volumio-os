@@ -67,22 +67,19 @@ for path in "${share_dirs[@]}"; do
   log "${path}:" "Pre: ${pre_size[$path]} Post: $(check_size "/usr/share/${path}")"
 done
 
-#TODO: This doesn't seem to be doing much atm
-log "Stripping binaries"
-STRP_DIRECTORIES=("${ROOTFSMNT}/lib/"
-  "${ROOTFSMNT}/bin/"
-  "${ROOTFSMNT}/usr/sbin"
-  "${ROOTFSMNT}/usr/local/bin/"
-  "${ROOTFSMNT}/lib/modules/")
+# #Note: Binaries seem to be pre stripped, and we waste build time here.
+# log "Stripping binaries"
+# STRP_DIRECTORIES=("${ROOTFSMNT}/lib/"
+#   "${ROOTFSMNT}/bin/"
+#   "${ROOTFSMNT}/usr/sbin"
+#   "${ROOTFSMNT}/usr/local/bin/"
+#   "${ROOTFSMNT}/lib/modules/")
 
-for DIR in "${STRP_DIRECTORIES[@]}"; do
-  log "${DIR} Pre  size" "$(check_size "${DIR}")"
-  find "${DIR}" -type f -exec strip --strip-unneeded {} ';' >/dev/null 2>&1
-  log "${DIR} Post size" "$(check_size "${DIR}")"
-done
-# else
-#   log "${BUILD} environment detected, not cleaning/stripping libs"
-# fi
+# for DIR in "${STRP_DIRECTORIES[@]}"; do
+#   log "${DIR} Pre  size" "$(check_size "${DIR}")"
+#   find "${DIR}" -type f -exec strip --strip-unneeded {} ';' >/dev/null 2>&1
+#   log "${DIR} Post size" "$(check_size "${DIR}")"
+# done
 
 log "Checking rootfs size"
 log "Rootfs:" "$(check_size "${ROOTFSMNT}")"
