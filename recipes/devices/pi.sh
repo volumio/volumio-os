@@ -274,7 +274,7 @@ device_chroot_tweaks_pre() {
 	dpkg -i dhcpcd*.deb
 
 	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
-	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/nodejs"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/dhcpcd"
 		Package: dhcpcd
 		Pin: release *
 		Pin-Priority: -1
