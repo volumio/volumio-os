@@ -63,15 +63,15 @@ ${mod_list}
 EOF
 
 ## Adding board specific packages
+apt-get update
 if [[ -n "${PACKAGES[*]}" ]]; then
   log "Installing ${#PACKAGES[@]} board packages:" "" "${PACKAGES[*]}"
-  apt-get update
   apt-get install -y "${PACKAGES[@]}" --no-install-recommends
 else
   log "No board packages specified for install" "wrn"
 fi
 
-# Custom packages for Volumio
+# Display stuff
 if [[ "${DISABLE_DISPLAY}" == "yes" ]]; then
   log "Adapting recipe for device with no display capabilities" "cfg"
   # Remove plymouth-label
@@ -79,9 +79,12 @@ if [[ "${DISABLE_DISPLAY}" == "yes" ]]; then
   # TODO: Check our kernel parameters has nosplash set.
 fi
 
-#TODO THIS SHALL RUN ONLY FOR SOME DEVICES WHERE WE WANT TO INSTALL KIOSK
-#TODO: This shall happen before configure.sh which substitutes conf files
-[ -f "/install-kiosk.sh" ] && log "Installing kiosk" "info" && bash install-kiosk.sh
+# # Custom pre-device packages
+[[ -f "/install-kiosk.sh" ]] && {
+  log "Installing kiosk" "info" "{KIOSKBROWSER}"
+  bash install-kiosk.sh
+}
+
 if [[ -d "/volumio/customPkgs" ]] && [[ $(ls /volumio/customPkgs/*.deb 2>/dev/null) ]]; then
   log "Installing Volumio customPkgs" "info"
   for deb in /volumio/customPkgs/*.deb; do
@@ -162,9 +165,6 @@ systemctl disable mpd.socket
 log "Entering device_chroot_tweaks_pre" "cfg"
 device_chroot_tweaks_pre
 
-log "Cleaning APT Cache and remove policy file" "info"
-rm -f /var/lib/apt/lists/*archive*
-apt-get clean
 # rm /usr/sbin/policy-rc.d
 [[ -d /volumio/customPkgs ]] && rm -r "/volumio/customPkgs"
 [[ -f /install-kiosk.sh ]] && rm "/install-kiosk.sh"
@@ -175,11 +175,11 @@ if [[ -n "${PLYMOUTH_THEME}" ]]; then
 fi
 
 if [[ -n "${PLYMOUTH_THEME}" ]]; then
-log "Setting plymouthd.defaults theme to ${PLYMOUTH_THEME}" "info"
-echo "[Daemon]
+  log "Setting plymouthd.defaults theme to ${PLYMOUTH_THEME}" "info"
+  echo "[Daemon]
 Theme=${PLYMOUTH_THEME}
 ShowDelay=0
-DeviceTimeout=6">/usr/share/plymouth/plymouthd.defaults
+DeviceTimeout=6" >/usr/share/plymouth/plymouthd.defaults
 fi
 
 # Fix services for tmpfs logs
@@ -237,6 +237,10 @@ log "Finished creating initramfs" "okay" "$(check_size "/boot/volumio.initrd")"
 
 log "Entering device_chroot_tweaks_post" "cfg"
 device_chroot_tweaks_post
+
+log "Cleaning APT Cache and remove policy file" "info"
+rm -f /var/lib/apt/lists/*archive*
+apt-get clean
 
 # Check permissions again
 log "Checking dir owners again"

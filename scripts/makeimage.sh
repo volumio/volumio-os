@@ -210,12 +210,11 @@ if [[ "${INIT_PLYMOUTH_DISABLE}" == yes ]]; then
 fi
 
 if [[ "${KIOSKMODE}" == yes ]]; then
-  if [[ "${KIOSKBROWSER}" == vivaldi ]]; then
-    log "Copying Vivaldi kiosk scripts to rootfs"
-    cp "${SRC}/scripts/components/install-kiosk-vivaldi.sh" "${ROOTFSMNT}"/install-kiosk.sh
+  if [[ -f "${SRC}/scripts/components/install-kiosk-${KIOSKBROWSER:=chromium}.sh" ]]; then
+    log "Copying scripts to rootfs" "${KIOSKBROWSER}"
+    cp "${SRC}/scripts/components/install-kiosk-${KIOSKBROWSER}.sh" "${ROOTFSMNT}"/install-kiosk.sh
   else
-    log "Copying Chromium kiosk scripts to rootfs"
-    cp "${SRC}/scripts/components/install-kiosk.sh" "${ROOTFSMNT}"/install-kiosk.sh
+    log "Kioskmode enabled, but install-kiosk-${KIOSKBROWSER} was not found!" "err"
   fi
 fi
 
@@ -246,8 +245,8 @@ UINITRD_ARCH="${UINITRD_ARCH}"
 KERNEL_VERSION="${KERNEL_VERSION}"
 DEBUG_IMAGE="${DEBUG_IMAGE:-no}"
 KIOSKMODE="${KIOSKMODE:-no}"
-KIOSKBROWSER="${KIOSKBROWSER:-chromium}"
-KIOSKINSTALL="${KIOSKMODE:-install-kiosk.sh}"
+KIOSKBROWSER="${KIOSKBROWSER}"
+KIOSKINSTALL="${KIOSKMODE:-install-kiosk-${KIOSKBROWSER}.sh}"
 VARIANT=${VARIANT}
 VOLVARIANT="${VOLVARIANT:-volumio}"
 BOOT_FS_SPEC=${BOOT_FS_SPEC}
