@@ -60,13 +60,6 @@ RpiRepo="https://github.com/raspberrypi/rpi-firmware"
 RpiUpdateRepo="raspberrypi/rpi-update"
 declare -A PI_KERNELS=(
 	#[KERNEL_VERSION]="SHA|Branch|Rev"
-	[5.10.92]="ea9e10e531a301b3df568dccb3c931d52a469106|stable|1514"
-	[5.10.95]="770ca2c26e9cf341db93786d3f03c89964b1f76f|master|1521"
-	[5.15.84]="a99e144e939bf93bbd03e8066601a8d3eae640f7|stable|1613"
-	[5.15.92]="f5c4fc199c8d8423cb427e509563737d1ac21f3c|master|1627"
-	[6.1.19]="fa51258e0239eaf68d9dff9c156cec3a622fbacc|stable|1637"
-	[6.1.21]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1642"
-	[6.1.47]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1674"
 	[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
 	[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
 	[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"
@@ -196,7 +189,7 @@ device_image_tweaks() {
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
 	RpiUpdate_args=("UPDATE_SELF=0" "ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
 		"SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
-		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=0"
+		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=1"
 		# "BRANCH=${KERNEL_BRANCH}"
 	)
 	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
@@ -274,7 +267,7 @@ device_chroot_tweaks_pre() {
 	dpkg -i dhcpcd*.deb
 
 	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
-	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/nodejs"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/dhcpcd"
 		Package: dhcpcd
 		Pin: release *
 		Pin-Priority: -1
