@@ -181,9 +181,11 @@ start_chroot_final=$(date +%s)
 log "Copying files for init:" "${INIT_TYPE}"
 cp "${SRC}/scripts/initramfs/${INIT_TYPE}" "${ROOTFSMNT}"/root/init
 if [[ -d "${SRC}/scripts/initramfs/scripts" ]] && [[ "${INIT_TYPE}" == "initv3" ]]; then
-  log "Adding initramfs scripts"
+  log "Adding initramfs scripts" "info" "${INIT_UUID_TYPE}"
   [[ -d "${ROOTFSMNT}/root/scripts" ]] || mkdir "${ROOTFSMNT}/root/scripts"
   cp -pdR "${SRC}"/scripts/initramfs/scripts/* "${ROOTFSMNT}/root/scripts"
+  # Add in our device specific scripts
+  [[ -n ${INIT_UUID_TYPE} ]] && cp "${SRC}/scripts/initramfs/custom/${INIT_UUID_TYPE}/custom-functions" "${ROOTFSMNT}/root/scripts"
 fi
 
 cp "${SRC}"/scripts/initramfs/mkinitramfs-custom.sh "${ROOTFSMNT}"/usr/local/sbin
