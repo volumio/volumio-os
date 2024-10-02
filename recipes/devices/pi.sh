@@ -196,7 +196,7 @@ device_image_tweaks() {
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
 	RpiUpdate_args=("UPDATE_SELF=0" "ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
 		"SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
-		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=0"
+		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=1"
 		# "BRANCH=${KERNEL_BRANCH}"
 	)
 	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
