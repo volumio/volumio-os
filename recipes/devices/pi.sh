@@ -36,6 +36,8 @@ BOOT_END=96
 BOOT_TYPE=msdos   # msdos or gpt
 BOOT_USE_UUID=yes # Add UUID to fstab
 INIT_TYPE="initv3"
+INIT_UUID_TYPE="pi" # Use block device GPEN if dynamic UUIDs are not handled.
+
 
 ## Plymouth theme management
 PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
@@ -193,10 +195,6 @@ device_image_tweaks() {
 		# "BRANCH=${KERNEL_BRANCH}"
 	)
 	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
-
-	log "Copying custom initramfs script functions" "cfg"
-	[[ -d "${ROOTFSMNT}"/root/scripts ]] || mkdir "${ROOTFSMNT}"/root/scripts
-	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" "${ROOTFSMNT}"/root/scripts
 }
 
 # Will be run in chroot (before other things)
