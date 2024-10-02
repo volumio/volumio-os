@@ -12,16 +12,18 @@ function check_size() {
 }
 
 echo "Updating Volumio Translations"
-git clone https://github.com/volumio/translations.git
+git clone https://github.com/volumio/translations.git --depth 1
 cd translations
-[[ -e "${ROOTFSMNT}/volumio/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/www/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/www/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/www3/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/www3/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/www4/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/www4/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/wizard/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/wizard/app/i18n/"
+# Main App
+[[ -e "${ROOTFSMNT}/volumio/app/i18n" ]] && cp -rp ./*.json "${ROOTFSMNT}/volumio/app/i18n/"
+# And different UIs
+ui_dirs=("www" "www3" "www4" "wizard")
+for ui in "${ui_dirs[@]}"; do
+  target="${ROOTFSMNT}/volumio/http/${ui}/app/i18n"
+  [[ -e "${target}" ]] && cp -rp ./*.json "${target}/"
+done
 echo "Volumio Translations updated"
-cd ..
-rm -rf translations
+cd .. && rm -rf translations
 
 [ -z "${ROOTFSMNT}" ] && ROOTFSMNT=/mnt/volumio/rootfs
 log "Computing Volumio folder Hash Checksum" "info"
