@@ -419,11 +419,11 @@ device_chroot_tweaks_pre() {
 		dtoverlay=dwc2,dr_mode=host
 		otg_mode=1
 		[pi5]
-		dtoverlay=vc4-kms-v3d-pi5
 		# dtparam=uart0_console # Disabled by default
 		dtparam=nvme
 		dtparam=pciex1_gen=2
 		[all]
+		dtoverlay=vc4-kms-v3d
 		arm_64bit=0
 		dtparam=audio=on
 		audio_pwm_mode=2
@@ -431,6 +431,7 @@ device_chroot_tweaks_pre() {
 		disable_splash=1
 		hdmi_force_hotplug=1
 		force_eeprom_read=0
+		display_auto_detect=1
 	EOF
 
 	log "Writing cmdline.txt file" "info"
