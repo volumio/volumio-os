@@ -31,8 +31,9 @@ VOLINITUPDATER=yes
 KIOSKMODE=no
 
 ## Partition info
-BOOT_START=0
-BOOT_END=96
+BOOT_START=1
+BOOT_END=257
+IMAGE_END=3257
 BOOT_TYPE=msdos   # msdos or gpt
 BOOT_USE_UUID=yes # Add UUID to fstab
 INIT_TYPE="initv3"
