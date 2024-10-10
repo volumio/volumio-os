@@ -210,7 +210,7 @@ device_chroot_tweaks_pre() {
 	# This will break proper plymouth on DSI screens at boot time.
 	# initramfs plymouth hook will not copy drm gpu drivers for list!.
 	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
-	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
+	sed -i "s/MODULES=most/MODULES=default/g" /etc/initramfs-tools/initramfs.conf
 
 	## Define parameters
 
