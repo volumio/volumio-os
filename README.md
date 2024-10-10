@@ -4,7 +4,7 @@ Copyright Volumio SRL
 
 #### Requirements
 
-On a Debian (buster) host, the following packages are required:
+On a Debian (bookworm) host, the following packages are required:
 ```
 build-essential
 ca-certificates
@@ -24,7 +24,7 @@ patch
 pv
 qemu-user-static
 qemu-utils
-qemu
+qemu-system
 squashfs-tools
 sudo
 u-boot-tools
