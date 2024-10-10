@@ -31,7 +31,9 @@ UUIDFMT="yes"			# yes|no (actually, anything non-blank)
 FACTORYCOPY="yes"
 
 # Modules to load (as a blank separated string array)
-MODULES="nls_cp437 fuse nvme nvme_core usbcore usb_common uas drm"
+MODULES=(
+	"drm" "drm_rp1_dsi" "panel_simple" "backlight" "v3d" "vc4" # Modules for Direct Rendering Manager with Plymouth
+	"fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 
 # Additional packages to install (as a blank separated string)
 #PACKAGES=""
