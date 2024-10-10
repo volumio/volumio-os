@@ -1,9 +1,9 @@
 [Unit]
 Description=Terminate Plymouth Boot Screen
-After=rc-local.service plymouth-start.service systemd-user-sessions.service getty.target
+After=rc-local.service plymouth-start.service systemd-user-sessions.service volumio.service volumio-kiosk.service
 
 [Service]
-ExecStart=-/bin/plymouth quit
+ExecStart=-/usr/bin/plymouth quit
 Type=oneshot
 RemainAfterExit=yes
 TimeoutSec=20

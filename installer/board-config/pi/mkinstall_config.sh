@@ -12,9 +12,9 @@ LBLDATA="volumio_data"
 
 # Partition Info
 BOOT_TYPE=msdos			# msdos or gpt
-BOOT_START=20
-BOOT_END=96
-IMAGE_END=2800
+BOOT_START=1
+BOOT_END=257
+IMAGE_END=3257
 BOOT=/mnt/boot
 BOOTDELAY=1
 BOOTDEV="mmcblk1"
@@ -31,7 +31,9 @@ UUIDFMT="yes"			# yes|no (actually, anything non-blank)
 FACTORYCOPY="yes"
 
 # Modules to load (as a blank separated string array)
-MODULES="nls_cp437 fuse nvme nvme_core usbcore usb_common uas drm"
+MODULES=(
+	"drm" "drm_rp1_dsi" "panel_simple" "backlight" "v3d" "vc4" # Modules for Direct Rendering Manager with Plymouth
+	"fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 
 # Additional packages to install (as a blank separated string)
 #PACKAGES=""

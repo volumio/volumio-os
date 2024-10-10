@@ -31,8 +31,9 @@ VOLINITUPDATER=yes
 KIOSKMODE=no
 
 ## Partition info
-BOOT_START=0
-BOOT_END=96
+BOOT_START=1
+BOOT_END=257
+IMAGE_END=3257
 BOOT_TYPE=msdos   # msdos or gpt
 BOOT_USE_UUID=yes # Add UUID to fstab
 INIT_TYPE="initv3"
@@ -209,7 +210,7 @@ device_chroot_tweaks_pre() {
 	# This will break proper plymouth on DSI screens at boot time.
 	# initramfs plymouth hook will not copy drm gpu drivers for list!.
 	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
-	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
+	sed -i "s/MODULES=most/MODULES=default/g" /etc/initramfs-tools/initramfs.conf
 
 	## Define parameters
 
@@ -418,11 +419,11 @@ device_chroot_tweaks_pre() {
 		dtoverlay=dwc2,dr_mode=host
 		otg_mode=1
 		[pi5]
-		dtoverlay=vc4-kms-v3d-pi5
 		# dtparam=uart0_console # Disabled by default
 		dtparam=nvme
 		dtparam=pciex1_gen=2
 		[all]
+		dtoverlay=vc4-kms-v3d
 		arm_64bit=0
 		dtparam=audio=on
 		audio_pwm_mode=2
@@ -430,6 +431,7 @@ device_chroot_tweaks_pre() {
 		disable_splash=1
 		hdmi_force_hotplug=1
 		force_eeprom_read=0
+		display_auto_detect=1
 	EOF
 
 	log "Writing cmdline.txt file" "info"
