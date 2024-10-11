@@ -361,6 +361,9 @@ ln -s /lib/systemd/system/volumiossh.service /etc/systemd/system/multi-user.targ
 # log "Enable Volumio Log Rotation Service"
 # ln -s /lib/systemd/system/volumiologrotate.service /etc/systemd/system/multi-user.target.wants/volumiologrotate.service
 
+log "Enable Volumio IP Change Monitoring Service"
+ln -s /lib/systemd/system/volumio-ipchange.service /etc/systemd/system/multi-user.target.wants/volumio-ipchange.service
+
 log "Enable Volumio Welcome Service"
 ln -s /lib/systemd/system/welcome.service /etc/systemd/system/multi-user.target.wants/welcome.service
 
