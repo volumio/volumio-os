@@ -5,12 +5,15 @@ logs
 platform-*
 myVolumioSDK
 VolumioSDK*
+image_info
 
 # We don't need logs and image artifacts
 *.log
 *.zip
 *.img*
-*.tar*
+# Changed - blocks service type targets
+*.tar
+*.tar.*
 # Selective ignore
 .ignore_dir
 

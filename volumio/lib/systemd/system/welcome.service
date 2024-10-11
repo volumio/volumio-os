@@ -2,8 +2,12 @@
 Description=Show a welcome message on console
 After=network-online.target
 Requires=network-online.target
+PartOf=ip-changed@eth0.target ip-changed@wlan0.target
+Before=ip-changed@eth0.target ip-changed@wlan0.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/welcome
+User=root
+Group=root
