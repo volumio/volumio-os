@@ -7,3 +7,5 @@ Requires=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/welcome
+User=root
+Group=root
