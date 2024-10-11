@@ -10,7 +10,9 @@ VolumioSDK*
 *.log
 *.zip
 *.img*
-*.tar*
+# Changed - blocks service type targets
+*.tar
+*.tar.*
 # Selective ignore
 .ignore_dir
 
