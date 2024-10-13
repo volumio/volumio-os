@@ -351,5 +351,5 @@ log "Populating image info file" "info"
 cat <<-EOF >"${OUTPUT_DIR}"/image_info
 extract_size=$(stat -c%s "${IMG_FILE}")
 extract_sha256=$(sha256sum "${IMG_FILE}" | awk '{print $1}')
-release_date=$BUILDDATE"
+release_date=$BUILDDATE
 EOF
