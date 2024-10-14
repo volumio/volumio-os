@@ -511,7 +511,7 @@ device_chroot_tweaks_pre() {
 		${kernel_params[@]}
 	EOF
 
-	log "Finalise all kenerls with depmod and other tricks" "info"
+	log "Finalise all kernels with depmod and other tricks" "info"
 	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
 	# + 	--> Pi 1,Zero,ZeroW, and CM 1
 	# -v7+  --> Pi 2,3,3+,Zero 2W, CM3, and CM3+
