@@ -321,7 +321,7 @@ rm -rf "${SQSHMNT:?}"/boot/*
 
 log "Creating SquashFS, removing any previous one" "info"
 [[ -f "${SRC}/Volumio.sqsh" ]] && rm "${SRC}/Volumio.sqsh"
-mksquashfs "${SQSHMNT}"/* "${SRC}/Volumio.sqsh"
+mksquashfs "${SQSHMNT}"/* "${SRC}/Volumio.sqsh" -comp zstd
 
 log "Squash filesystem created" "okay" "$(du -h0 "${SRC}/Volumio.sqsh" | cut -f1)"
 rm -rf --one-file-system "${SQSHMNT}"
