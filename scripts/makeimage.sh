@@ -274,6 +274,8 @@ chroot "${ROOTFSMNT}" /chrootconfig.sh
 log "Finished chroot config for ${DEVICE}" "okay"
 # Clean up chroot stuff
 rm "${ROOTFSMNT:?}"/*.sh "${ROOTFSMNT}"/root/init
+log "Cleaning legacy sysv-rc leftovers" "okay"
+rm "${ROOTFSMNT}"/etc/init.d/README
 
 unmount_chroot "${ROOTFSMNT}"
 end_chroot_final=$(date +%s)
