@@ -321,7 +321,7 @@ rm -rf "${SQSHMNT:?}"/boot/*
 
 log "Creating SquashFS, removing any previous one" "info"
 [[ -f "${SRC}/Volumio.sqsh" ]] && rm "${SRC}/Volumio.sqsh"
-mksquashfs "${SQSHMNT}"/* "${SRC}/Volumio.sqsh"
+mksquashfs "${SQSHMNT}"/* "${SRC}/Volumio.sqsh" -comp zstd
 
 log "Squash filesystem created" "okay" "$(du -h0 "${SRC}/Volumio.sqsh" | cut -f1)"
 rm -rf --one-file-system "${SQSHMNT}"
@@ -351,5 +351,5 @@ log "Populating image info file" "info"
 cat <<-EOF >"${OUTPUT_DIR}"/image_info
 extract_size=$(stat -c%s "${IMG_FILE}")
 extract_sha256=$(sha256sum "${IMG_FILE}" | awk '{print $1}')
-release_date=$BUILDDATE"
+release_date=$BUILDDATE
 EOF
