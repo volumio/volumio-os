@@ -352,6 +352,9 @@ ln -s /lib/systemd/system/iptables.service /etc/systemd/system/multi-user.target
 log "Adding headless_wireless Service"
 ln -s /lib/systemd/system/headless_wireless.service /etc/systemd/system/multi-user.target.wants/headless_wireless.service
 
+log "Adding Manage nl80211 modules blocking state Service"
+ln -s /lib/systemd/system/hvolumio_rfkill_unblock.service /etc/systemd/system/multi-user.target.wants/volumio_rfkill_unblock.service
+
 log "Disabling SSH by default"
 systemctl disable ssh.service
 

@@ -60,6 +60,10 @@ done
 # Network
 cp -r "${SRC}"/volumio/etc/network/* "${ROOTFS}"/etc/network
 
+# nl80211 modules blocking state
+cp "${SRC}/volumio/bin/volumio_rfkill_unblock.sh" "${ROOTFS}/bin/volumio_rfkill_unblock.sh"
+chmod a+x "${ROOTFS}/bin/volumio_rfkill_unblock.sh"
+
 # Wpa Supplicant
 echo " " >"${ROOTFS}"/etc/wpa_supplicant/wpa_supplicant.conf
 chmod 777 "${ROOTFS}"/etc/wpa_supplicant/wpa_supplicant.conf
