@@ -264,7 +264,7 @@ device_chroot_tweaks_pre() {
 	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
-	dpkg -i dhcpcd*.deb
+	dpkg -i dhcpcd*.deb && rm -rf dhcpcd*.deb
 
 	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/dhcpcd"
@@ -373,7 +373,7 @@ device_chroot_tweaks_pre() {
 
 	# All additional drivers
 	log "Adding Custom firmware from github" "info"
-	# TODO: There is gcc missmatch between Bookworm and rpi-firmware and as such in chroot environment ld-linux.so.3 is complainin when using dropship to /usr directly
+	# TODO: There is gcc mismatch between Bookworm and rpi-firmware and as such in chroot environment ld-linux.so.3 is complaining when using drop-ship to /usr directly
 		for key in "${!CustomFirmware[@]}"; do
 		mkdir -p "/tmp/$key" && cd "/tmp/$key"
 		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
