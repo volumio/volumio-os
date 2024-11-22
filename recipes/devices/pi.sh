@@ -373,16 +373,22 @@ device_chroot_tweaks_pre() {
 
 	# All additional drivers
 	log "Adding Custom firmware from github" "info"
-	for key in "${!CustomFirmware[@]}"; do
+	# TODO: There is gcc missmatch between Bookworm and rpi-firmware and as such in chroot environment ld-linux.so.3 is complainin when using dropship to /usr directly
+		for key in "${!CustomFirmware[@]}"; do
+		mkdir -p "/tmp/$key" && cd "/tmp/$key"
 		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
 			log "Failed to get firmware:" "err" "${key}"
-			rm "$key.tar.gz"
+			rm "$key.tar.gz" && cd - && rm -rf "/tmp/$key"
 			continue
 		}
-		# TODO: The --strip-components behaviour has changed and need to be researched
-		# tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
-		tar --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
+		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
 		rm "$key.tar.gz"
+		if [[ -d boot ]]; then
+			log "Updating /boot content" "info"
+			cp -rp boot "${ROOTFS}"/ && rm -rf boot
+		fi
+		log "Adding $key update" "info"
+		cp -rp * "${ROOTFS}"/usr && cd - && rm -rf "/tmp/$key"
 	done
 
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
