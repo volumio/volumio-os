@@ -264,7 +264,7 @@ device_chroot_tweaks_pre() {
 	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
-	dpkg -i dhcpcd*.deb
+	dpkg -i dhcpcd*.deb && rm -rf dhcpcd*.deb
 
 	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/dhcpcd"
@@ -373,16 +373,22 @@ device_chroot_tweaks_pre() {
 
 	# All additional drivers
 	log "Adding Custom firmware from github" "info"
-	for key in "${!CustomFirmware[@]}"; do
+	# TODO: There is gcc mismatch between Bookworm and rpi-firmware and as such in chroot environment ld-linux.so.3 is complaining when using drop-ship to /usr directly
+		for key in "${!CustomFirmware[@]}"; do
+		mkdir -p "/tmp/$key" && cd "/tmp/$key"
 		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
 			log "Failed to get firmware:" "err" "${key}"
-			rm "$key.tar.gz"
+			rm "$key.tar.gz" && cd - && rm -rf "/tmp/$key"
 			continue
 		}
-		# TODO: The --strip-components behaviour has changed and need to be researched
-		# tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
-		tar --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
+		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
 		rm "$key.tar.gz"
+		if [[ -d boot ]]; then
+			log "Updating /boot content" "info"
+			cp -rp boot "${ROOTFS}"/ && rm -rf boot
+		fi
+		log "Adding $key update" "info"
+		cp -rp * "${ROOTFS}"/usr && cd - && rm -rf "/tmp/$key"
 	done
 
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
