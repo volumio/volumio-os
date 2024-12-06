@@ -12,16 +12,18 @@ function check_size() {
 }
 
 echo "Updating Volumio Translations"
-git clone https://github.com/volumio/translations.git
+git clone https://github.com/volumio/translations.git --depth 1
 cd translations
-[[ -e "${ROOTFSMNT}/volumio/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/www/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/www/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/www3/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/www3/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/www4/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/www4/app/i18n/"
-[[ -e "${ROOTFSMNT}/volumio/http/wizard/app/i18n" ]] && cp -rp *.json "${ROOTFSMNT}/volumio/http/wizard/app/i18n/"
+# Main App
+[[ -e "${ROOTFSMNT}/volumio/app/i18n" ]] && cp -rp ./*.json "${ROOTFSMNT}/volumio/app/i18n/"
+# And different UIs
+ui_dirs=("www" "www3" "www4" "wizard")
+for ui in "${ui_dirs[@]}"; do
+  target="${ROOTFSMNT}/volumio/http/${ui}/app/i18n"
+  [[ -e "${target}" ]] && cp -rp ./*.json "${target}/"
+done
 echo "Volumio Translations updated"
-cd ..
-rm -rf translations
+cd .. && rm -rf translations
 
 [ -z "${ROOTFSMNT}" ] && ROOTFSMNT=/mnt/volumio/rootfs
 log "Computing Volumio folder Hash Checksum" "info"
@@ -67,22 +69,19 @@ for path in "${share_dirs[@]}"; do
   log "${path}:" "Pre: ${pre_size[$path]} Post: $(check_size "/usr/share/${path}")"
 done
 
-#TODO: This doesn't seem to be doing much atm
-log "Stripping binaries"
-STRP_DIRECTORIES=("${ROOTFSMNT}/lib/"
-  "${ROOTFSMNT}/bin/"
-  "${ROOTFSMNT}/usr/sbin"
-  "${ROOTFSMNT}/usr/local/bin/"
-  "${ROOTFSMNT}/lib/modules/")
+# #Note: Binaries seem to be pre stripped, and we waste build time here.
+# log "Stripping binaries"
+# STRP_DIRECTORIES=("${ROOTFSMNT}/lib/"
+#   "${ROOTFSMNT}/bin/"
+#   "${ROOTFSMNT}/usr/sbin"
+#   "${ROOTFSMNT}/usr/local/bin/"
+#   "${ROOTFSMNT}/lib/modules/")
 
-for DIR in "${STRP_DIRECTORIES[@]}"; do
-  log "${DIR} Pre  size" "$(check_size "${DIR}")"
-  find "${DIR}" -type f -exec strip --strip-unneeded {} ';' >/dev/null 2>&1
-  log "${DIR} Post size" "$(check_size "${DIR}")"
-done
-# else
-#   log "${BUILD} environment detected, not cleaning/stripping libs"
-# fi
+# for DIR in "${STRP_DIRECTORIES[@]}"; do
+#   log "${DIR} Pre  size" "$(check_size "${DIR}")"
+#   find "${DIR}" -type f -exec strip --strip-unneeded {} ';' >/dev/null 2>&1
+#   log "${DIR} Post size" "$(check_size "${DIR}")"
+# done
 
 log "Checking rootfs size"
 log "Rootfs:" "$(check_size "${ROOTFSMNT}")"
@@ -92,15 +91,6 @@ log "Volumio parts:" "$(check_size "${ROOTFSMNT}"/volumio) $(check_size "${ROOTF
 log "Updating MOTD"
 rm -f "${ROOTFSMNT}"/etc/motd "${ROOTFSMNT}"/etc/update-motd.d/*
 cp "${SRC}"/volumio/etc/update-motd.d/* "${ROOTFSMNT}"/etc/update-motd.d/
-
-#TODO This shall be refactored as per https://github.com/volumio/Build/issues/479
-# Temporary workaround
-log "Copying over upmpdcli.service"
-cp "${SRC}/volumio/lib/systemd/system/upmpdcli.service" "${ROOTFSMNT}/lib/systemd/system/upmpdcli.service"
-
-log "Copying over shairport-sync.service"
-[[ -e "${ROOTFSMNT}/lib/systemd/system/shairport-sync.service" ]] && rm "${ROOTFSMNT}/lib/systemd/system/shairport-sync.service"
-cp "${SRC}/volumio/lib/systemd/system/shairport-sync.service" "${ROOTFSMNT}/lib/systemd/system/shairport-sync.service"
 
 log "Add Volumio WebUI IP"
 cat <<-EOF >>"${ROOTFSMNT}"/etc/issue

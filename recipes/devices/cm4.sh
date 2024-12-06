@@ -37,6 +37,7 @@ BOOT_END=96
 BOOT_TYPE=msdos    # msdos or gpt
 BOOT_USE_UUID=yes  # Add UUID to fstab
 INIT_TYPE="initv3"
+INIT_UUID_TYPE="pi" # Use block device GPEN if dynamic UUIDs are not handled.
 
 ## Plymouth theme management
 PLYMOUTH_THEME="volumio-player"	# Choices are: {volumio,volumio-logo,volumio-player}
@@ -146,10 +147,6 @@ device_image_tweaks() {
 	#TODO: Look into moving kernel stuff outside chroot using ROOT/BOOT_PATH to speed things up
 	# ROOT_PATH=${ROOTFSMNT}
 	# BOOT_PATH=${ROOT_PATH}/boot
-
-	log "Copying custom initramfs script functions" "cfg"
-	[ -d ${ROOTFSMNT}/root/scripts ] || mkdir ${ROOTFSMNT}/root/scripts
-	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" ${ROOTFSMNT}/root/scripts
 }
 
 # Will be run in chroot (before other things)
@@ -169,14 +166,6 @@ device_chroot_tweaks_pre() {
 	## Define parameters
 	declare -A PI_KERNELS=(
 		#[KERNEL_VERSION]="SHA|Branch|Rev"
-		[5.10.90]="9a09c1dcd4fae55422085ab6a87cc650e68c4181|master|1512"
-		[5.10.92]="ea9e10e531a301b3df568dccb3c931d52a469106|stable|1514"
-		[5.10.95]="770ca2c26e9cf341db93786d3f03c89964b1f76f|master|1521"
-		[5.15.84]="a99e144e939bf93bbd03e8066601a8d3eae640f7|stable|1613"
-		[5.15.92]="f5c4fc199c8d8423cb427e509563737d1ac21f3c|master|1627"
-		[6.1.19]="fa51258e0239eaf68d9dff9c156cec3a622fbacc|stable|1637"
-		[6.1.21]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1642"
-		[6.1.47]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1674"
 		[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
 		[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
 		[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"

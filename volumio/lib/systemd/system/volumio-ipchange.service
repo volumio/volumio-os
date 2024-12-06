@@ -1,0 +1,11 @@
+[Unit]
+# Adopted from https://clinta.github.io/run-service-on-ip-change/ 
+Description=Volumio IP Change Monitor
+Requires=network.target
+After=network-online.target
+
+[Service]
+ExecStart=:/bin/bash -c "ip mon addr | sed -nu -r 's/.*[[:digit:]]+:[[:space:]]+([^[:space:]]+).*/\\1/p\' | while read iface; do systemctl restart ip-changed@${iface}.target; done"
+
+[Install]
+WantedBy=multi-user.target default.target

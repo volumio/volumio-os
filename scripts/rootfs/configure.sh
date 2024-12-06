@@ -52,8 +52,17 @@ for service in "${SRC}"/volumio/lib/systemd/system/*.service; do
   cp  "${service}" "${ROOTFS}"/lib/systemd/system/
 done
 
+for target in "${SRC}"/volumio/lib/systemd/system/*.target; do
+  log "Copying ${target}" 
+  cp  "${target}" "${ROOTFS}"/lib/systemd/system/
+done
+
 # Network
 cp -r "${SRC}"/volumio/etc/network/* "${ROOTFS}"/etc/network
+
+# nl80211 modules blocking state
+cp "${SRC}/volumio/bin/volumio_rfkill_unblock.sh" "${ROOTFS}/bin/volumio_rfkill_unblock.sh"
+chmod a+x "${ROOTFS}/bin/volumio_rfkill_unblock.sh"
 
 # Wpa Supplicant
 echo " " >"${ROOTFS}"/etc/wpa_supplicant/wpa_supplicant.conf

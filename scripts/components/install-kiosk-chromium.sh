@@ -9,6 +9,9 @@ log "Installing $CMP_NAME" "ext"
 source /etc/os-release
 export DEBIAN_FRONTEND=noninteractive
 
+# Some (more) raspbian specific schenanigans
+BrowerPckg="chromium"
+[[ ${ID} == raspbian ]] && BrowerPckg+="-browser"
 CMP_PACKAGES=(
   # Keyboard config
   "keyboard-configuration"
@@ -16,7 +19,7 @@ CMP_PACKAGES=(
   "openbox" "unclutter" "xorg" "xinit"
   # Browser
   # TODO: Why not firefox? it seems to work OTB on most devices with less hassle?
-  "chromium" "chromium-l10n"
+  "${BrowerPckg}" "chromium-l10n"
   # Fonts
   "fonts-arphic-ukai" "fonts-arphic-gbsn00lp" "fonts-unfonts-core"
   # Fonts for Japanese and Thai languages

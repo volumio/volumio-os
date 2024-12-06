@@ -2,6 +2,6 @@
 
 IFS=" " read -r -a ip_addresses < <(hostname -I)
 echo "Resolved ip:[${#ip_addresses[@]}] ${ip_addresses[*]}"
-sudo sed -i '/WebUI /q' /etc/issue
-qrencode -m 2 -8 -t utf8 <<<"http://${ip_addresses[0]}" >>/etc/issue
-sudo agetty --reload
+/usr/bin/sed -i '/WebUI /q' /etc/issue
+/usr/bin/qrencode -m 2 -8 -t utf8 <<<"http://${ip_addresses[0]}" >>/etc/issue
+agetty --reload

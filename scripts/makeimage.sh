@@ -181,9 +181,11 @@ start_chroot_final=$(date +%s)
 log "Copying files for init:" "${INIT_TYPE}"
 cp "${SRC}/scripts/initramfs/${INIT_TYPE}" "${ROOTFSMNT}"/root/init
 if [[ -d "${SRC}/scripts/initramfs/scripts" ]] && [[ "${INIT_TYPE}" == "initv3" ]]; then
-  log "Adding initramfs scripts"
+  log "Adding initramfs scripts" "info" "${INIT_UUID_TYPE}"
   [[ -d "${ROOTFSMNT}/root/scripts" ]] || mkdir "${ROOTFSMNT}/root/scripts"
   cp -pdR "${SRC}"/scripts/initramfs/scripts/* "${ROOTFSMNT}/root/scripts"
+  # Add in our device specific scripts
+  [[ -n ${INIT_UUID_TYPE} ]] && cp "${SRC}/scripts/initramfs/custom/${INIT_UUID_TYPE}/custom-functions" "${ROOTFSMNT}/root/scripts"
 fi
 
 cp "${SRC}"/scripts/initramfs/mkinitramfs-custom.sh "${ROOTFSMNT}"/usr/local/sbin
@@ -208,12 +210,11 @@ if [[ "${INIT_PLYMOUTH_DISABLE}" == yes ]]; then
 fi
 
 if [[ "${KIOSKMODE}" == yes ]]; then
-  if [[ "${KIOSKBROWSER}" == vivaldi ]]; then
-    log "Copying Vivaldi kiosk scripts to rootfs"
-    cp "${SRC}/scripts/components/install-kiosk-vivaldi.sh" "${ROOTFSMNT}"/install-kiosk.sh
+  if [[ -f "${SRC}/scripts/components/install-kiosk-${KIOSKBROWSER:=chromium}.sh" ]]; then
+    log "Copying scripts to rootfs" "${KIOSKBROWSER}"
+    cp "${SRC}/scripts/components/install-kiosk-${KIOSKBROWSER}.sh" "${ROOTFSMNT}"/install-kiosk.sh
   else
-    log "Copying Chromium kiosk scripts to rootfs"
-    cp "${SRC}/scripts/components/install-kiosk.sh" "${ROOTFSMNT}"/install-kiosk.sh
+    log "Kioskmode enabled, but install-kiosk-${KIOSKBROWSER} was not found!" "err"
   fi
 fi
 
@@ -244,8 +245,8 @@ UINITRD_ARCH="${UINITRD_ARCH}"
 KERNEL_VERSION="${KERNEL_VERSION}"
 DEBUG_IMAGE="${DEBUG_IMAGE:-no}"
 KIOSKMODE="${KIOSKMODE:-no}"
-KIOSKBROWSER="${KIOSKBROWSER:-chromium}"
-KIOSKINSTALL="${KIOSKMODE:-install-kiosk.sh}"
+KIOSKBROWSER="${KIOSKBROWSER}"
+KIOSKINSTALL="${KIOSKMODE:-install-kiosk-${KIOSKBROWSER}.sh}"
 VARIANT=${VARIANT}
 VOLVARIANT="${VOLVARIANT:-volumio}"
 BOOT_FS_SPEC=${BOOT_FS_SPEC}
@@ -273,6 +274,8 @@ chroot "${ROOTFSMNT}" /chrootconfig.sh
 log "Finished chroot config for ${DEVICE}" "okay"
 # Clean up chroot stuff
 rm "${ROOTFSMNT:?}"/*.sh "${ROOTFSMNT}"/root/init
+log "Cleaning legacy sysv-rc leftovers" "okay"
+rm "${ROOTFSMNT}"/etc/init.d/README
 
 unmount_chroot "${ROOTFSMNT}"
 end_chroot_final=$(date +%s)
@@ -347,6 +350,8 @@ md5sum "$IMG_FILE" >"${IMG_FILE}.md5"
 
 log "Populating image info file" "info"
 
-echo "extract_size=$(stat -c%s $IMG_FILE)
-extract_sha256=$(sha256sum $IMG_FILE | awk '{print $1}')
-release_date=$BUILDDATE" >"${OUTPUT_DIR}"/image_info
+cat <<-EOF >"${OUTPUT_DIR}"/image_info
+extract_size=$(stat -c%s "${IMG_FILE}")
+extract_sha256=$(sha256sum "${IMG_FILE}" | awk '{print $1}')
+release_date=$BUILDDATE
+EOF

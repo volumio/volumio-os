@@ -7,7 +7,7 @@ Before=initrd-switch-root.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=-/bin/plymouth update-root-fs --new-root-dir=/sysroot
+ExecStart=-/usr/bin/plymouth update-root-fs --new-root-dir=/sysroot
 StandardInput=null
 StandardOutput=null
 StandardError=null

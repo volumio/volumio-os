@@ -12,9 +12,9 @@ LBLDATA="volumio_data"
 
 # Partition Info
 BOOT_TYPE=msdos			# msdos or gpt
-BOOT_START=20
-BOOT_END=96
-IMAGE_END=2800
+BOOT_START=1
+BOOT_END=257
+IMAGE_END=3257
 BOOT=/mnt/boot
 BOOTDELAY=1
 BOOTDEV="mmcblk1"
@@ -31,7 +31,7 @@ UUIDFMT="yes"			# yes|no (actually, anything non-blank)
 FACTORYCOPY="yes"
 
 # Modules to load (as a blank separated string array)
-MODULES="nls_cp437 fuse nvme nvme_core usbcore usb_common uas drm"
+MODULES=("fuse" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 
 # Additional packages to install (as a blank separated string)
 #PACKAGES=""
@@ -76,7 +76,3 @@ write_boot_parameters()
    sed -i "s/verbosity/#verbosity/g" $ROOTFSMNT/boot/cmdlinux.txt
    sed -i "s/imgpart=UUID= bootpart=UUID= datapart=UUID= bootconfig=cmdlinux.txt imgfile=\/volumio_current.sqsh net.ifnames=0/loglevel=0/g" $ROOTFSMNT/boot/cmdlinux.txt
 }
-
-
-
-

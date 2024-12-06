@@ -29,13 +29,17 @@ VOLVARIANT=no # Custom Volumio (Motivo/Primo etc)
 MYVOLUMIO=no
 VOLINITUPDATER=yes
 KIOSKMODE=no
+# KIOSKBROWSER=vivaldi
 
 ## Partition info
-BOOT_START=0
-BOOT_END=96
+BOOT_START=1
+BOOT_END=257
+IMAGE_END=3257
 BOOT_TYPE=msdos   # msdos or gpt
 BOOT_USE_UUID=yes # Add UUID to fstab
 INIT_TYPE="initv3"
+INIT_UUID_TYPE="pi" # Use block device GPEN if dynamic UUIDs are not handled.
+
 
 ## Plymouth theme management
 PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
@@ -46,9 +50,7 @@ INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initializati
 UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="yes" # yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
 
 # Modules that will be added to initramfs
-MODULES=(
-	"drm" "drm_rp1_dsi" "panel_simple" "backlight" "v3d" "vc4" # Modules for Direct Rendering Manager with Plymouth
-	"fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
+MODULES=("fuse" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
 # Packages that will be installed
 PACKAGES=(
 	# GPIO stuff
@@ -60,13 +62,6 @@ RpiRepo="https://github.com/raspberrypi/rpi-firmware"
 RpiUpdateRepo="raspberrypi/rpi-update"
 declare -A PI_KERNELS=(
 	#[KERNEL_VERSION]="SHA|Branch|Rev"
-	[5.10.92]="ea9e10e531a301b3df568dccb3c931d52a469106|stable|1514"
-	[5.10.95]="770ca2c26e9cf341db93786d3f03c89964b1f76f|master|1521"
-	[5.15.84]="a99e144e939bf93bbd03e8066601a8d3eae640f7|stable|1613"
-	[5.15.92]="f5c4fc199c8d8423cb427e509563737d1ac21f3c|master|1627"
-	[6.1.19]="fa51258e0239eaf68d9dff9c156cec3a622fbacc|stable|1637"
-	[6.1.21]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1642"
-	[6.1.47]="f87ad1a3cb8c81e32dc3d541259291605ddaada0|stable|1674"
 	[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
 	[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
 	[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"
@@ -76,9 +71,11 @@ declare -A PI_KERNELS=(
 	[6.1.77]="5fc4f643d2e9c5aa972828705a902d184527ae3f|master|1730"
 	[6.6.30]="3b768c3f4d2b9a275fafdb53978f126d7ad72a1a|master|1763"
 	[6.6.47]="a0d314ac077cda7cbacee1850e84a57af9919f94|master|1792"
+	[6.6.51]="d5a7dbe77b71974b9abb133a4b5210a8070c9284|master|1796"
+	[6.6.56]="a5efb544aeb14338b481c3bdc27f709e8ee3cf8c|master|1803"
 )
 # Version we want
-KERNEL_VERSION="6.6.47"
+KERNEL_VERSION="6.6.56"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -196,14 +193,10 @@ device_image_tweaks() {
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
 	RpiUpdate_args=("UPDATE_SELF=0" "ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
 		"SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
-		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=0"
+		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=1"
 		# "BRANCH=${KERNEL_BRANCH}"
 	)
 	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
-
-	log "Copying custom initramfs script functions" "cfg"
-	[[ -d "${ROOTFSMNT}"/root/scripts ]] || mkdir "${ROOTFSMNT}"/root/scripts
-	cp "${SRC}/scripts/initramfs/custom/pi/custom-functions" "${ROOTFSMNT}"/root/scripts
 }
 
 # Will be run in chroot (before other things)
@@ -217,8 +210,8 @@ device_chroot_tweaks_pre() {
 	# !Warning!
 	# This will break proper plymouth on DSI screens at boot time.
 	# initramfs plymouth hook will not copy drm gpu drivers for list!.
-	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
-	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
+	# log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
+	# sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
 
 	## Define parameters
 
@@ -235,12 +228,12 @@ device_chroot_tweaks_pre() {
 	# List of custom firmware -
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
-		# [AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
-		# [TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
-		# [Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
-		# [wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
-		# [brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
-		# [PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
+		[AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
+		[TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
+		[Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
+		[wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
+		[brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
+		[PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
 	)
 
 	## Comment to keep RPi4/RPi5 64bit kernel
@@ -271,10 +264,10 @@ device_chroot_tweaks_pre() {
 	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
-	dpkg -i dhcpcd*.deb
+	dpkg -i dhcpcd*.deb && rm -rf dhcpcd*.deb
 
 	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
-	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/nodejs"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/dhcpcd"
 		Package: dhcpcd
 		Pin: release *
 		Pin-Priority: -1
@@ -380,14 +373,22 @@ device_chroot_tweaks_pre() {
 
 	# All additional drivers
 	log "Adding Custom firmware from github" "info"
-	for key in "${!CustomFirmware[@]}"; do
+	# TODO: There is gcc mismatch between Bookworm and rpi-firmware and as such in chroot environment ld-linux.so.3 is complaining when using drop-ship to /usr directly
+		for key in "${!CustomFirmware[@]}"; do
+		mkdir -p "/tmp/$key" && cd "/tmp/$key"
 		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
 			log "Failed to get firmware:" "err" "${key}"
-			rm "$key.tar.gz"
+			rm "$key.tar.gz" && cd - && rm -rf "/tmp/$key"
 			continue
 		}
 		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
 		rm "$key.tar.gz"
+		if [[ -d boot ]]; then
+			log "Updating /boot content" "info"
+			cp -rp boot "${ROOTFS}"/ && rm -rf boot
+		fi
+		log "Adding $key update" "info"
+		cp -rp * "${ROOTFS}"/usr && cd - && rm -rf "/tmp/$key"
 	done
 
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
@@ -439,6 +440,7 @@ device_chroot_tweaks_pre() {
 		disable_splash=1
 		hdmi_force_hotplug=1
 		force_eeprom_read=0
+		display_auto_detect=1
 	EOF
 
 	log "Writing cmdline.txt file" "info"
@@ -520,14 +522,25 @@ device_chroot_tweaks_pre() {
 		${kernel_params[@]}
 	EOF
 
-	# Rerun depmod for new drivers
-	log "Finalising drivers installation with depmod on ${KERNEL_VERSION}+,-v7+, v7l+ and v8+" "info"
-	depmod "${KERNEL_VERSION}+"     # Pi 1, Zero, Compute Module
-	depmod "${KERNEL_VERSION}-v7+"  # Pi 2,3 CM3
-	depmod "${KERNEL_VERSION}-v7l+" # Pi 4 CM4
-	depmod "${KERNEL_VERSION}-v8+"  # Pi 4,5 CM4 64bit
-	#depmod "${KERNEL_VERSION}-v8-16k+"  # Pi 4,5 CM4 64bit
+	log "Finalise all kernels with depmod and other tricks" "info"
+	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
+	# + 	--> Pi 1,Zero,ZeroW, and CM 1
+	# -v7+  --> Pi 2,3,3+,Zero 2W, CM3, and CM3+
+	# -v7l+ --> Pi 4,400, CM 4 (32bit)
+	# -v8+  --> Pi 3,3+,4,400, Zero 2W, CM 3,3+,4 (64bit)
 
+	## Reconfirm our final kernel lists - we may have deleted a few!
+	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
+	mapfile -t kver < <(ls -t /lib/modules | sort)
+	for ver in "${kver[@]}"; do
+		log "Running depmod on" "${ver}"
+		depmod "${ver}"
+		# Trick our non std kernel install with the right bits for intramfs creation
+		cat <<-EOF >"/boot/config-${ver}"
+			CONFIG_RD_ZSTD=y
+			CONFIG_RD_GZIP=y
+		EOF
+	done
 	log "Raspi Kernel and Modules installed" "okay"
 
 }

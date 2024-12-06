@@ -1,0 +1,12 @@
+[Unit]
+Description=Manage nl80211 modules blocking state
+Before=dhcpcd.service hostapd.service
+After=systemd-rfkill.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/volumio_rfkill_unblock.sh
+
+[Install]
+WantedBy=multi-user.target

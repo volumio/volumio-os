@@ -11,7 +11,7 @@ source "${SRC}"/recipes/devices/pi.sh
 
 # Enable kiosk
 KIOSKMODE=yes
-KIOSKBROWSER=vivaldi
+KIOSKBROWSER=chromium
 
 # We need a bigger image size
 BOOT_END=180
