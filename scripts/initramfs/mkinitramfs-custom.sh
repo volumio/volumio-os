@@ -493,10 +493,15 @@ build_volumio_initramfs() {
   # Pick how many kernels we want to add
   # (Future proofing for Rpi 5,6,7 etc..) ¯\_(ツ)_/¯
 
-  num_ker_max=3
+  num_ker_max=4
 
-  log "Found ${#versions[@]} kernel version(s)" "${versions[@]}" "info"
+  log "Found ${#versions[@]} kernel version(s)" "${versions[*]}" "info"
   for ver in "${!versions[@]}"; do
+    if [[ $ver -gt $num_ker_max ]]; then
+      log "Using only ${num_ker_max} kernels" "wrn"
+      log "Ignoring kernel ${versions[ver]}" "err"
+      break
+    fi
     log "Building intramsfs for Kernel[${ver}]: ${versions[ver]}" "info"
     build_initramfs "${versions[ver]}"
     log "initramfs built for Kernel[${ver}]: ${versions[ver]} at ${DESTDIR}" "okay"
