@@ -154,7 +154,7 @@ EOF
 exit 0
 EOF
   chmod +x "${ROOTFSMNT}/usr/local/bin/soundcard-init.sh"
-  [[ -d ${ROOTFSMNT}/lib/systemd/system/ ]] || mkdir -p "${ROOTFSMNT}/lib/systemd/system/"	
+  [[ -d ${ROOTFSMNT}/lib/systemd/system/ ]] || mkdir -p "${ROOTFSMNT}/lib/systemd/system/"
   cat <<-EOF >"${ROOTFSMNT}/lib/systemd/system/soundcard-init.service"
 [Unit]
 Description = Intel SST and HDA soundcard init service
@@ -194,7 +194,7 @@ device_chroot_tweaks_pre() {
   log "Change linux kernel image name to 'vmlinuz'" "info"
   # Rename linux kernel to a fixed name, like we do for any other platform.
   # We only have one and we should not start multiple versions.
-  # - our OTA update can't curently handle that and it blows up size of /boot and /lib.
+  # - our OTA update can't currently handle that and it blows up size of /boot and /lib.
   # This rename is safe, because we have only one vmlinuz* in /boot
   mv /boot/vmlinuz* /boot/vmlinuz
 
