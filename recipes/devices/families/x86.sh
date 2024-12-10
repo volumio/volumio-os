@@ -63,8 +63,8 @@ PACKAGES=()
 # Firmware selection
 # FIRMWARE_VERSION="20211027"
 # FIRMWARE_VERSION="20221216"
-#FIRMWARE_VERSION="20230804"
-FIRMWARE_VERSION="20241110"
+FIRMWARE_VERSION="20230804"
+#FIRMWARE_VERSION="20241110"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -120,6 +120,11 @@ write_device_files() {
   ]
 }
 EOF
+
+  # Headphone detect currently only for atom z8350 with rt5640 codec
+  # Evaluate additional requirements when they arrive
+  log "Copying acpi event handing for headphone jack detect (z8350 with rt5640 only)" "info"
+  cp "${PLTDIR}/${DEVICE}"/utilities/bytcr-init/jackdetect "${ROOTFSMNT}"/etc/acpi/events
 
 }
 
@@ -202,7 +207,10 @@ device_chroot_tweaks_pre() {
   log "Installing Syslinux Legacy BIOS at ${BOOT_PART-?BOOT_PART is not known}" "info"
   syslinux -v
   syslinux "${BOOT_PART}"
-
+  dd if="${BOOT_PART}" of=bootrec.dat bs=512 count=1
+  dd if=bootrec.dat of="${BOOT_PART}" bs=512 seek=6
+  rm bootrec.dat 
+  
   log "Preparing boot configurations" "cfg"
   if [[ $DEBUG_IMAGE == yes ]]; then
 		log "Debug image: remove splash from cmdline" "cfg"
