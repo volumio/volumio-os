@@ -207,7 +207,10 @@ device_chroot_tweaks_pre() {
   log "Installing Syslinux Legacy BIOS at ${BOOT_PART-?BOOT_PART is not known}" "info"
   syslinux -v
   syslinux "${BOOT_PART}"
-
+  dd if="${BOOT_PART}" of=bootrec.dat bs=512 count=1
+  dd if=bootrec.dat of="${BOOT_PART}" bs=512 seek=6
+  rm bootrec.dat 
+  
   log "Preparing boot configurations" "cfg"
   if [[ $DEBUG_IMAGE == yes ]]; then
 		log "Debug image: remove splash from cmdline" "cfg"
