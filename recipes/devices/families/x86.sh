@@ -26,7 +26,7 @@ KIOSKMODE=yes
 
 ## Partition info
 BOOT_START=1
-BOOT_END=180
+BOOT_END=256
 IMAGE_END=3800
 BOOT_TYPE=gpt        # msdos or gpt
 BOOT_USE_UUID=yes    # Add UUID to fstab
@@ -77,19 +77,19 @@ write_device_files() {
 
   cp "${pkg_root}"/linux-image-${KERNEL_VERSION}*_${ARCH}.deb "${ROOTFSMNT}"
 
-  log "Copying header files, when present" "info"
-  if [ -f "${pkg_root}"/linux-headers-${KERNEL_VERSION}*_${ARCH}.deb ]; then
-    cp "${pkg_root}"/linux-headers-${KERNEL_VERSION}*_${ARCH}.deb "${ROOTFSMNT}"
-  fi
+  # log "Copying header files, when present" "info"
+  # if [ -f "${pkg_root}"/linux-headers-${KERNEL_VERSION}*_${ARCH}.deb ]; then
+  #   cp "${pkg_root}"/linux-headers-${KERNEL_VERSION}*_${ARCH}.deb "${ROOTFSMNT}"
+  # fi
 
-  log "Copying the latest firmware into /lib/firmware" "info"
-  log "Unpacking the tar file firmware-${FIRMWARE_VERSION}" "info"
-  tar xfJ "${pkg_root}"/firmware-${FIRMWARE_VERSION}.tar.xz -C "${ROOTFSMNT}"
+  # log "Copying the latest firmware into /lib/firmware" "info"
+  # log "Unpacking the tar file firmware-${FIRMWARE_VERSION}" "info"
+  # tar xfJ "${pkg_root}"/firmware-${FIRMWARE_VERSION}.tar.xz -C "${ROOTFSMNT}"
 
   #log "Copying Alsa Use Case Manager files"
   #With Buster we seem to have a default install, but it is not complete. Add the missing codecs.
   #(UCM2, which is complete, does not work with Buster's Alsa version but will with Bullseye)
-  cp -R "${pkg_root}"/UCM/* "${ROOTFSMNT}"/usr/share/alsa/ucm/
+  # cp -R "${pkg_root}"/UCM/* "${ROOTFSMNT}"/usr/share/alsa/ucm/
 
   mkdir -p "${ROOTFSMNT}"/usr/local/bin/
   declare -A CustomScripts=(
@@ -100,10 +100,11 @@ write_device_files() {
   )
   #TODO: not checked with other Intel SST bytrt/cht audio boards yet, needs more input
   #      to be added to the snd_hda_audio tweaks (see below)
-  log "Adding ${#CustomScripts[@]} custom scripts to /usr/local/bin: " "" "${CustomScripts[@]}" "ext"
+  log "Adding ${#CustomScripts[@]} custom scripts to /usr/local/bin:"
   for script in "${!CustomScripts[@]}"; do
     cp "${pkg_root}/${CustomScripts[$script]}" "${ROOTFSMNT}"/usr/local/bin/"${script}"
     chmod +x "${ROOTFSMNT}"/usr/local/bin/"${script}"
+    log "Added ${script}"
   done
 
   log "Creating efi folders" "info"
@@ -166,7 +167,7 @@ EOF
 exit 0
 EOF
   chmod +x "${ROOTFSMNT}/usr/local/bin/soundcard-init.sh"
-
+  [[ -d ${ROOTFSMNT}/lib/systemd/system/ ]] || mkdir -p "${ROOTFSMNT}/lib/systemd/system/"
   cat <<-EOF >"${ROOTFSMNT}/lib/systemd/system/soundcard-init.service"
 [Unit]
 Description = Intel SST and HDA soundcard init service
@@ -204,24 +205,26 @@ device_chroot_tweaks_pre() {
   log "Performing device_chroot_tweaks_pre" "ext"
   log "Preparing kernel stuff" "info"
 
-  log "Installing the kernel" "info"
+  log "Installing the kernel" "info"  
+  apt-get install -yy linux-image-amd64 firmware-linux
   # Exact kernel version not known
   # Not brilliant, but safe enough as platform repo *should* have only a single kernel package
   # Confirm anyway
-  dpkg-deb -R linux-image-*_"${ARCH}".deb ./
-  rm -r /DEBIAN
-  rm -r /etc/kernel
-  rm -r /usr/share/doc/linux-image*
-  rm linux-image-*_"${ARCH}".deb
+  # ls linux-image-*
+  # dpkg-deb -R linux-image-*_"${ARCH}".deb ./
+  # rm -r /DEBIAN
+  # rm -r /etc/kernel
+  # rm -r /usr/share/doc/linux-image*
+  # rm linux-image-*_"${ARCH}".deb
 
-  log "Installing the headers, when present" "info"
-  if [ -f linux-headers-*_"${ARCH}".deb ]; then
-    mkdir /tmpheaders
-    dpkg-deb -R linux-headers-*_"${ARCH}".deb ./tmpheaders
-    cp -R /tmpheaders/usr/src/linux-headers*/include /usr/src
-    rm -r /tmpheaders
-    rm linux-headers-*_"${ARCH}".deb
-  fi
+  # log "Installing the headers, when present" "info"
+  # if [ -f linux-headers-*_"${ARCH}".deb ]; then
+  #   mkdir /tmpheaders
+  #   dpkg-deb -R linux-headers-*_"${ARCH}".deb ./tmpheaders
+  #   cp -R /tmpheaders/usr/src/linux-headers*/include /usr/src
+  #   rm -r /tmpheaders
+  #   rm linux-headers-*_"${ARCH}".deb
+  # fi
 
   log "Change linux kernel image name to 'vmlinuz'" "info"
   # Rename linux kernel to a fixed name, like we do for any other platform.
