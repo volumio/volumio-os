@@ -59,6 +59,8 @@ log "Running dpkg fixes for ${DISTRO_NAME} (${DISTRO_VER})"
 
 case "${DISTRO_VER}" in
 12)
+  log "Removing trailing whitespaces from /var/lib/dpkg/status" "wrn"
+  sed -i 's/[ \t]*$//' /var/lib/dpkg/status
   # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=924401
   log "Running base-passwd.preinst" "wrn"
   /var/lib/dpkg/info/base-passwd.preinst install

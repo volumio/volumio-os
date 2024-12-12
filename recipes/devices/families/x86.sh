@@ -10,9 +10,9 @@ BUILD="x86"
 ### Build image with initramfs debug info?
 DEBUG_IMAGE="no"
 ### Device information
-DEVICENAME="x86"
+DEVICENAME="x86_amd64"
 # This is useful for multiple devices sharing the same/similar kernel
-DEVICEFAMILY="x86"
+DEVICEFAMILY="x64"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEREPO="http://github.com/volumio/platform-${DEVICEFAMILY}"
@@ -26,7 +26,7 @@ KIOSKMODE=yes
 
 ## Partition info
 BOOT_START=1
-BOOT_END=256
+BOOT_END=180
 IMAGE_END=3800
 BOOT_TYPE=gpt        # msdos or gpt
 BOOT_USE_UUID=yes    # Add UUID to fstab
@@ -58,38 +58,29 @@ MODULES=("overlay" "squashfs"
 PACKAGES=()
 
 # Kernel selection
-# This will be expanded as a glob, you can be as specific or vague as required
-# KERNEL_VERSION=5.10
-# KERNEL_VERSION=6.1
-KERNEL_VERSION=6.6
+# Kernel selection has been deprecated, the kernel version is now set during the 'build-x86-platform' process.
 
 # Firmware selection
 # FIRMWARE_VERSION="20211027"
 # FIRMWARE_VERSION="20221216"
 FIRMWARE_VERSION="20230804"
-  
+#FIRMWARE_VERSION="20241110"
+
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
 write_device_files() {
   log "Running write_device_files" "ext"
-  log "Copying kernel files" "info"
-  pkg_root="${PLTDIR}/packages-buster"
+  log "Copying x86 platform (kernel, headers, libc-dev) files" "info"
 
-  cp "${pkg_root}"/linux-image-${KERNEL_VERSION}*_${ARCH}.deb "${ROOTFSMNT}"
+  cp -dR "${PLTDIR}/${DEVICE}/boot" "${ROOTFSMNT}"
+  # for bookworm, copy "lib" to "/usr/lib"!!
+  cp -pdR "${PLTDIR}/${DEVICE}/lib" "${ROOTFSMNT}/usr"
+  cp -pdR "${PLTDIR}/${DEVICE}/usr" "${ROOTFSMNT}"
 
-  # log "Copying header files, when present" "info"
-  # if [ -f "${pkg_root}"/linux-headers-${KERNEL_VERSION}*_${ARCH}.deb ]; then
-  #   cp "${pkg_root}"/linux-headers-${KERNEL_VERSION}*_${ARCH}.deb "${ROOTFSMNT}"
-  # fi
-
-  # log "Copying the latest firmware into /lib/firmware" "info"
-  # log "Unpacking the tar file firmware-${FIRMWARE_VERSION}" "info"
-  # tar xfJ "${pkg_root}"/firmware-${FIRMWARE_VERSION}.tar.xz -C "${ROOTFSMNT}"
-
-  #log "Copying Alsa Use Case Manager files"
-  #With Buster we seem to have a default install, but it is not complete. Add the missing codecs.
-  #(UCM2, which is complete, does not work with Buster's Alsa version but will with Bullseye)
-  # cp -R "${pkg_root}"/UCM/* "${ROOTFSMNT}"/usr/share/alsa/ucm/
+  log "Copying the latest firmware into /lib/firmware" "info"
+  log "Unpacking the tar file firmware-${FIRMWARE_VERSION}" "info"
+  # for bookworm, de-compress firmware to "/usr/lib"!!
+  tar xfJ "${PLTDIR}"/firmware-${FIRMWARE_VERSION}.tar.xz -C "${ROOTFSMNT}/usr"
 
   mkdir -p "${ROOTFSMNT}"/usr/local/bin/
   declare -A CustomScripts=(
@@ -100,11 +91,11 @@ write_device_files() {
   )
   #TODO: not checked with other Intel SST bytrt/cht audio boards yet, needs more input
   #      to be added to the snd_hda_audio tweaks (see below)
-  log "Adding ${#CustomScripts[@]} custom scripts to /usr/local/bin:"
+  log "Adding ${#CustomScripts[@]} custom scripts to /usr/local/bin: " "ext"
   for script in "${!CustomScripts[@]}"; do
-    cp "${pkg_root}/${CustomScripts[$script]}" "${ROOTFSMNT}"/usr/local/bin/"${script}"
+    log "..${script}"
+    cp "${PLTDIR}/${DEVICE}/utilities/${CustomScripts[$script]}" "${ROOTFSMNT}"/usr/local/bin/"${script}"
     chmod +x "${ROOTFSMNT}"/usr/local/bin/"${script}"
-    log "Added ${script}"
   done
 
   log "Creating efi folders" "info"
@@ -114,9 +105,9 @@ write_device_files() {
   
   log "Copying bootloaders and grub configuration template" "ext"
   mkdir -p "${ROOTFSMNT}"/boot/grub
-  cp "${pkg_root}"/efi/BOOT/grub.cfg "${ROOTFSMNT}"/boot/efi/BOOT/grub.tmpl
-  cp "${pkg_root}"/efi/BOOT/BOOTIA32.EFI "${ROOTFSMNT}"/boot/efi/BOOT/BOOTIA32.EFI
-  cp "${pkg_root}"/efi/BOOT/BOOTX64.EFI "${ROOTFSMNT}"/boot/efi/BOOT/BOOTX64.EFI
+  cp "${PLTDIR}/${DEVICE}"/utilities/efi/BOOT/grub.cfg "${ROOTFSMNT}"/boot/efi/BOOT/grub.tmpl
+  cp "${PLTDIR}/${DEVICE}"/utilities/efi/BOOT/BOOTIA32.EFI "${ROOTFSMNT}"/boot/efi/BOOT/BOOTIA32.EFI
+  cp "${PLTDIR}/${DEVICE}"/utilities/efi/BOOT/BOOTX64.EFI "${ROOTFSMNT}"/boot/efi/BOOT/BOOTX64.EFI
 
   log "Copying current partition data for use in runtime fast 'installToDisk'" "ext"
   cat <<-EOF >"${ROOTFSMNT}/boot/partconfig.json"
@@ -130,10 +121,11 @@ write_device_files() {
 }
 EOF
 
-	# Headphone detect currently only for atom z8350 with rt5640 codec
+  # Headphone detect currently only for atom z8350 with rt5640 codec
   # Evaluate additional requirements when they arrive
   log "Copying acpi event handing for headphone jack detect (z8350 with rt5640 only)" "info"
-  cp "${pkg_root}"/bytcr-init/jackdetect "${ROOTFSMNT}"/etc/acpi/events
+  cp "${PLTDIR}/${DEVICE}"/utilities/bytcr-init/jackdetect "${ROOTFSMNT}"/etc/acpi/events
+
 }
 
 write_device_bootloader() {
@@ -203,28 +195,6 @@ device_chroot_tweaks() {
 # TODO Try and streamline this!
 device_chroot_tweaks_pre() {
   log "Performing device_chroot_tweaks_pre" "ext"
-  log "Preparing kernel stuff" "info"
-
-  log "Installing the kernel" "info"  
-  apt-get install -yy linux-image-amd64 firmware-linux
-  # Exact kernel version not known
-  # Not brilliant, but safe enough as platform repo *should* have only a single kernel package
-  # Confirm anyway
-  # ls linux-image-*
-  # dpkg-deb -R linux-image-*_"${ARCH}".deb ./
-  # rm -r /DEBIAN
-  # rm -r /etc/kernel
-  # rm -r /usr/share/doc/linux-image*
-  # rm linux-image-*_"${ARCH}".deb
-
-  # log "Installing the headers, when present" "info"
-  # if [ -f linux-headers-*_"${ARCH}".deb ]; then
-  #   mkdir /tmpheaders
-  #   dpkg-deb -R linux-headers-*_"${ARCH}".deb ./tmpheaders
-  #   cp -R /tmpheaders/usr/src/linux-headers*/include /usr/src
-  #   rm -r /tmpheaders
-  #   rm linux-headers-*_"${ARCH}".deb
-  # fi
 
   log "Change linux kernel image name to 'vmlinuz'" "info"
   # Rename linux kernel to a fixed name, like we do for any other platform.
@@ -237,7 +207,10 @@ device_chroot_tweaks_pre() {
   log "Installing Syslinux Legacy BIOS at ${BOOT_PART-?BOOT_PART is not known}" "info"
   syslinux -v
   syslinux "${BOOT_PART}"
-
+  dd if="${BOOT_PART}" of=bootrec.dat bs=512 count=1
+  dd if=bootrec.dat of="${BOOT_PART}" bs=512 seek=6
+  rm bootrec.dat 
+  
   log "Preparing boot configurations" "cfg"
   if [[ $DEBUG_IMAGE == yes ]]; then
 		log "Debug image: remove splash from cmdline" "cfg"
