@@ -139,6 +139,9 @@ device_image_tweaks() {
 		deb http://archive.raspberrypi.com/debian/ ${SUITE} main
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
 		#deb-src http://archive.raspberrypi.org/debian/ buster main ui
+		# https://github.com/volumio/volumio-os/issues/45 - mesa libs unmet dependencies
+		deb http://archive.raspberrypi.com/debian/ ${SUITE} untested
+
 	EOF
 
 	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files
