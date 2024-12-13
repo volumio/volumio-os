@@ -32,10 +32,11 @@ KIOSKMODE=yes
 KIOSKBROWSER=vivaldi
 
 ## Partition info
-BOOT_START=0
-BOOT_END=96
-BOOT_TYPE=msdos    # msdos or gpt
-BOOT_USE_UUID=yes  # Add UUID to fstab
+BOOT_START=1
+BOOT_END=257
+IMAGE_END=3257
+BOOT_TYPE=msdos   # msdos or gpt
+BOOT_USE_UUID=yes # Add UUID to fstab
 INIT_TYPE="initv3"
 INIT_UUID_TYPE="pi" # Use block device GPEN if dynamic UUIDs are not handled.
 
@@ -73,10 +74,29 @@ PACKAGES=( # Bluetooth packages
 	"fbset"	
 	# "rpi-eeprom"\ Needs raspberrypi-bootloader that we hold back
 	# GPIO stuff
-	"wiringpi"	
-	# Wireless firmware
-	"firmware-atheros" "firmware-ralink" "firmware-realtek" "firmware-brcm80211"
+	# "wiringpi" # --> Not in repo, grabbing from github release
 )
+
+#Pi Specific
+RpiRepo="https://github.com/raspberrypi/rpi-firmware"
+RpiUpdateRepo="raspberrypi/rpi-update"
+declare -A PI_KERNELS=(
+	#[KERNEL_VERSION]="SHA|Branch|Rev"
+	[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
+	[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
+	[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"
+	[6.1.64]="01145f0eb166cbc68dd2fe63740fac04d682133e|master|1702"
+	[6.1.69]="ec8e8136d773de83e313aaf983e664079cce2815|master|1710"
+	[6.1.70]="fc9319fda550a86dc6c23c12adda54a0f8163f22|master|1712"
+	[6.1.77]="5fc4f643d2e9c5aa972828705a902d184527ae3f|master|1730"
+	[6.6.30]="3b768c3f4d2b9a275fafdb53978f126d7ad72a1a|master|1763"
+	[6.6.47]="a0d314ac077cda7cbacee1850e84a57af9919f94|master|1792"
+	[6.6.51]="d5a7dbe77b71974b9abb133a4b5210a8070c9284|master|1796"
+	[6.6.56]="a5efb544aeb14338b481c3bdc27f709e8ee3cf8c|master|1803"
+	[6.6.62]="9a9bda382acec723c901e5ae7c7f415d9afbf635|master|1816"
+)
+# Version we want
+KERNEL_VERSION="6.6.62"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -116,7 +136,7 @@ device_image_tweaks() {
 
 	log "Adding archive.raspberrypi debian repo" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/sources.list.d/raspi.list"
-		deb http://archive.raspberrypi.org/debian/ buster main ui
+		deb http://archive.raspberrypi.com/debian/ ${SUITE} main
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
 		#deb-src http://archive.raspberrypi.org/debian/ buster main ui
 	EOF
@@ -142,45 +162,70 @@ device_image_tweaks() {
 	EOF
 
 	log "Fetching rpi-update" "info"
-	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://raw.githubusercontent.com/raspberrypi/rpi-update/master/rpi-update &&
+	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" "https://raw.githubusercontent.com/${RpiUpdateRepo}/master/rpi-update" &&
 		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
-	#TODO: Look into moving kernel stuff outside chroot using ROOT/BOOT_PATH to speed things up
-	# ROOT_PATH=${ROOTFSMNT}
-	# BOOT_PATH=${ROOT_PATH}/boot
+
+	# For bleeding edge, check what is the latest on offer
+	# Things *might* break, so you are warned!
+	if [[ ${RPI_USE_LATEST_KERNEL:-no} == yes ]]; then
+		branch=master
+		log "Using bleeding edge Rpi kernel" "info" "$branch"
+		RpiRepoApi=${RpiRepo/github.com/api.github.com\/repos}
+		RpiRepoRaw=${RpiRepo/github.com/raw.githubusercontent.com}
+		log "Fetching latest kernel details from ${RpiRepo}" "info"
+		RpiGitSHA=$(curl --silent "${RpiRepoApi}/branches/${branch}")
+		readarray -t RpiCommitDetails <<<"$(jq -r '.commit.sha, .commit.commit.message' <<<"${RpiGitSHA}")"
+		log "Rpi latest kernel -- ${RpiCommitDetails[*]}" "info"
+		# Parse required info from `uname_string`
+		uname_string=$(curl --silent "${RpiRepoRaw}/${RpiCommitDetails[0]}/uname_string")
+		RpiKerVer=$(awk '{print $3}' <<<"${uname_string}")
+		KERNEL_VERSION=${RpiKerVer/+/}
+		RpiKerRev=$(awk '{print $1}' <<<"${uname_string##*#}")
+		PI_KERNELS[${KERNEL_VERSION}]+="${RpiCommitDetails[0]}|${branch}|${RpiKerRev}"
+		# Make life easier
+		log "Using rpi-update SHA:${RpiCommitDetails[0]} Rev:${RpiKerRev}" "${KERNEL_VERSION}" "dbg"
+		log "[${KERNEL_VERSION}]=\"${RpiCommitDetails[0]}|${branch}|${RpiKerRev}\"" "dbg"
+	fi
+
+	### Kernel installation
+	IFS=\| read -r KERNEL_COMMIT KERNEL_BRANCH KERNEL_REV <<<"${PI_KERNELS[$KERNEL_VERSION]}"
+
+	# using rpi-update to fetch and install kernel and firmware
+	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
+	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
+	RpiUpdate_args=("UPDATE_SELF=0" "ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
+		"SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
+		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=1"
+		# "BRANCH=${KERNEL_BRANCH}"
+	)
+	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
 }
 
 # Will be run in chroot (before other things)
 device_chroot_tweaks() {
 	log "Running device_image_tweaks" "ext"
-	# rpi-update needs binutils
-	log "Installing binutils for rpi-update" "ext"
-	apt-get update -qq && apt-get -yy install binutils
 }
 
 # Will be run in chroot - Pre initramfs
 # TODO Try and streamline this!
 device_chroot_tweaks_pre() {
-	log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
-	sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
+	# !Warning!
+	# This will break proper plymouth on DSI screens at boot time.
+	# initramfs plymouth hook will not copy drm gpu drivers for list!.
+	# log "Changing initramfs module config to 'modules=list' to limit volumio.initrd size" "cfg"
+	# sed -i "s/MODULES=most/MODULES=list/g" /etc/initramfs-tools/initramfs.conf
 
 	## Define parameters
-	declare -A PI_KERNELS=(
-		#[KERNEL_VERSION]="SHA|Branch|Rev"
-		[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
-		[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
-		[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"
-		[6.1.64]="01145f0eb166cbc68dd2fe63740fac04d682133e|master|1702"
-		[6.1.69]="ec8e8136d773de83e313aaf983e664079cce2815|master|1710"
-		[6.1.70]="fc9319fda550a86dc6c23c12adda54a0f8163f22|master|1712"
-		[6.1.77]="5fc4f643d2e9c5aa972828705a902d184527ae3f|master|1730"
-		[6.6.30]="3b768c3f4d2b9a275fafdb53978f126d7ad72a1a|master|1763"
-	)
-	# Version we want
-	KERNEL_VERSION="6.6.30"
 
-	MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 1)
-	MINOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 2)
-	PATCH_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 3)
+	## Reconfirm our kernel version
+	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
+	mapfile -t kver < <(ls -t /lib/modules | sort)
+	log "Found ${#kver[@]} kernel version(s)" "${kver[*]}"
+	ksemver=${kver[0]%%-*} && ksemver=${ksemver%%+*}
+	[[ ${ksemver} != "${KERNEL_VERSION}" ]] && [[ ${RPI_USE_RPI_UPDATE} == yes ]] &&
+		log "Installed kernel doesn't match requested version!" "wrn" "${ksemver} != ${KERNEL_VERSION}"
+	KERNEL_VERSION=${ksemver}
+	IFS=\. read -ra KERNEL_SEMVER <<<"${KERNEL_VERSION}"
 
 	# List of custom firmware -
 	# github archives that can be extracted directly
@@ -190,56 +235,15 @@ device_chroot_tweaks_pre() {
 		[RPiUserlandTools]="https://github.com/volumio/volumio3-os-static-assets/raw/master/tools/rpi-softfp-vc.tar.gz"
 	)
 
-	### Kernel installation
-	IFS=\. read -ra KERNEL_SEMVER <<<"${KERNEL_VERSION}"
-	IFS=\| read -r KERNEL_COMMIT KERNEL_BRANCH KERNEL_REV <<<"${PI_KERNELS[$KERNEL_VERSION]}"
+	## Comment to keep RPi4/RPi5 64bit kernel
+	#if [ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]; then
+	#	log "Removing v8+ (Pi4/5) Kernel and modules" "info"
+	#	rm -rf /boot/kernel8.img
+	#	rm -rf "/lib/modules/${KERNEL_VERSION}-v8+"
+	#fi
 
-	# using rpi-update to fetch and install kernel and firmware
-	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
-	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
-	echo y | SKIP_BACKUP=1 WANT_32BIT=1 WANT_64BIT=1 WANT_PI4=1 WANT_PI5=0 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 /usr/bin/rpi-update "${KERNEL_COMMIT}"
-
-	log "Adding Custom firmware from github" "info"
-	for key in "${!CustomFirmware[@]}"; do
-		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
-			log "Failed to get firmware:" "err" "${key}"
-			rm "$key.tar.gz"
-			continue
-		}
-		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
-		rm "$key.tar.gz"
-	done
-
-	if [ -d "/lib/modules/${KERNEL_VERSION}+" ]; then
-		log "Removing ${KERNEL_VERSION}+ Kernel and modules" "info"
-		rm -rf /boot/kernel.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}+"
-	fi
-
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v7+" ]; then
-		log "Removing ${KERNEL_VERSION}-v7+ Kernel and modules" "info"
-		rm -rf /boot/kernel7.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}-v7+"
-	fi
-
-	#	if [ -d "/lib/modules/${KERNEL_VERSION}-v7l+" ]; then
-	#		log "Removing ${KERNEL_VERSION}-v7l+ Kernel and modules" "info"
-	#		rm -rf /boot/kernel7l.img
-	#		rm -rf "/lib/modules/${KERNEL_VERSION}-v7l+"
-	#	fi
-
-	#	if [ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]; then
-	#		log "Removing ${KERNEL_VERSION}-v8+ Kernel and modules" "info"
-	#		rm -rf /boot/kernel8.img
-	#		rm -rf "/lib/modules/${KERNEL_VERSION}-v8+"
-	#	fi
-
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v8_16k+" ]; then
-		log "Removing ${KERNEL_VERSION}-v8_16k+ Kernel and modules" "info"
-		rm -rf /boot/kernel_2712.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}-v8_16k+"
-	fi
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]; then
+	## Comment to keep RPi5 64bit 16k page size kernel
+	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]]; then
 		log "Removing v8-16k+ (Pi5 16k) Kernel and modules" "info"
 		rm -rf /boot/kernel_2712.img
 		rm -rf "/lib/modules/${KERNEL_VERSION}-v8-16k+"
@@ -248,30 +252,33 @@ device_chroot_tweaks_pre() {
 	log "Finished Kernel installation" "okay"
 
 	### Other Rpi specific stuff
-	log "Installing fake libraspberrypi0 package" "info"
-	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/libraspberrypi0/libraspberrypi0_1.20230509-buster-1_armhf.deb
-	dpkg -i libraspberrypi0_1.20230509-buster-1_armhf.deb
-	rm libraspberrypi0_1.20230509-buster-1_armhf.deb
-	### Plymouth backport
-	# TODO: Temporary only, backport for drm DSI rotation
-	if [[ "${VARIANT}" == motivo ]]; then
-		log "Installing custom backport plymouth packages" "info"
-		wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/plymouth/01libplymouth5_0.9.5-4_arm.deb
-		wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/plymouth/02plymouth_0.9.5-4_arm.deb
-		wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/plymouth/plymouth-label_0.9.5-4_arm.deb
-		dpkg -i *plymouth*_0.9.5-4_arm.deb
-		rm *plymouth*_0.9.5-4_arm.deb
-		# Block upgrade of libplymouth from raspi repos
-		log "Blocking libplymouth upgrades from raspi repos" "info"
-		cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/libplymouth"
-			Package: libplymouth4
-			Pin: release *
-			Pin-Priority: -1
-		EOF
-	fi
-
 	## Lets update some packages from raspbian repos now
 	apt-get update && apt-get -y upgrade
+
+	# https://github.com/volumio/volumio3-os/issues/174
+	## Quick fix for dhcpcd in Raspbian vs Debian
+	log "Raspbian vs Debian dhcpcd debug "
+	apt-get remove dhcpcd -yy && apt-get autoremove
+	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
+	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd_9.4.1-24~deb12u4_all.deb
+	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
+	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
+	dpkg -i dhcpcd*.deb && rm -rf dhcpcd*.deb
+
+	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/dhcpcd"
+		Package: dhcpcd
+		Pin: release *
+		Pin-Priority: -1
+
+		Package: dhcpcd-base
+		Pin: release *
+		Pin-Priority: -1
+	EOF
+
+	log "Installing WiringPi 3.10 package" "info"
+	wget -nv https://github.com/WiringPi/WiringPi/releases/download/3.10/wiringpi_3.10_armhf.deb
+	dpkg -i wiringpi_3.10_armhf.deb && rm wiringpi_3.10_armhf.deb
 
 	NODE_VERSION=$(node --version)
 	log "Node version installed:" "dbg" "${NODE_VERSION}"
@@ -335,13 +342,27 @@ device_chroot_tweaks_pre() {
 	log "Updating LD_LIBRARY_PATH" "info"
 	ldconfig
 
+	# libraspberrypi0 normally links this, so counter check and link if required
+	if [[ ! -f /lib/ld-linux.so.3 ]] && [[ "$(dpkg --print-architecture)" = armhf ]]; then
+		log "Linking /lib/ld-linux.so.3"
+		ln -s /lib/ld-linux-armhf.so.3 /lib/ld-linux.so.3 2>/dev/null || true
+		ln -s /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ld-linux.so.3 2>/dev/null || true
+	fi
+
 	log "Symlinking vc bins" "info"
+	# Clean this up! > Quoting popcornmix "Code from here is no longer installed on latest RPiOS Bookworm images.If you are using code from here you should rethink your solution.Consider this repo closed."
 	# https://github.com/RPi-Distro/firmware/blob/debian/debian/libraspberrypi-bin.links
 	VC_BINS=("edidparser" "raspistill" "raspivid" "raspividyuv" "raspiyuv"
-		"tvservice" "vcdbg" "vcgencmd" "vchiq_test"
-		"dtoverlay" "dtoverlay-pre" "dtoverlay-post" "dtmerge")
+		"tvservice" "vcdbg" "vchiq_test"
+		"dtoverlay-pre" "dtoverlay-post")
+
 	for bin in "${VC_BINS[@]}"; do
-		ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
+		if [[ ! -f /usr/bin/${bin} && -f /opt/vc/bin/${bin} ]]; then
+			ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
+			log "Linked ${bin}"
+		else
+			log "${bin} wasn't linked!" "wrn"
+		fi
 	done
 
 	log "Fixing vcgencmd permissions" "info"
@@ -349,8 +370,30 @@ device_chroot_tweaks_pre() {
 		SUBSYSTEM=="vchiq",GROUP="video",MODE="0660"
 	EOF
 
+	# All additional drivers
+	log "Adding Custom firmware from github" "info"
+	# TODO: There is gcc mismatch between Bookworm and rpi-firmware and as such in chroot environment ld-linux.so.3 is complaining when using drop-ship to /usr directly
+		for key in "${!CustomFirmware[@]}"; do
+		mkdir -p "/tmp/$key" && cd "/tmp/$key"
+		wget -nv "${CustomFirmware[$key]}" -O "$key.tar.gz" || {
+			log "Failed to get firmware:" "err" "${key}"
+			rm "$key.tar.gz" && cd - && rm -rf "/tmp/$key"
+			continue
+		}
+		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
+		rm "$key.tar.gz"
+		if [[ -d boot ]]; then
+			log "Updating /boot content" "info"
+			cp -rp boot "${ROOTFS}"/ && rm -rf boot
+		fi
+		log "Adding $key update" "info"
+		cp -rp * "${ROOTFS}"/usr && cd - && rm -rf "/tmp/$key"
+	done
+
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
-	if [ "$MAJOR_VERSION" -gt 6 ] || { [ "$MAJOR_VERSION" -eq 6 ] && { [ "$MINOR_VERSION" -gt 1 ] || [ "$MINOR_VERSION" -eq 1 ] && [ "$PATCH_VERSION" -ge 54 ]; }; }; then
+	if [[ "${KERNEL_SEMVER[0]}" -gt 6 ]] ||
+		[[ "${KERNEL_SEMVER[0]}" -eq 6 && "${KERNEL_SEMVER[1]}" -gt 1 ]] ||
+		[[ "${KERNEL_SEMVER[0]}" -eq 6 && "${KERNEL_SEMVER[1]}" -eq 1 && "${KERNEL_SEMVER[2]}" -ge 54 ]]; then
 		log "Rename gpiomem in udev rules" "info"
 		sed -i 's/bcm2835-gpiomem/gpiomem/g' /etc/udev/rules.d/99-com.rules
 	fi
@@ -466,16 +509,27 @@ device_chroot_tweaks_pre() {
 		${kernel_params[@]}
 	EOF
 
-	# Rerun depmod for new drivers
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v7l+" ]; then
-		log "Finalising drivers installation with depmod on ${KERNEL_VERSION}-v7l+"
-		depmod "${KERNEL_VERSION}-v7l+" # CM4 with 32bit kernel
-	fi
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]; then
-		log "Finalising drivers installation with depmod on ${KERNEL_VERSION}-v8+"
-		depmod "${KERNEL_VERSION}-v8+" # CM4 with 64bit kernel
-	fi
-	log "CM4 Kernel and Modules installed" "okay"
+	log "Finalise all kernels with depmod and other tricks" "info"
+	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
+	# + 	--> Pi 1,Zero,ZeroW, and CM 1
+	# -v7+  --> Pi 2,3,3+,Zero 2W, CM3, and CM3+
+	# -v7l+ --> Pi 4,400, CM 4 (32bit)
+	# -v8+  --> Pi 3,3+,4,400, Zero 2W, CM 3,3+,4 (64bit)
+
+	## Reconfirm our final kernel lists - we may have deleted a few!
+	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
+	mapfile -t kver < <(ls -t /lib/modules | sort)
+	for ver in "${kver[@]}"; do
+		log "Running depmod on" "${ver}"
+		depmod "${ver}"
+		# Trick our non std kernel install with the right bits for intramfs creation
+		cat <<-EOF >"/boot/config-${ver}"
+			CONFIG_RD_ZSTD=y
+			CONFIG_RD_GZIP=y
+		EOF
+	done
+	log "Raspi Kernel and Modules installed" "okay"
+
 }
 
 # Will be run in chroot - Post initramfs
@@ -487,9 +541,9 @@ device_chroot_tweaks_post() {
 # Will be called by the image builder post the chroot, before finalisation
 device_image_tweaks_post() {
 	log "Running device_image_tweaks_post" "ext"
-    # Plymouth systemd services OVERWRITE
+	# Plymouth systemd services OVERWRITE
 	if [[ "${UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM}" == yes ]]; then
-        log "Updating plymouth systemd services" "info"
-        cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
+		log "Updating plymouth systemd services" "info"
+		cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
 	fi
 }
