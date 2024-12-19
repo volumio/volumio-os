@@ -84,7 +84,7 @@ write_device_files() {
 
   mkdir -p "${ROOTFSMNT}"/usr/local/bin/
   declare -A CustomScripts=(
-    [bytcr_init.sh]="bytcr-init/bytcr-init.sh"
+    [bytcr_init.sh]="bytcr-init/bytcr_init.sh"
     [jackdetect.sh]="bytcr-init/jackdetect.sh"
     [volumio_hda_intel_tweak.sh]="hda-intel-tweaks/volumio_hda_intel_tweak.sh"
     [x86Installer.sh]="x86Installer/x86Installer.sh"
