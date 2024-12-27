@@ -574,7 +574,7 @@ build_volumio_initramfs() {
     '/sbin/e2fsck' '/sbin/resize2fs' '/sbin/mke2fsfull' '/sbin/mkfs.vfat')
   if [[ ${DPKG_ARCH} = 'i386' ]] || [[ ${DPKG_ARCH} = 'amd64' ]]; then
     log "Adding x86/x64 specific binaries (sgdisk/lsblk/dmidecode..etc)" "info"
-    volbins+=('/sbin/fdisk' '/sbin/sgdisk' '/usr/sbin/dmidecode')
+    volbins+=('/usr/sbin/fdisk' '/usr/sbin/sgdisk' '/usr/sbin/dmidecode')
   fi
   # mkinitramfs for installer's do not have a volumio-init-updater
   if [[ -f "/usr/local/sbin/volumio-init-updater" ]]; then
