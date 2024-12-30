@@ -10,7 +10,7 @@ maybe_volumio_break() {
 # Breakpoints are specified on the kernel cmdline using the 'break=', comma-separated.
 #
 # Valid breakpoints are:
-#       top, modules, premount, mount, cust-init-part, init-part-pars, progress, backup_gpt,
+#       top, modules, premount, mount, cust-init-part, init-part-pars, progress, dev_partiton,
 #       krnl-archive, search-for-firmw, search-fact-reset, search-fact-reset, krnl-rollbck,
 #       krnl-upd, resize-data, mnt-overlayfs, cust-upd-uuid, updfstab, bottom and init
 # Globals
