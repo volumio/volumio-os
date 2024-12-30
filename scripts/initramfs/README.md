@@ -102,7 +102,7 @@ Use ```maybe_volumio_break <break name> "init: $LINENO"``` for that and remove t
 
 ### Valid breakpoints are:
 ```
-top, modules, premount, mount, udev-slumber, cust-init-part, init-part-pars, progress, backup_gpt, krnl-archive, search-for-firmw, search-fact-reset, search-fact-reset, krnl-rollbck,krnl-upd, resize-data, mnt-overlayfs, cust-upd-uuid, updfstab, bottom, init
+top, modules, premount, mount, udev-slumber, cust-init-part, init-part-pars, progress, dev_partiton, krnl-archive, search-for-firmw, search-fact-reset, search-fact-reset, krnl-rollbck,krnl-upd, resize-data, mnt-overlayfs, cust-upd-uuid, updfstab, bottom, init
 ```
 
 ### Configuring a breakpoint
