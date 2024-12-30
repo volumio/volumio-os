@@ -406,9 +406,9 @@ mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}"
 # In case of a gpt boot partition: move the backup table when not done yet
 # This function is also safe for non-gpt boot partitions (it will not trigger a mismatch).
 #
-maybe_volumio_break backup_gpt "init: $LINENO"
+maybe_volumio_break dev_partiton "init: $LINENO"
 
-move_backup_gpt_table
+maintain_device_partitions
 
 #
 #
