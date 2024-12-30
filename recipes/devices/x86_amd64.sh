@@ -14,3 +14,4 @@ ARCH="amd64"
 BUILD="x64"
 DEVICE="x86_amd64"
 DEVICENAME="x86_64"
+INIT_UUID_TYPE="x86" # Enable GPT partition fix using custom-functions.
