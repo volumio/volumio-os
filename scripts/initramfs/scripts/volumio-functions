@@ -255,19 +255,11 @@ for i in 1 2 3 4 5
   log_end_msg
 }
 
-
-move_backup_gpt_table() {
-
-# GPT partitions: as the Volumio image likely has been dd'ed to a bigger disk,
-#     the backup GPT table is not at the end of the disk.
-# 		Fix this before doing anything else (only at first boot)
-  
-  GPTSIZEMISMATCH="$(/sbin/fdisk -l ${BOOT_DEVICE} 2>&1 | grep 'GPT PMBR size mismatch')"
-  if [ ! "x${GPTSIZEMISMATCH}" == "x" ]; then
-    log_begin_msg "Alternate (backup) GPT header not at the end of the disk, moving it..."
-    sgdisk -e "${BOOT_DEVICE}" >/dev/null 2>&1
-    log_end_msg 
-  fi
+maintain_device_partitions() {
+  # Placeholder for device specific partition fix or procedures.
+  # x86 - uses it to update gpt partitions: as the Volumio image likely has been dd'ed to a bigger disk.
+  # Pi - uses it to fix incorrectly unmount vfat boot partition. 
+  :
 }
 
 create_kernel_archive() {

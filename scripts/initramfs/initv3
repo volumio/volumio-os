@@ -408,7 +408,7 @@ mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}"
 #
 maybe_volumio_break backup_gpt "init: $LINENO"
 
-move_backup_gpt_table
+maintain_device_partitions
 
 #
 #
