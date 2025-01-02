@@ -571,7 +571,7 @@ build_volumio_initramfs() {
   log "Adding Volumio specific binaries" "info"
   # Add VolumioOS binaries
   volbins=('/sbin/parted' '/sbin/findfs' '/bin/lsblk' '/sbin/mke2fs'
-    '/sbin/e2fsck' '/sbin/resize2fs' '/sbin/mke2fsfull' '/sbin/mkfs.vfat')
+    '/sbin/e2fsck' '/sbin/resize2fs' '/sbin/mke2fsfull' '/sbin/mkfs.vfat' '/sbin/fsck.fat')
   if [[ ${DPKG_ARCH} = 'i386' ]] || [[ ${DPKG_ARCH} = 'amd64' ]]; then
     log "Adding x86/x64 specific binaries (sgdisk/lsblk/dmidecode..etc)" "info"
     volbins+=('/usr/sbin/fdisk' '/usr/sbin/sgdisk' '/usr/sbin/dmidecode')
