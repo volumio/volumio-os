@@ -121,6 +121,11 @@ Add "plymouth.debug" to the cmdline parameters.
 Boot and just let it run. After boot, login (```ctrl-F1```) and check file ```/var/log/plymouth-debug.log```
 
 
+# **Modifying kernel command parameters in an already built image**
+
+The parameters are integrated in the ```grub.cfg``` file, which can be found in folder ```/boot/efi/BOOT/grub.cfg```.  
+Scroll down to ```menuentry 'Volumio Audiophile Music player GNU/Linux'```.  
+ and locate the line ```linux   /vmlinuz ```.
 
 # Integrating the new INITRAMFS (initv3)
 ## WIP
