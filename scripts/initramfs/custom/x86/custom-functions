@@ -15,4 +15,12 @@ maintain_device_partitions() {
     log_end_msg
   fi
   rm -f /tmp/parted
+
+# Remove dirty bit from the boot record and its backup
+  fsck.fat ${BOOT_PARTITION} -a -w
+# Dump the bootrecord
+  dd if="${BOOT_PARTITION}" of=bootrec.dat bs=512 count=1
+# Copy it to its backup
+  dd if=bootrec.dat of="${BOOT_PARTITION}" bs=512 seek=6
+  rm bootrec.dat
 }
