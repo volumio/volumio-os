@@ -107,4 +107,9 @@ chmod a+x "${ROOTFS}/bin/manage_user_groups.sh"
 cp -rp "${SRC}/volumio/etc/groups-config.conf" "${ROOTFS}/etc/groups-config.conf" 
 cp -rp "${SRC}/volumio/lib/systemd/system/volumio_groups_manager.service" "${ROOTFS}/lib/systemd/system/volumio_groups_manager.service"
 
+#VOLUMIO FS PROTECTION
+cp -rp "${SRC}/volumio/bin/volumio_fs_protection.sh" "${ROOTFS}/bin/volumio_fs_protection.sh"
+chmod a+x "${ROOTFS}/bin/volumio_fs_protection.sh"
+cp -rp "${SRC}/volumio/lib/systemd/system/volumio_fs_protection.service" "${ROOTFS}/lib/systemd/system/volumio_fs_protection.service"
+
 log 'Done Copying Custom Volumio System Files' "okay"
