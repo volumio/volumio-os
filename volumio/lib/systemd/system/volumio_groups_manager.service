@@ -1,0 +1,26 @@
+[Unit]
+Description=Automatically manage user-group assignments from configuration file
+After=network.target
+
+# This service ensures that users are correctly assigned to specified groups
+# based on the configuration file at /etc/groups-config.conf.
+# It runs once at boot and exits after execution.
+
+[Service]
+Type=oneshot
+ExecStart=/bin/manage_user_groups.sh
+RemainAfterExit=yes
+
+# CONFIGURATION:
+# - Edit /etc/groups-config.conf to define which users should be added to which groups.
+# - Format: user:group1,group2,group3
+# - Example:
+#     root:volumio,audio,lp,bluetooth
+#     volumio:bluetooth
+# - After updating the config file, apply changes with:
+#     sudo systemctl restart volumio_groups_manager.service
+# - To check if a user has been assigned to the correct groups:
+#     groups <username>
+
+[Install]
+WantedBy=multi-user.target
