@@ -386,6 +386,9 @@ log "Linking Volumio Command Line Client"
 ln -s /volumio/app/plugins/system_controller/volumio_command_line_client/volumio.sh /usr/local/bin/volumio
 chmod a+x /usr/local/bin/volumio
 
+log "Eanble Volumio group manager"
+ln -s /lib/systemd/system/volumio_groups_manager.service /etc/systemd/system/multi-user.target.wants/volumio_groups_manager.service 
+
 #####################
 #Audio Optimizations#-----------------------------------------
 #####################
