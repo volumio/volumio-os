@@ -25,8 +25,8 @@ case "$ACTION" in
         ;;
     status)
         echo "Current settings:"
-        sysctl fs.protected_regular
-        sysctl fs.protected_fifos
+        sudo sysctl fs.protected_regular
+        sudo sysctl fs.protected_fifos
         ;;
     *)
         echo "Usage: $0 {enable|disable|status}"
