@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CONFIG_FILE="/etc/groups-config.conf"
-LOG_FILE="/var/log/groups-config.log"
+LOG_FILE="/var/log/groups-manager.log"
 
 # Check if config file exists
 if [[ ! -f "$CONFIG_FILE" ]]; then
