@@ -101,4 +101,13 @@ cp "${SRC}/volumio/etc/triggerhappy/triggers.d/audio.conf" "${ROOTFS}/etc/trigge
 #VOLUMIO LOG ROTATE
 cp -rp "${SRC}/volumio/bin/volumiologrotate" "${ROOTFS}/bin/volumiologrotate"
 
+#VOLUMIO GROUPS MANAGER
+cp -rp "${SRC}/volumio/bin/manage_user_groups.sh" "${ROOTFS}/bin/manage_user_groups.sh"
+chmod a+x "${ROOTFS}/bin/manage_user_groups.sh"
+cp -rp "${SRC}/volumio/etc/groups-config.conf" "${ROOTFS}/etc/groups-config.conf" 
+
+#VOLUMIO FS PROTECTION
+cp -rp "${SRC}/volumio/bin/volumio_fs_protection.sh" "${ROOTFS}/bin/volumio_fs_protection.sh"
+chmod a+x "${ROOTFS}/bin/volumio_fs_protection.sh"
+
 log 'Done Copying Custom Volumio System Files' "okay"
