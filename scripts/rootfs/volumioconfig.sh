@@ -141,12 +141,12 @@ echo 'root:$1$JVNbxLRo$pNn5AmZxwRtWZ.xF.8xUq/' | chpasswd -e
 log 'Setting BashRC for custom system calls'
 cat <<-EOF >/etc/bash.bashrc
 ## System Commands ##
-alias reboot="sudo /sbin/reboot"
-alias poweroff="sudo /sbin/poweroff"
-alias halt="sudo /sbin/halt"
-alias shutdown="sudo /sbin/shutdown"
+alias reboot="sudo /usr/sbin/reboot"
+alias poweroff="sudo /usr/sbin/poweroff"
+alias halt="sudo /usr/sbin/halt"
+alias shutdown="sudo /usr/sbin/shutdown"
 alias apt-get="sudo /usr/bin/apt-get"
-alias systemctl="/bin/systemctl"
+alias systemctl="/usr/bin/systemctl"
 alias iwconfig="iwconfig wlan0"
 alias come="echo 'se fosse antani'"
 ## Utilities thanks to http://www.cyberciti.biz/tips/bash-aliases-mac-centos-linux-unix.html ##
@@ -172,13 +172,13 @@ alias df="df -H"
 alias du="du -ch"
 alias makemeasandwich="echo 'What? Make it yourself'"
 alias sudomakemeasandwich="echo 'OKAY'"
-alias snapclient="/usr/sbin/snapclient"
-alias snapserver="/usr/sbin/snapserver"
-alias mount="sudo /bin/mount"
-alias systemctl="sudo /bin/systemctl"
+alias snapclient="/usr/bin/snapclient"
+alias snapserver="/usr/bin/snapserver"
+alias mount="sudo /usr/bin/mount"
+alias systemctl="sudo /usr/bin/systemctl"
 alias killall="sudo /usr/bin/killall"
 alias service="sudo /usr/sbin/service"
-alias ifconfig="sudo /sbin/ifconfig"
+alias ifconfig="sudo /usr/sbin/ifconfig"
 EOF
 
 #Sudoers Nopasswd
