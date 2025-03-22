@@ -51,12 +51,11 @@ progress = 1;
 
 # Restrict text scroll space
 
-num_scroll_lines=5;
+num_scroll_lines=3;
 line_width=80;
 
 message.x = (Window.GetWidth() / 2 - flyingman_image[1].GetWidth() / 2); # Align with the image horizontal centre
-image_bottom_y = (Window.GetHeight() / 2 + flyingman_image[1].GetHeight() / 2); # Align with the image vertical centre
-message.y = Math.Min(image_bottom_y + 10, Window.GetHeight() - (num_scroll_lines * 20) - 10); # Move message below the image, but ensure it is within screen bounds
+message.y = (Window.GetHeight() / 2 + flyingman_image[1].GetHeight() / 2 + 10); # Align with the image vertical centre and move message below the image
 message.z = 1000;
 
 message.sprite.SetX (message.x);
