@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-## Setup for Radxa Rock Pi S
-DEVICE_SUPPORT_TYPE="C" # First letter (Community Porting|Supported Officially|OEM)
+## Setup for NanoPi NEO3
+DEVICE_SUPPORT_TYPE="O" # First letter (Community Porting|Supported Officially|OEM)
 DEVICE_STATUS="P"       # First letter (Planned|Test|Maintenance)
 
 # Base system
@@ -12,9 +12,9 @@ BUILD="armv7"
 UINITRD_ARCH="arm64"
 
 ### Device information
-DEVICENAME="RockPi S"
+DEVICENAME="NanoPi NEO3"
 # This is useful for multiple devices sharing the same/similar kernel
-DEVICEFAMILY="rockpi"
+DEVICEFAMILY="neo3-armbian"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEREPO="https://github.com/volumio/platform-${DEVICEFAMILY}.git"
@@ -88,6 +88,7 @@ EOF
   cat <<-EOF >/etc/udev/rules.d/99-gpio.rules
 	SUBSYSTEM=="gpio*", PROGRAM="/bin/sh -c 'find -L /sys/class/gpio/ -maxdepth 2 -exec chown root:gpio {} \; -exec chmod 770 {} \; || true'"
 	EOF
+
   log "Fix for Volumio Remote updater"
   sed -i '10i\RestartSec=5' /lib/systemd/system/volumio-remote-updater.service
 }
