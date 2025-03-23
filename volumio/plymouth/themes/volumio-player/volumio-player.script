@@ -1,6 +1,6 @@
-#  volumio.script - boot splash plugin
+#  volumio-player.script - boot splash plugin with adaptive message rendering
 #
-#  Copyright (C) 2024 Volumio Srl
+#  Copyright (C) 2025 Volumio Srl
 #  
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -30,101 +30,103 @@
 
 #------------------------------------------------ SEQUENCE ------------------------------------------------#
 
-#  Nice colour on top of the screen fading to
 Window.SetBackgroundTopColor (0.0, 0.00, 0.0);
-
-# an equally nice colour on the bottom
 Window.SetBackgroundBottomColor (0.0, 0.00, 0.0);
 
-# Image animation loop
 for (i = 1; i < 90; i++)
-flyingman_image[i] = Image("progress-" + i + ".png");
+  flyingman_image[i] = Image("progress-" + i + ".png");
 flyingman_sprite = Sprite();
 
-
-flyingman_sprite.SetX(Window.GetWidth() / 2 - flyingman_image[1].GetWidth() / 2); # Place horizontally in the screen centre
-flyingman_sprite.SetY(Window.GetHeight() / 2 - flyingman_image[1].GetHeight() / 2); # Place vertically in the screen centre
+flyingman_sprite.SetX(Window.GetWidth() / 2 - flyingman_image[1].GetWidth() / 2);
+flyingman_sprite.SetY(Window.GetHeight() / 2 - flyingman_image[1].GetHeight() / 2);
 
 progress = 1;
 
 #------------------------------------------------ MESSAGES ------------------------------------------------#
 
-# Restrict text scroll space
+line_height = 20;
+line_width = 80;
+max_scroll_lines = 3;
 
-num_scroll_lines=3;
-line_width=80;
+font_size = "Sans 8";
+if (Window.GetHeight() < 240) {
+  font_size = "Sans 6";
+  line_height = 16;
+}
 
-message.x = (Window.GetWidth() / 2 - flyingman_image[1].GetWidth() / 2); # Align with the image horizontal centre
-message.y = (Window.GetHeight() / 2 + flyingman_image[1].GetHeight() / 2 + 10); # Align with the image vertical centre and move message below the image
+screen_height = Window.GetHeight();
+screen_center_y = screen_height / 2;
+image_half_height = flyingman_image[1].GetHeight() / 2;
+image_bottom_y = screen_center_y + image_half_height;
+
+max_text_y = screen_height - 10;
+min_text_y = image_bottom_y + 10;
+
+available_space = max_text_y - min_text_y;
+num_scroll_lines = Math.Min(max_scroll_lines, Math.Floor(available_space / line_height));
+if (num_scroll_lines < 1) {
+  num_scroll_lines = 1;
+}
+
+scroll_block_height = num_scroll_lines * line_height;
+message.y = min_text_y;
+message.x = Window.GetWidth() / 2;
 message.z = 1000;
 
-message.sprite.SetX (message.x);
-message.sprite.SetY (message.y);
-message.sprite.SetZ (message.z);
-message.sprite.SetOpacity (1);
-
-# Initialising text images and their positions
-# 20 is the height (including line spacing) of each line
-
 for (index = 0; index < num_scroll_lines; index++) {
-  lines[index] = Image.Text ("", 1, 1, 1, 1, "Sans 8");
-  message[index] = Sprite ();
-  message[index].SetX (message.x);
-  message[index].SetY (message.y + (Window.GetHeight() / 3) + (index * 20));
-  message[index].SetZ (10000); 
-  message[index].SetImage (lines[index]);
+  lines[index] = Image.Text("", 1, 1, 1, 1, font_size);
+  message[index] = Sprite();
+  message[index].SetX(message.x - lines[index].GetWidth() / 2);
+  message[index].SetY(message.y + (index * line_height));
+  message[index].SetZ(10000);
+  message[index].SetImage(lines[index]);
+
+  fade_factor = 1.0 - (index * (1.0 / num_scroll_lines));
+  message[index].SetOpacity(fade_factor);
 }
 
 fun StringLength(string) {
   pos = 0;
-  str = String (string);
+  str = String(string);
   while(str.CharAt(pos)) pos++;
   return pos;
 }
 
-# Scroll message function
-
 fun scroll_message_callback(text) {
-
-# Truncate the message if too long
   if (StringLength(text) > line_width) {
     text = text.SubString(0, line_width - 3);
     text += "...";
   }
 
-# Shift message one up
   for (index = 0; index < num_scroll_lines - 1; index++) {
     lines[index] = lines[index + 1];
   }
 
-# Create the image for the latest message
-  lines[index] = Image.Text (text, 1, 1, 1, 1, "Sans 8");
+  lines[index] = Image.Text(text, 1, 1, 1, 1, font_size);
 
-# Re-positioning the text images
   for (index = 0; index < num_scroll_lines; index++) {
-    message[index].SetImage (lines[index]);
-    # Re-position image
-    index_pos_x = Window.GetWidth()/2 - lines[index].GetWidth()/2;
-    message[index].SetX (index_pos_x);
-    message[index].SetY (message.y + (Window.GetHeight() / 3) + (index * 20));
-    message[index].SetZ (10000);
+    message[index].SetImage(lines[index]);
+    index_pos_x = Window.GetWidth() / 2 - lines[index].GetWidth() / 2;
+    message[index].SetX(index_pos_x);
+    message[index].SetY(message.y + (index * line_height));
+
+    fade_factor = 1.0 - (index * (1.0 / num_scroll_lines));
+    message[index].SetOpacity(fade_factor);
+    message[index].SetZ(10000);
   }
 }
 
-#------------------------------------------------- STATUS -------------------------------------------------#
-
-# Enable to display service start messages
+#------------------------------------------------ STATUS --------------------------------------------------#
 
 # Plymouth.SetUpdateStatusFunction(scroll_message_callback);
 
-#------------------------------------------------- RENDER -------------------------------------------------#
+#------------------------------------------------ RENDER --------------------------------------------------#
 
-Plymouth.SetMessageFunction (scroll_message_callback);
+Plymouth.SetMessageFunction(scroll_message_callback);
 
-fun refresh_callback ()
-  {
-    flyingman_sprite.SetImage(flyingman_image[Math.Int(progress / 3) % 90]);
-    progress++;
-  }
-  
-Plymouth.SetRefreshFunction (refresh_callback);
+fun refresh_callback() {
+  flyingman_sprite.SetImage(flyingman_image[Math.Int(progress / 3) % 90]);
+  progress++;
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
