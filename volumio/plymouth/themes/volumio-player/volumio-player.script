@@ -30,8 +30,8 @@
 
 #------------------------------------------------ SEQUENCE ------------------------------------------------#
 
-Window.SetBackgroundTopColor (0.0, 0.00, 0.0);
-Window.SetBackgroundBottomColor (0.0, 0.00, 0.0);
+Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
 for (i = 1; i < 90; i++)
   flyingman_image[i] = Image("progress-" + i + ".png");
@@ -44,45 +44,32 @@ progress = 1;
 
 #------------------------------------------------ MESSAGES ------------------------------------------------#
 
-line_height = 20;
+num_scroll_lines = 5;
 line_width = 80;
-max_scroll_lines = 3;
-
+line_height = 20;
 font_size = "Sans 8";
+
 if (Window.GetHeight() < 240) {
   font_size = "Sans 6";
   line_height = 16;
 }
 
-screen_height = Window.GetHeight();
-screen_center_y = screen_height / 2;
-image_half_height = flyingman_image[1].GetHeight() / 2;
-image_bottom_y = screen_center_y + image_half_height;
-
-max_text_y = screen_height - 10;
-min_text_y = image_bottom_y + 10;
-
-available_space = max_text_y - min_text_y;
-num_scroll_lines = Math.Min(max_scroll_lines, Math.Floor(available_space / line_height));
-if (num_scroll_lines < 1) {
-  num_scroll_lines = 1;
-}
-
 scroll_block_height = num_scroll_lines * line_height;
-message.y = min_text_y;
-message.x = Window.GetWidth() / 2;
-message.z = 1000;
+image_bottom_y = Window.GetHeight() / 2 + flyingman_image[1].GetHeight() / 2;
+message_y = image_bottom_y + 10;
+
+max_scroll_top = Window.GetHeight() - scroll_block_height - 50;
+message_y = Math.Min(message_y, max_scroll_top);
 
 for (index = 0; index < num_scroll_lines; index++) {
   lines[index] = Image.Text("", 1, 1, 1, 1, font_size);
   message[index] = Sprite();
-  message[index].SetX(message.x - lines[index].GetWidth() / 2);
-  message[index].SetY(message.y + (index * line_height));
-  message[index].SetZ(10000);
   message[index].SetImage(lines[index]);
-
-  fade_factor = 1.0 - (index * (1.0 / num_scroll_lines));
-  message[index].SetOpacity(fade_factor);
+  message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
+  message[index].SetY(message_y + (index * line_height));
+  message[index].SetZ(10000);
+  fade = 0.2 + (index * 0.2);
+  message[index].SetOpacity(fade);
 }
 
 fun StringLength(string) {
@@ -102,17 +89,15 @@ fun scroll_message_callback(text) {
     lines[index] = lines[index + 1];
   }
 
-  lines[index] = Image.Text(text, 1, 1, 1, 1, font_size);
+  lines[num_scroll_lines - 1] = Image.Text(text, 1, 1, 1, 1, font_size);
 
   for (index = 0; index < num_scroll_lines; index++) {
     message[index].SetImage(lines[index]);
-    index_pos_x = Window.GetWidth() / 2 - lines[index].GetWidth() / 2;
-    message[index].SetX(index_pos_x);
-    message[index].SetY(message.y + (index * line_height));
-
-    fade_factor = 1.0 - (index * (1.0 / num_scroll_lines));
-    message[index].SetOpacity(fade_factor);
+    message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
+    message[index].SetY(message_y + (index * line_height));
     message[index].SetZ(10000);
+    fade = 0.2 + (index * 0.2);
+    message[index].SetOpacity(fade);
   }
 }
 
