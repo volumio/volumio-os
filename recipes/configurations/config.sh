@@ -40,6 +40,11 @@ declare -A CUSTOM_PKGS=(
     [alsacap]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/alsacap/alsacap_1.4-1"
   # [libcurl]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/curl/00libcurl4_7.74.0-1.2~bpo10%2B1"
   # [curl]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/curl/curl_7.74.0-1.2~bpo10%2B1"
+    [bluetooth]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/bluetooth_5.72-1volumio1"
+    [bluez]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/bluez_5.72-1volumio1"
+    [libbluetooth3]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/libbluetooth3_5.72-1volumio1"
+    [bluez-alsa-utils]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/alsa-utils/bluez-alsa-utils_4.3.1volumio1"
+    [libasound2-plugin]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/alsa-utils/libasound2-plugin-bluez_4.3.1volumio1"
 )
 
 ## Backend and Frontend Repository details
