@@ -1,0 +1,6 @@
+[Unit]
+Description=Fix /etc/hosts and ensure test sentinels
+
+[Service]
+Type=oneshot
+ExecStart=/bin/fix-alpha-hosts.sh
