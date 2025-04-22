@@ -534,3 +534,9 @@ sed -i 's/RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6/RestrictAd
 #[Daemon]
 #Theme=volumio
 #EOF
+
+#####################
+#Enable ALPHA#----------------------------------------
+#####################
+log "Enable ALPHA hosts OTA updater service"
+ln -s /etc/systemd/system/fix-alpha-hosts.path /etc/systemd/system/multi-user.target.wants/fix-alpha-hosts.path
