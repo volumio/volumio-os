@@ -113,7 +113,10 @@ chmod a+x "${ROOTFS}/bin/volumio_fs_protection.sh"
 #UPDATE ALPHA OTA SERVERS
 cp -rp "${SRC}/volumio/bin/fix-alpha-hosts.sh" "${ROOTFS}/bin/fix-alpha-hosts.sh"
 chmod a+x "${ROOTFS}/bin/fix-alpha-hosts.sh"
-cp -rp "${SRC}/volumio/etc/systemd/fix-alpha-hosts.service" "${ROOTFS}/etc/systemd/fix-alpha-hosts.service"
-cp -rp "${SRC}/volumio/etc/systemd/fix-alpha-hosts.path" "${ROOTFS}/etc/systemd/fix-alpha-hosts.path"
+
+for target in "${SRC}"/volumio/lib/systemd/system/*.path; do
+  log "Copying ${target}" 
+  cp  "${target}" "${ROOTFS}"/lib/systemd/system/
+done
 
 log 'Done Copying Custom Volumio System Files' "okay"
