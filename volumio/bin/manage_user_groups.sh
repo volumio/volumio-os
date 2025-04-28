@@ -11,10 +11,11 @@ fi
 
 # Process each line in the config file
 while IFS=: read -r user groups; do
-    if [[ -z "$user" || -z "$groups" ]]; then
-        continue  # Skip empty lines
+    # Skip comments and malformed lines
+    if [[ "$user" =~ ^#.*$ || -z "$user" || -z "$groups" ]]; then
+        continue
     fi
-    
+
     echo "$(date) - Checking user: $user" | tee -a "$LOG_FILE"
 
     # Get current groups for the user
