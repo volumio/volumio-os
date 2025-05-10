@@ -109,18 +109,19 @@ Modify the following parameters, some may have the correct values already.
 |---|---|---|
 |DEVICEBASE|rock4
 |BOARDFAMILY|rockpi-4b
-PLATFORMREPO|https://github.com/volumio/platform-${DEVICEBASE}.git"
-BOOT_START|20
-BOOT_END|148
-BOOTDEV|mmcblk0|Check this by booting from an SD card and then see which device you booted from and which one is your target disk (with eMMC it is the one with the special boot0 and boot1 partitions). Use this info for the following TARGET parameters
-BOOTDEVICE|/dev/mmcblk0p1
-BOOTCONFIG|armbianEnv.txt
-TARGETBOOT|/dev/mmcblk1p1|Used by the installer image
-TARGETDEV|/dev/mmcblk1|Used by the installer image
-TARGETDATA|dev/mmcblk1p3|Used by the installer image
-TARGETIMAGE|/dev/mmcblk1p2|Used by the installer image
-MODULES|"nls_cp437 fuse"|To be safe, match this with your build recipe. But omit overlay, overlayfs and squashfs, the installer does not need them.
-HWDEVICE|rockpi-4b|Used by the installer image
+|PLATFORMREPO|https://github.com/volumio/platform-${DEVICEBASE}.git"
+|DEVICEREPO_BRANCH|variable lets you specify which Git branch to use when cloning the platform-<DEVICEFAMILY> repository|If not set, it defaults to main
+|BOOT_START|20
+|BOOT_END|148
+|BOOTDEV|mmcblk0|Check this by booting from an SD card and then see which device you booted from and which one is your target disk (with eMMC it is the one with the special boot0 and boot1 partitions). Use this info for the following TARGET parameters
+|BOOTDEVICE|/dev/mmcblk0p1
+|BOOTCONFIG|armbianEnv.txt
+|TARGETBOOT|/dev/mmcblk1p1|Used by the installer image
+|TARGETDEV|/dev/mmcblk1|Used by the installer image
+|TARGETDATA|dev/mmcblk1p3|Used by the installer image
+|TARGETIMAGE|/dev/mmcblk1p2|Used by the installer image
+|MODULES|"nls_cp437 fuse"|To be safe, match this with your build recipe. But omit overlay, overlayfs and squashfs, the installer does not need them.
+|HWDEVICE|rockpi-4b|Used by the installer image
 
 - Next in ```mkinstall_config.sh```, re-write the board-specific functions.  
 For ```write_device_files()```, just copy the needed basic files for booting, no need for an overlay or any other board-specific run-time content.  
