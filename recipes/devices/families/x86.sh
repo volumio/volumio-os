@@ -61,10 +61,9 @@ PACKAGES=()
 # Kernel selection has been deprecated, the kernel version is now set during the 'build-x86-platform' process.
 
 # Firmware selection
-# FIRMWARE_VERSION="20211027"
-# FIRMWARE_VERSION="20221216"
-FIRMWARE_VERSION="20230804"
-#FIRMWARE_VERSION="20241110"
+# FIRMWARE_VERSION="20230804"
+# FIRMWARE_VERSION="20241110"
+FIRMWARE_VERSION="20250509"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -80,7 +79,20 @@ write_device_files() {
   log "Copying the latest firmware into /lib/firmware" "info"
   log "Unpacking the tar file firmware-${FIRMWARE_VERSION}" "info"
   # for bookworm, de-compress firmware to "/usr/lib"!!
-  tar xfJ "${PLTDIR}"/firmware-${FIRMWARE_VERSION}.tar.xz -C "${ROOTFSMNT}/usr"
+  FIRMWARE_ARCHIVE="${PLTDIR}/firmware-${FIRMWARE_VERSION}.tar.xz"
+  FIRMWARE_CHUNKS="${FIRMWARE_ARCHIVE}.part_"
+  TEMP_REASSEMBLED="${FIRMWARE_ARCHIVE}.reassembled"
+
+  if ls "${FIRMWARE_CHUNKS}"* 1>/dev/null 2>&1; then
+    log "Detected chunked firmware archive, reassembling..." "info"
+    cat "${FIRMWARE_CHUNKS}"* > "${TEMP_REASSEMBLED}"
+    tar xfJ "${TEMP_REASSEMBLED}" -C "${ROOTFSMNT}/usr"
+    rm -f "${TEMP_REASSEMBLED}"
+  elif [[ -f "${FIRMWARE_ARCHIVE}" ]]; then
+    tar xfJ "${FIRMWARE_ARCHIVE}" -C "${ROOTFSMNT}/usr"
+  else
+    log "No firmware archive found for ${FIRMWARE_VERSION}, skipping firmware install" "wrn"
+  fi
 
   mkdir -p "${ROOTFSMNT}"/usr/local/bin/
   declare -A CustomScripts=(
@@ -125,7 +137,6 @@ EOF
   # Evaluate additional requirements when they arrive
   log "Copying acpi event handing for headphone jack detect (z8350 with rt5640 only)" "info"
   cp "${PLTDIR}/${DEVICE}"/utilities/bytcr-init/jackdetect "${ROOTFSMNT}"/etc/acpi/events
-
 }
 
 write_device_bootloader() {

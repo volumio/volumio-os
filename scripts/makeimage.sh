@@ -153,6 +153,22 @@ fi
 if [[ "${HAS_PLTDIR}" == yes ]]; then
   # This is pulled in from each device's config script
   log "Copying ${DEVICE} boot files from platform-${DEVICEFAMILY}/${DEVICEBASE}.tar.xz" "info"
+
+  PLATFORM_ARCHIVE="${PLTDIR}/${DEVICEBASE}.tar.xz"
+  PLATFORM_CHUNKS="${PLATFORM_ARCHIVE}.part_"
+  TEMP_REASSEMBLED="${PLATFORM_ARCHIVE}.reassembled"
+
+  if ls "${PLATFORM_CHUNKS}"* 1>/dev/null 2>&1; then
+    log "Detected chunked platform archive, reassembling..." "info"
+    cat "${PLATFORM_CHUNKS}"* > "${TEMP_REASSEMBLED}"
+    tar xfJ "${TEMP_REASSEMBLED}" -C "${PLTDIR}/"
+    rm -f "${TEMP_REASSEMBLED}"
+  elif [[ -f "${PLATFORM_ARCHIVE}" ]]; then
+    tar xfJ "${PLATFORM_ARCHIVE}" -C "${PLTDIR}/"
+  else
+    log "No platform archive found for ${DEVICEBASE}, skipping platform extraction" "wrn"
+  fi
+
   log "Entering write_device_files" "cfg"
   write_device_files
   log "Entering write_device_bootloader" "cfg"
