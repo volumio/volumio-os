@@ -16,6 +16,7 @@ DEVICEFAMILY="x64"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEREPO="http://github.com/volumio/platform-${DEVICEFAMILY}"
+DEVICEREPO_BRANCH="6.12.28" # Branch to use for the device repo or empty for main
 
 ### What features do we want to target
 # TODO: Not fully implemented
