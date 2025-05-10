@@ -77,7 +77,7 @@ declare -A PI_KERNELS=(
 	[6.12.27]="f54e67fef6e726725d3a8f56d232194497bd247c|master|1876"
 )
 # Version we want
-KERNEL_VERSION="6.6.62"
+KERNEL_VERSION="6.12.27"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
