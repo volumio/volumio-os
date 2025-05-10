@@ -128,15 +128,17 @@ fi
 
 log "Getting device specific files for ${DEVICE} from platform-${DEVICEFAMILY}" "info"
 PLTDIR="${SRC}/platform-${DEVICEFAMILY}"
+
 if [[ -d "${PLTDIR}" ]]; then
   log "Platform folder exists, keeping it" "" "platform-${DEVICEFAMILY}"
   HAS_PLTDIR=yes
 elif [[ -n "${DEVICEREPO}" ]]; then
-  log "Cloning platform-${DEVICEFAMILY} from ${DEVICEREPO}"
-  git clone --depth 1 "${DEVICEREPO}" "platform-${DEVICEFAMILY}"
+  DEVICEREPO_BRANCH="${DEVICEREPO_BRANCH:-main}"
+  log "Cloning platform-${DEVICEFAMILY} from ${DEVICEREPO} (branch: ${DEVICEREPO_BRANCH})" "info"
+  git clone --branch "${DEVICEREPO_BRANCH}" --depth 1 "${DEVICEREPO}" "platform-${DEVICEFAMILY}"
   HAS_PLTDIR=yes
 else
-  log "No platform-${DEVICEFAMILY} found, skipping this step"
+  log "No platform-${DEVICEFAMILY} found, skipping this step" "wrn"
   HAS_PLTDIR=no
 fi
 
