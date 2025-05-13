@@ -1,7 +1,7 @@
 [Unit]
 Description=Manage nl80211 modules blocking state
-Before=dhcpcd.service hostapd.service
-After=systemd-rfkill.service
+Before=network.target dhcpcd.service hostapd.service
+After=systemd-udevd.service systemd-rfkill.service
 
 [Service]
 Type=oneshot
