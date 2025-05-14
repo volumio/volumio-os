@@ -1,0 +1,11 @@
+[Unit]
+Description=Time Synchronization Helper Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/setdatetime-helper.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -101,22 +101,22 @@ cp "${SRC}/volumio/etc/triggerhappy/triggers.d/audio.conf" "${ROOTFS}/etc/trigge
 #VOLUMIO LOG ROTATE
 cp -rp "${SRC}/volumio/bin/volumiologrotate" "${ROOTFS}/bin/volumiologrotate"
 
-#VOLUMIO GROUPS MANAGER
-cp -rp "${SRC}/volumio/bin/manage_user_groups.sh" "${ROOTFS}/bin/manage_user_groups.sh"
-chmod a+x "${ROOTFS}/bin/manage_user_groups.sh"
-cp -rp "${SRC}/volumio/etc/groups-config.conf" "${ROOTFS}/etc/groups-config.conf" 
+#VOLUMIO TIME HELPER
+cp -rp "${SRC}/volumio/bin/setdatetime-helper.sh" "${ROOTFS}/bin/setdatetime-helper.sh"
+chmod a+x "${ROOTFS}/bin/setdatetime-helper.sh"
 
-#VOLUMIO FS PROTECTION
-cp -rp "${SRC}/volumio/bin/volumio_fs_protection.sh" "${ROOTFS}/bin/volumio_fs_protection.sh"
-chmod a+x "${ROOTFS}/bin/volumio_fs_protection.sh"
+for timer in "${SRC}"/volumio/lib/systemd/system/*.timer ; do
+  log "Copying ${timer}" 
+  cp  "${timer}" "${ROOTFS}"/lib/systemd/system/
+done
 
 #UPDATE ALPHA OTA SERVERS
 cp -rp "${SRC}/volumio/bin/fix-alpha-hosts.sh" "${ROOTFS}/bin/fix-alpha-hosts.sh"
 chmod a+x "${ROOTFS}/bin/fix-alpha-hosts.sh"
 
-for target in "${SRC}"/volumio/lib/systemd/system/*.path; do
-  log "Copying ${target}" 
-  cp  "${target}" "${ROOTFS}"/lib/systemd/system/
+for path in "${SRC}"/volumio/lib/systemd/system/*.path; do
+  log "Copying ${path}" 
+  cp  "${path}" "${ROOTFS}"/lib/systemd/system/
 done
 
 log 'Done Copying Custom Volumio System Files' "okay"

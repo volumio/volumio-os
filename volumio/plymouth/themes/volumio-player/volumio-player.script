@@ -31,10 +31,10 @@
 # --------------------------------- DEBUG TOGGLE ----------------------------------
 
 # To enable debug overlays (background + text), use:
-enable_debug_overlay = (Window.GetWidth() > -1);  # always true at runtime
+# enable_debug_overlay = (Window.GetWidth() > -1);  # always true at runtime
 
 # To disable debug overlays safely, use:
-# enable_debug_overlay = (Window.GetWidth() < 0);  # always false
+enable_debug_overlay = (Window.GetWidth() < 0);  # always false
 
 # ------------------------------------ SEQUENCE -----------------------------------
 
