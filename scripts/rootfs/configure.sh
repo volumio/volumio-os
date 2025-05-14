@@ -101,11 +101,6 @@ cp "${SRC}/volumio/etc/triggerhappy/triggers.d/audio.conf" "${ROOTFS}/etc/trigge
 #VOLUMIO LOG ROTATE
 cp -rp "${SRC}/volumio/bin/volumiologrotate" "${ROOTFS}/bin/volumiologrotate"
 
-#VOLUMIO GROUPS MANAGER
-cp -rp "${SRC}/volumio/bin/manage_user_groups.sh" "${ROOTFS}/bin/manage_user_groups.sh"
-chmod a+x "${ROOTFS}/bin/manage_user_groups.sh"
-cp -rp "${SRC}/volumio/etc/groups-config.conf" "${ROOTFS}/etc/groups-config.conf" 
-
 #UPDATE ALPHA OTA SERVERS
 cp -rp "${SRC}/volumio/bin/fix-alpha-hosts.sh" "${ROOTFS}/bin/fix-alpha-hosts.sh"
 chmod a+x "${ROOTFS}/bin/fix-alpha-hosts.sh"
