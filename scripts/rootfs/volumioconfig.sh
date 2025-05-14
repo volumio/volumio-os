@@ -532,10 +532,10 @@ fs.protected_regular=0
 EOF
 
 log "Adding root explicitly to groups - dbus"  "info"
-usermod -a -G root audio
-usermod -a -G root bluetooth
-usermod -a -G root lp
-usermod -a -G root volumio
+usermod -a -G audio root
+usermod -a -G bluetooth root
+usermod -a -G lp root
+usermod -a -G volumio root
 
 # TODO: FIX the volumio theme. it makes mp1 build fail
 #log "Setting default Volumio Splash Theme"
