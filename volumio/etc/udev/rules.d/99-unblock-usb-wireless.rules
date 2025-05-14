@@ -1,5 +1,5 @@
 # Unblock all USB WiFi adapters
-ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:e00106:*", RUN+="/usr/sbin/rfkill unblock wifi"
+ACTION=="add|change", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:e00106:*", RUN+="/usr/sbin/rfkill unblock wifi"
 
 # Unblock all USB Bluetooth adapters
-ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:e00101:*", RUN+="/usr/sbin/rfkill unblock bluetooth"
+ACTION=="add|change", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:e00101:*", RUN+="/usr/sbin/rfkill unblock bluetooth"

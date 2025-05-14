@@ -386,12 +386,6 @@ log "Linking Volumio Command Line Client"
 ln -s /volumio/app/plugins/system_controller/volumio_command_line_client/volumio.sh /usr/local/bin/volumio
 chmod a+x /usr/local/bin/volumio
 
-log "Eanble Volumio group manager"
-ln -s /lib/systemd/system/volumio_groups_manager.service /etc/systemd/system/multi-user.target.wants/volumio_groups_manager.service 
-
-log "Enable Volumio FS Protection"
-ln -s /lib/systemd/system/volumio_fs_protection.service /etc/systemd/system/multi-user.target.wants/volumio_fs_protection.service
-
 #####################
 #Audio Optimizations#-----------------------------------------
 #####################
@@ -530,12 +524,32 @@ sed -i 's/RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6/RestrictAd
 #Miscellanea#-----------------------------------------
 #####################
 
+log "Adding legacy behavior - root file permission"  "info"
+cat <<-EOF >>/etc/sysctl.conf
+# Legacy behavior - root can write to any file it has permission for
+fs.protected_fifos=0
+fs.protected_regular=0
+EOF
+
+log "Adding root explicitly to groups - dbus"  "info"
+usermod -a -G root audio
+usermod -a -G root bluetooth
+usermod -a -G root lp
+usermod -a -G root volumio
+
 # TODO: FIX the volumio theme. it makes mp1 build fail
 #log "Setting default Volumio Splash Theme"
 #cat <<-EOF >/etc/plymouth/plymouthd.conf
 #[Daemon]
 #Theme=volumio
 #EOF
+
+#####################
+#TIME HELPER#----------------------------------------
+#####################
+log "Enable time sync helper and watchdog"  "info"
+ln -s /lib/systemd/system/setdatetime-helper.service /etc/systemd/system/multi-user.target.wants/setdatetime-helper.service
+ln -s /lib/systemd/system/setdatetime-helper.timer /etc/systemd/system/timers.target.wants/setdatetime-helper.timer
 
 #####################
 #Enable ALPHA#----------------------------------------
