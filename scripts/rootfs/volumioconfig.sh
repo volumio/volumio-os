@@ -442,9 +442,6 @@ fs.inotify.max_user_watches = 524288
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
-# Legacy behavior - root can write to any file it has permission for
-fs.protected_fifos=0
-fs.protected_regular=0
 EOF
 
 log "Creating Wireless service"
