@@ -530,6 +530,13 @@ sed -i 's/RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6/RestrictAd
 #Miscellanea#-----------------------------------------
 #####################
 
+log "Adding legacy behavior - root file permission"  "info"
+cat <<-EOF >>/etc/sysctl.conf
+# Legacy behavior - root can write to any file it has permission for
+fs.protected_fifos=0
+fs.protected_regular=0
+EOF
+
 # TODO: FIX the volumio theme. it makes mp1 build fail
 #log "Setting default Volumio Splash Theme"
 #cat <<-EOF >/etc/plymouth/plymouthd.conf
