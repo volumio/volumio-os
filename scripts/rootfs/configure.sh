@@ -106,10 +106,6 @@ cp -rp "${SRC}/volumio/bin/manage_user_groups.sh" "${ROOTFS}/bin/manage_user_gro
 chmod a+x "${ROOTFS}/bin/manage_user_groups.sh"
 cp -rp "${SRC}/volumio/etc/groups-config.conf" "${ROOTFS}/etc/groups-config.conf" 
 
-#VOLUMIO FS PROTECTION
-cp -rp "${SRC}/volumio/bin/volumio_fs_protection.sh" "${ROOTFS}/bin/volumio_fs_protection.sh"
-chmod a+x "${ROOTFS}/bin/volumio_fs_protection.sh"
-
 #UPDATE ALPHA OTA SERVERS
 cp -rp "${SRC}/volumio/bin/fix-alpha-hosts.sh" "${ROOTFS}/bin/fix-alpha-hosts.sh"
 chmod a+x "${ROOTFS}/bin/fix-alpha-hosts.sh"

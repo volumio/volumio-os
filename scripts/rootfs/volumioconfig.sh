@@ -389,9 +389,6 @@ chmod a+x /usr/local/bin/volumio
 log "Eanble Volumio group manager"
 ln -s /lib/systemd/system/volumio_groups_manager.service /etc/systemd/system/multi-user.target.wants/volumio_groups_manager.service 
 
-log "Enable Volumio FS Protection"
-ln -s /lib/systemd/system/volumio_fs_protection.service /etc/systemd/system/multi-user.target.wants/volumio_fs_protection.service
-
 #####################
 #Audio Optimizations#-----------------------------------------
 #####################
@@ -448,6 +445,9 @@ fs.inotify.max_user_watches = 524288
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
+# Legacy behavior - root can write to any file it has permission for
+fs.protected_fifos=0
+fs.protected_regular=0
 EOF
 
 log "Creating Wireless service"
