@@ -351,15 +351,35 @@ function startHotspotFallbackSafe(retry = 0) {
 
     function handleHotspotResult(err) {
         if (err) {
-            console.log(`Hotspot attempt ${retry + 1} failed.`);
+            console.log(`Hotspot launch failed. Retry ${retry + 1} of ${hotspotMaxRetries}`);
             if (retry + 1 < hotspotMaxRetries) {
-                console.log("Retrying hotspot...");
                 setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
             } else {
-                console.log("Hotspot setup failed after maximum retries. System will remain offline.");
+                console.log("Hotspot failed after maximum retries. System remains offline.");
             }
-        } else {
-            console.log("Hotspot started successfully.");
+            return;
+        }
+
+        // Verify hostapd status
+        try {
+            const hostapdStatus = execSync("systemctl is-active hostapd", { encoding: 'utf8' }).trim();
+            if (hostapdStatus !== "active") {
+                console.log("Hostapd did not reach active state. Retrying fallback.");
+                if (retry + 1 < hotspotMaxRetries) {
+                    setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+                } else {
+                    console.log("Hostapd failed after maximum retries. System remains offline.");
+                }
+            } else {
+                console.log("Hotspot active and hostapd is running.");
+            }
+        } catch (e) {
+            console.log("Error checking hostapd status:", e.message);
+            if (retry + 1 < hotspotMaxRetries) {
+                setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+            } else {
+                console.log("Could not confirm hostapd status. System remains offline.");
+            }
         }
     }
 
