@@ -27,6 +27,8 @@ if (debug) {
 } else {
     var wpasupp = "wpa_supplicant -s -B -D" + wirelessWPADriver + " -c/etc/wpa_supplicant/wpa_supplicant.conf -i" + wlan;
 }
+var retryCount = 0;
+var maxRetries = 3;
 
 function kill(process, callback) {
     var all = process.split(" ");
@@ -198,10 +200,36 @@ function startFlow() {
         const wait = () => {
             if (checkInterfaceReleased()) {
                 console.log("Interface wlan0 released. Proceeding with startAP...");
-                startAP(afterAPStart);
+                startAP(function () {
+                    if (wpaerr > 0) {
+                        retryCount++;
+                        console.log(`startAP failed. Retry ${retryCount} of ${maxRetries}`);
+                        if (retryCount < maxRetries) {
+                            setTimeout(waitForInterfaceReleaseAndStartAP, 2000);
+                        } else {
+                            console.log("startAP reached max retries. Attempting fallback.");
+                            startHotspotFallbackSafe();
+                        }
+                    } else {
+                        afterAPStart();
+                    }
+                });
             } else if (waited >= MAX_WAIT) {
                 console.log("Timeout waiting for wlan0 release. Proceeding with startAP anyway...");
-                startAP(afterAPStart);
+                startAP(function () {
+                    if (wpaerr > 0) {
+                        retryCount++;
+                        console.log(`startAP failed. Retry ${retryCount} of ${maxRetries}`);
+                        if (retryCount < maxRetries) {
+                            setTimeout(waitForInterfaceReleaseAndStartAP, 2000);
+                        } else {
+                            console.log("startAP reached max retries. Attempting fallback.");
+                            startHotspotFallbackSafe();
+                        }
+                    } else {
+                        afterAPStart();
+                    }
+                });
             } else {
                 waited += INTERVAL;
                 setTimeout(wait, INTERVAL);
@@ -278,6 +306,7 @@ function startFlow() {
                              (ifstatus.ipv6_address != undefined && ifstatus.ipv6_address.length > "::".length))) {
                             if (apstopped == 0) {
                                 console.log("It's done! AP");
+                                retryCount = 0;
                                 wstatus("ap");
                                 clearTimeout(lesstimer);
                                 restartAvahi();
@@ -314,6 +343,40 @@ function startFlow() {
     } else {
         console.log("Start wireless flow");
         waitForInterfaceReleaseAndStartAP();
+    }
+}
+
+function startHotspotFallbackSafe(retry = 0) {
+    const hotspotMaxRetries = 3;
+
+    function handleHotspotResult(err) {
+        if (err) {
+            console.log(`Hotspot attempt ${retry + 1} failed.`);
+            if (retry + 1 < hotspotMaxRetries) {
+                console.log("Retrying hotspot...");
+                setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+            } else {
+                console.log("Hotspot setup failed after maximum retries. System will remain offline.");
+            }
+        } else {
+            console.log("Hotspot started successfully.");
+        }
+    }
+
+    if (!isWirelessDisabled()) {
+        if (checkConcurrentModeSupport()) {
+            console.log('Fallback: Concurrent AP+STA supported. Starting hotspot.');
+            startHotspot(handleHotspotResult);
+        } else {
+            console.log('Fallback: Stopping STA and starting hotspot.');
+            stopAP(function () {
+                setTimeout(() => {
+                    startHotspot(handleHotspotResult);
+                }, settleTime);
+            });
+        }
+    } else {
+        console.log("Fallback: WiFi disabled. No hotspot started.");
     }
 }
 
