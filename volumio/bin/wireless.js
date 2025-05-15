@@ -210,6 +210,17 @@ function startFlow() {
         wait();
     }
 
+    function isConfiguredSSIDVisible() {
+        try {
+            const config = getWirelessConfiguration();
+            const ssid = config.wlanssid?.value;
+            const scan = execSync('/usr/bin/sudo /sbin/iw wlan0 scan | grep SSID:', { encoding: 'utf8' });
+            return ssid && scan.includes(ssid);
+        } catch (e) {
+            return false;
+        }
+    }
+
     function afterAPStart() {
         console.log("Start ap");
         lesstimer = setInterval(() => {
@@ -219,20 +230,34 @@ function startFlow() {
             }
 
             if (actualTime > totalSecondsForConnection) {
-                console.log("Overtime, starting plan B");
-                if (hotspotFallbackCondition()) {
-                    console.log('STARTING HOTSPOT');
-                    apstopped = 1;
-                    clearTimeout(lesstimer);
-                    stopAP(function () {
-                        setTimeout(() => {
-                            startHotspot(function (err) {
-                                if (err) {
-                                    console.log('Could not start Hotspot Fallback: ' + err);
-                                }
-                            });
-                        }, settleTime);
-                    });
+                console.log("Overtime, connection failed. Evaluating hotspot condition.");
+
+                const fallbackEnabled = hotspotFallbackCondition();
+                const ssidMissing = !isConfiguredSSIDVisible();
+                const firstBoot = !hasWirelessConnectionBeenEstablishedOnce();
+
+                if (!isWirelessDisabled() && (fallbackEnabled || ssidMissing || firstBoot)) {
+                    if (checkConcurrentModeSupport()) {
+                        console.log('Concurrent AP+STA supported. Starting hotspot without stopping STA.');
+                        startHotspot(function (err) {
+                            if (err) {
+                                console.log('Could not start Hotspot Fallback: ' + err);
+                            }
+                        });
+                    } else {
+                        console.log('No concurrent mode. Stopping STA and starting hotspot.');
+                        apstopped = 1;
+                        clearTimeout(lesstimer);
+                        stopAP(function () {
+                            setTimeout(() => {
+                                startHotspot(function (err) {
+                                    if (err) {
+                                        console.log('Could not start Hotspot Fallback: ' + err);
+                                    }
+                                });
+                            }, settleTime);
+                        });
+                    }
                 } else {
                     apstopped = 0;
                     wstatus("ap");
@@ -486,4 +511,33 @@ function determineMostAppropriateRegdomain(arr) {
             return acc;
         }, {})
        return mostFreq;
+}
+
+function checkConcurrentModeSupport() {
+    try {
+        const output = execSync('iw list', { encoding: 'utf8' });
+        const comboRegex = /valid interface combinations([\s\S]*?)(?=\n\n)/i;
+        const comboBlock = output.match(comboRegex);
+
+        if (!comboBlock || comboBlock.length < 2) {
+            logger('WIRELESS: No interface combination block found.');
+            return false;
+        }
+
+        const comboText = comboBlock[1];
+
+        const hasAP = comboText.includes('AP');
+        const hasSTA = comboText.includes('station') || comboText.includes('STA');
+
+        if (hasAP && hasSTA) {
+            logger('WIRELESS: Concurrent AP+STA mode supported.');
+            return true;
+        } else {
+            logger('WIRELESS: Concurrent AP+STA mode NOT supported.');
+            return false;
+        }
+    } catch (err) {
+        logger('WIRELESS: Failed to determine interface mode support: ' + err);
+        return false;
+    }
 }
