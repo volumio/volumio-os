@@ -1,0 +1,10 @@
+[Unit]
+Description=Unblock WiFi/Bluetooth after Flight Mode OFF
+After=systemd-rfkill.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/volumio_rfkill_unblock.sh
+StandardOutput=journal
+StandardError=journal
+LogLevelMax=info

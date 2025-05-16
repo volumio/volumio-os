@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch rfkill state to auto-recover after Flight Mode toggle
+Wants=volumio_rfkill_runtime.service
+
+[Path]
+PathChanged=/sys/class/rfkill/rfkill0/soft
+PathChanged=/sys/class/rfkill/rfkill1/soft
+
+[Install]
+WantedBy=multi-user.target

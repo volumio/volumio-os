@@ -7,6 +7,9 @@ After=systemd-udevd.service systemd-rfkill.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/volumio_rfkill_unblock.sh
+StandardOutput=journal
+StandardError=journal
+LogLevelMax=info
 
 [Install]
 WantedBy=multi-user.target
