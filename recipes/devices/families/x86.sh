@@ -27,8 +27,8 @@ KIOSKMODE=yes
 
 ## Partition info
 BOOT_START=1
-BOOT_END=257
-IMAGE_END=4357
+BOOT_END=258
+IMAGE_END=4865
 BOOT_TYPE=gpt        # msdos or gpt
 BOOT_USE_UUID=yes    # Add UUID to fstab
 
