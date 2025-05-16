@@ -39,7 +39,7 @@ PLYMOUTH_THEME="volumio-player"
 # Modules that will be added to intramfs
 MODULES=("overlay" "squashfs"
   # USB/FS modules
-  "usbcore" "usb_common" "mmc_core" "mmc_block" "nvme_core" "nvme" "sdhci" "sdhci_pci" "sdhci_acpi"
+  "usbcore" "usb_common" "mmc_core" "mmc_block" "nvme_core" "nvme-core" "nvme" "sdhci" "sdhci_pci" "sdhci_acpi"
   "ehci_pci" "ohci_pci" "uhci_hcd" "ehci_hcd" "xhci_hcd" "ohci_hcd" "usbhid" "hid_cherry" "hid_generic"
   "hid" "nls_cp437" "nls_utf8" "vfat" "fuse" "uas"
   # nls_ascii might be needed on some kernels (debian upstream for example)
