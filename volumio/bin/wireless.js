@@ -80,7 +80,6 @@ function launch(fullprocess, name, sync, callback) {
     return
 }
 
-
 function startHotspot() {
     stopHotspot(function(err) {
         if (isHotspotDisabled()) {
@@ -91,8 +90,8 @@ function startHotspot() {
         } else {
             launch(ifconfigHotspot, "confighotspot", true, function(err) {
                 logger("ifconfig " + err);
-                launch(starthostapd,"hotspot" , false, function() {
-                    wstatus("hotspot");
+                launch(starthostapd, "hotspot", false, function() {
+                    updateNetworkState("hotspot");
                 });
             });
         }
@@ -101,11 +100,11 @@ function startHotspot() {
 
 function startHotspotForce() {
     stopHotspot(function(err) {
-        logger('Starting Force Hotspot')
+        logger('Starting Force Hotspot');
         launch(ifconfigHotspot, "confighotspot", true, function(err) {
             logger("ifconfig " + err);
-            launch(starthostapd,"hotspot" , false, function() {
-                wstatus("hotspot");
+            launch(starthostapd, "hotspot", false, function() {
+                updateNetworkState("hotspot");
             });
         });
     });
@@ -270,6 +269,8 @@ function startFlow() {
                         startHotspot(function (err) {
                             if (err) {
                                 logger('Could not start Hotspot Fallback: ' + err);
+                            } else {
+                                updateNetworkState("hotspot");
                             }
                         });
                     } else {
@@ -281,6 +282,8 @@ function startFlow() {
                                 startHotspot(function (err) {
                                     if (err) {
                                         logger('Could not start Hotspot Fallback: ' + err);
+                                    } else {
+                                        updateNetworkState("hotspot");
                                     }
                                 });
                             }, settleTime);
@@ -288,7 +291,7 @@ function startFlow() {
                     }
                 } else {
                     apstopped = 0;
-                    wstatus("ap");
+                    updateNetworkState("ap");
                     clearTimeout(lesstimer);
                 }
             } else {
@@ -307,7 +310,7 @@ function startFlow() {
                             if (apstopped == 0) {
                                 logger("It's done! AP");
                                 retryCount = 0;
-                                wstatus("ap");
+                                updateNetworkState("ap");
                                 clearTimeout(lesstimer);
                                 restartAvahi();
                                 saveWirelessConnectionEstablished();
@@ -328,7 +331,7 @@ function startFlow() {
     try {
         fs.accessSync('/tmp/forcehotspot', fs.F_OK);
         var hotspotForce = true;
-        fs.unlinkSync('/tmp/forcehotspot')
+        fs.unlinkSync('/tmp/forcehotspot');
     } catch (e) {
         var hotspotForce = false;
     }
@@ -372,9 +375,10 @@ function startHotspotFallbackSafe(retry = 0) {
                 }
             } else {
                 logger("Hotspot active and hostapd is running.");
+                updateNetworkState("hotspot");
             }
         } catch (e) {
-            logger("Error checking hostapd status:", e.message);
+            logger("Error checking hostapd status: " + e.message);
             if (retry + 1 < hotspotMaxRetries) {
                 setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
             } else {
@@ -443,6 +447,11 @@ function wstatus(nstatus) {
     thus.exec("echo " + nstatus + " >/tmp/networkstatus", null);
 }
 
+function updateNetworkState(state) {
+    wstatus(state);
+    refreshNetworkStatusFile();
+}
+
 function restartAvahi() {
     logger("Restarting avahi-daemon...");
     thus.exec("/bin/systemctl restart avahi-daemon", function (err, stdout, stderr) {
@@ -455,6 +464,15 @@ function restartAvahi() {
 function logger(msg) {
     if (debug) {
         console.log(msg)
+    }
+}
+
+function refreshNetworkStatusFile() {
+    const fs = require('fs');
+    try {
+        fs.utimesSync('/tmp/networkstatus', new Date(), new Date());
+    } catch (e) {
+        logger("Failed to refresh /tmp/networkstatus timestamp: " + e.toString());
     }
 }
 
