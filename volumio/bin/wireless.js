@@ -27,6 +27,8 @@ if (debug) {
 } else {
     var wpasupp = "wpa_supplicant -s -B -D" + wirelessWPADriver + " -c/etc/wpa_supplicant/wpa_supplicant.conf -i" + wlan;
 }
+var retryCount = 0;
+var maxRetries = 3;
 
 function kill(process, callback) {
     var all = process.split(" ");
@@ -78,19 +80,18 @@ function launch(fullprocess, name, sync, callback) {
     return
 }
 
-
 function startHotspot() {
     stopHotspot(function(err) {
         if (isHotspotDisabled()) {
-            console.log('Hotspot is disabled, not starting it');
+            logger('Hotspot is disabled, not starting it');
             launch(ifconfigWlan, "configwlanup", true, function(err) {
                 logger("ifconfig " + err);
             });
         } else {
             launch(ifconfigHotspot, "confighotspot", true, function(err) {
                 logger("ifconfig " + err);
-                launch(starthostapd,"hotspot" , false, function() {
-                    wstatus("hotspot");
+                launch(starthostapd, "hotspot", false, function() {
+                    updateNetworkState("hotspot");
                 });
             });
         }
@@ -99,11 +100,11 @@ function startHotspot() {
 
 function startHotspotForce() {
     stopHotspot(function(err) {
-        console.log('Starting Force Hotspot')
+        logger('Starting Force Hotspot');
         launch(ifconfigHotspot, "confighotspot", true, function(err) {
             logger("ifconfig " + err);
-            launch(starthostapd,"hotspot" , false, function() {
-                wstatus("hotspot");
+            launch(starthostapd, "hotspot", false, function() {
+                updateNetworkState("hotspot");
             });
         });
     });
@@ -116,7 +117,7 @@ function stopHotspot(callback) {
 }
 
 function startAP(callback) {
-    console.log("Stopped hotspot (if there)..");
+    logger("Stopped hotspot (if there)..");
     launch(ifdeconfig, "ifdeconfig", true, function (err) {
         logger("Conf " + ifdeconfig);
         waitForWlanRelease(0, function () {
@@ -127,10 +128,10 @@ function startAP(callback) {
                 let staticDhcpFile;
                 try {
                     staticDhcpFile = fs.readFileSync('/data/configuration/wlanstatic', 'utf8');
-                    console.log("FIXED IP via wlanstatic");
+                    logger("FIXED IP via wlanstatic");
                 } catch (e) {
                     staticDhcpFile = dhclient; // fallback
-                    console.log("DHCP IP fallback");
+                    logger("DHCP IP fallback");
                 }
 
                 launch(staticDhcpFile, "dhclient", false, callback);
@@ -197,11 +198,37 @@ function startFlow() {
 
         const wait = () => {
             if (checkInterfaceReleased()) {
-                console.log("Interface wlan0 released. Proceeding with startAP...");
-                startAP(afterAPStart);
+                logger("Interface wlan0 released. Proceeding with startAP...");
+                startAP(function () {
+                    if (wpaerr > 0) {
+                        retryCount++;
+                        logger(`startAP failed. Retry ${retryCount} of ${maxRetries}`);
+                        if (retryCount < maxRetries) {
+                            setTimeout(waitForInterfaceReleaseAndStartAP, 2000);
+                        } else {
+                            logger("startAP reached max retries. Attempting fallback.");
+                            startHotspotFallbackSafe();
+                        }
+                    } else {
+                        afterAPStart();
+                    }
+                });
             } else if (waited >= MAX_WAIT) {
-                console.log("Timeout waiting for wlan0 release. Proceeding with startAP anyway...");
-                startAP(afterAPStart);
+                logger("Timeout waiting for wlan0 release. Proceeding with startAP anyway...");
+                startAP(function () {
+                    if (wpaerr > 0) {
+                        retryCount++;
+                        logger(`startAP failed. Retry ${retryCount} of ${maxRetries}`);
+                        if (retryCount < maxRetries) {
+                            setTimeout(waitForInterfaceReleaseAndStartAP, 2000);
+                        } else {
+                            logger("startAP reached max retries. Attempting fallback.");
+                            startHotspotFallbackSafe();
+                        }
+                    } else {
+                        afterAPStart();
+                    }
+                });
             } else {
                 waited += INTERVAL;
                 setTimeout(wait, INTERVAL);
@@ -210,8 +237,19 @@ function startFlow() {
         wait();
     }
 
+    function isConfiguredSSIDVisible() {
+        try {
+            const config = getWirelessConfiguration();
+            const ssid = config.wlanssid?.value;
+            const scan = execSync('/usr/bin/sudo /sbin/iw wlan0 scan | grep SSID:', { encoding: 'utf8' });
+            return ssid && scan.includes(ssid);
+        } catch (e) {
+            return false;
+        }
+    }
+
     function afterAPStart() {
-        console.log("Start ap");
+        logger("Start ap");
         lesstimer = setInterval(() => {
             actualTime += pollingTime;
             if (wpaerr > 0) {
@@ -219,41 +257,60 @@ function startFlow() {
             }
 
             if (actualTime > totalSecondsForConnection) {
-                console.log("Overtime, starting plan B");
-                if (hotspotFallbackCondition()) {
-                    console.log('STARTING HOTSPOT');
-                    apstopped = 1;
-                    clearTimeout(lesstimer);
-                    stopAP(function () {
-                        setTimeout(() => {
-                            startHotspot(function (err) {
-                                if (err) {
-                                    console.log('Could not start Hotspot Fallback: ' + err);
-                                }
-                            });
-                        }, settleTime);
-                    });
+                logger("Overtime, connection failed. Evaluating hotspot condition.");
+
+                const fallbackEnabled = hotspotFallbackCondition();
+                const ssidMissing = !isConfiguredSSIDVisible();
+                const firstBoot = !hasWirelessConnectionBeenEstablishedOnce();
+
+                if (!isWirelessDisabled() && (fallbackEnabled || ssidMissing || firstBoot)) {
+                    if (checkConcurrentModeSupport()) {
+                        logger('Concurrent AP+STA supported. Starting hotspot without stopping STA.');
+                        startHotspot(function (err) {
+                            if (err) {
+                                logger('Could not start Hotspot Fallback: ' + err);
+                            } else {
+                                updateNetworkState("hotspot");
+                            }
+                        });
+                    } else {
+                        logger('No concurrent mode. Stopping STA and starting hotspot.');
+                        apstopped = 1;
+                        clearTimeout(lesstimer);
+                        stopAP(function () {
+                            setTimeout(() => {
+                                startHotspot(function (err) {
+                                    if (err) {
+                                        logger('Could not start Hotspot Fallback: ' + err);
+                                    } else {
+                                        updateNetworkState("hotspot");
+                                    }
+                                });
+                            }, settleTime);
+                        });
+                    }
                 } else {
                     apstopped = 0;
-                    wstatus("ap");
+                    updateNetworkState("ap");
                     clearTimeout(lesstimer);
                 }
             } else {
                 let SSID;
-                console.log("trying...");
+                logger("trying...");
                 try {
                     SSID = execSync("/usr/bin/sudo /sbin/iwgetid -r", { uid: 1000, gid: 1000, encoding: 'utf8' });
-                    console.log('Connected to: ----' + SSID + '----');
+                    logger('Connected to: ----' + SSID + '----');
                 } catch (e) {}
 
                 if (SSID !== undefined) {
                     ifconfig.status(wlan, function (err, ifstatus) {
-                        console.log("... joined AP, wlan0 IPv4 is " + ifstatus.ipv4_address + ", ipV6 is " + ifstatus.ipv6_address);
+                        logger("... joined AP, wlan0 IPv4 is " + ifstatus.ipv4_address + ", ipV6 is " + ifstatus.ipv6_address);
                         if (((ifstatus.ipv4_address != undefined && ifstatus.ipv4_address.length > "0.0.0.0".length) ||
                              (ifstatus.ipv6_address != undefined && ifstatus.ipv6_address.length > "::".length))) {
                             if (apstopped == 0) {
-                                console.log("It's done! AP");
-                                wstatus("ap");
+                                logger("It's done! AP");
+                                retryCount = 0;
+                                updateNetworkState("ap");
                                 clearTimeout(lesstimer);
                                 restartAvahi();
                                 saveWirelessConnectionEstablished();
@@ -274,21 +331,76 @@ function startFlow() {
     try {
         fs.accessSync('/tmp/forcehotspot', fs.F_OK);
         var hotspotForce = true;
-        fs.unlinkSync('/tmp/forcehotspot')
+        fs.unlinkSync('/tmp/forcehotspot');
     } catch (e) {
         var hotspotForce = false;
     }
 
     if (hotspotForce) {
-        console.log('Wireless networking forced to hotspot mode');
+        logger('Wireless networking forced to hotspot mode');
         startHotspotForce(() => {});
     } else if (isWirelessDisabled()) {
-        console.log('Wireless Networking DISABLED, not starting wireless flow');
+        logger('Wireless Networking DISABLED, not starting wireless flow');
     } else if (directhotspot) {
         startHotspot(() => {});
     } else {
-        console.log("Start wireless flow");
+        logger("Start wireless flow");
         waitForInterfaceReleaseAndStartAP();
+    }
+}
+
+function startHotspotFallbackSafe(retry = 0) {
+    const hotspotMaxRetries = 3;
+
+    function handleHotspotResult(err) {
+        if (err) {
+            logger(`Hotspot launch failed. Retry ${retry + 1} of ${hotspotMaxRetries}`);
+            if (retry + 1 < hotspotMaxRetries) {
+                setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+            } else {
+                logger("Hotspot failed after maximum retries. System remains offline.");
+            }
+            return;
+        }
+
+        // Verify hostapd status
+        try {
+            const hostapdStatus = execSync("systemctl is-active hostapd", { encoding: 'utf8' }).trim();
+            if (hostapdStatus !== "active") {
+                logger("Hostapd did not reach active state. Retrying fallback.");
+                if (retry + 1 < hotspotMaxRetries) {
+                    setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+                } else {
+                    logger("Hostapd failed after maximum retries. System remains offline.");
+                }
+            } else {
+                logger("Hotspot active and hostapd is running.");
+                updateNetworkState("hotspot");
+            }
+        } catch (e) {
+            logger("Error checking hostapd status: " + e.message);
+            if (retry + 1 < hotspotMaxRetries) {
+                setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+            } else {
+                logger("Could not confirm hostapd status. System remains offline.");
+            }
+        }
+    }
+
+    if (!isWirelessDisabled()) {
+        if (checkConcurrentModeSupport()) {
+            logger('Fallback: Concurrent AP+STA supported. Starting hotspot.');
+            startHotspot(handleHotspotResult);
+        } else {
+            logger('Fallback: Stopping STA and starting hotspot.');
+            stopAP(function () {
+                setTimeout(() => {
+                    startHotspot(handleHotspotResult);
+                }, settleTime);
+            });
+        }
+    } else {
+        logger("Fallback: WiFi disabled. No hotspot started.");
     }
 }
 
@@ -299,23 +411,23 @@ function stop(callback) {
 }
 
 if ( ! fs.existsSync("/sys/class/net/" + wlan + "/operstate") ) {
-    console.log("WIRELESS: No wireless interface, exiting");
+    logger("WIRELESS: No wireless interface, exiting");
     process.exit(0);
 }
 
 
 if (process.argv.length < 2) {
-    console.log("Use: start|stop");
+    logger("Use: start|stop");
 } else {
     var args = process.argv[2];
     logger('WIRELESS DAEMON: ' + args);
 
     switch (args) {
         case "start":
-            console.log("Cleaning previous...");
+            logger("Cleaning previous...");
             stopHotspot(function () {
                 stopAP(function() {
-                    console.log("Stopped aP");
+                    logger("Stopped aP");
                     // Here we set the regdomain if not set
                     detectAndApplyRegdomain(function() {
                         startFlow();
@@ -335,6 +447,11 @@ function wstatus(nstatus) {
     thus.exec("echo " + nstatus + " >/tmp/networkstatus", null);
 }
 
+function updateNetworkState(state) {
+    wstatus(state);
+    refreshNetworkStatusFile();
+}
+
 function restartAvahi() {
     logger("Restarting avahi-daemon...");
     thus.exec("/bin/systemctl restart avahi-daemon", function (err, stdout, stderr) {
@@ -347,6 +464,15 @@ function restartAvahi() {
 function logger(msg) {
     if (debug) {
         console.log(msg)
+    }
+}
+
+function refreshNetworkStatusFile() {
+    const fs = require('fs');
+    try {
+        fs.utimesSync('/tmp/networkstatus', new Date(), new Date());
+    } catch (e) {
+        logger("Failed to refresh /tmp/networkstatus timestamp: " + e.toString());
     }
 }
 
@@ -440,23 +566,22 @@ function detectAndApplyRegdomain(callback) {
             applyNewRegDomain(appropriateRegDomain);
         }
     } catch(e) {
-        console.log('Failed to determine most appropriate reg domain: ' + e);
+        logger('Failed to determine most appropriate reg domain: ' + e);
     }
     callback();
 }
 
 function applyNewRegDomain(newRegDom) {
-    console.log('SETTING APPROPRIATE REG DOMAIN: ' + newRegDom);
+    logger('SETTING APPROPRIATE REG DOMAIN: ' + newRegDom);
 
     try {
         execSync("/usr/bin/sudo /sbin/ifconfig wlan0 up && /usr/bin/sudo /sbin/iw reg set " + newRegDom, { uid: 1000, gid: 1000, encoding: 'utf8'});
         //execSync("/usr/bin/sudo /bin/echo 'REGDOMAIN=" + newRegDom + "' > /etc/default/crda", { uid: 1000, gid: 1000, encoding: 'utf8'});
         fs.writeFileSync("/etc/default/crda", "REGDOMAIN=" + newRegDom);
-        console.log('SUCCESSFULLY SET NEW REGDOMAIN: ' + newRegDom)
+        logger('SUCCESSFULLY SET NEW REGDOMAIN: ' + newRegDom)
     } catch(e) {
-        console.log('Failed to set new reg domain: ' + e);
+        logger('Failed to set new reg domain: ' + e);
     }
-
 }
 
 function isValidRegDomain(regDomain) {
@@ -486,4 +611,33 @@ function determineMostAppropriateRegdomain(arr) {
             return acc;
         }, {})
        return mostFreq;
+}
+
+function checkConcurrentModeSupport() {
+    try {
+        const output = execSync('iw list', { encoding: 'utf8' });
+        const comboRegex = /valid interface combinations([\s\S]*?)(?=\n\n)/i;
+        const comboBlock = output.match(comboRegex);
+
+        if (!comboBlock || comboBlock.length < 2) {
+            logger('WIRELESS: No interface combination block found.');
+            return false;
+        }
+
+        const comboText = comboBlock[1];
+
+        const hasAP = comboText.includes('AP');
+        const hasSTA = comboText.includes('station') || comboText.includes('STA');
+
+        if (hasAP && hasSTA) {
+            logger('WIRELESS: Concurrent AP+STA mode supported.');
+            return true;
+        } else {
+            logger('WIRELESS: Concurrent AP+STA mode NOT supported.');
+            return false;
+        }
+    } catch (err) {
+        logger('WIRELESS: Failed to determine interface mode support: ' + err);
+        return false;
+    }
 }

@@ -2,10 +2,13 @@
 Description=Time Synchronization Helper Service
 After=network-online.target
 Wants=network-online.target
+ConditionPathExists=/usr/bin/setdatetime-helper.sh
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/setdatetime-helper.sh
+ExecStart=/bin/bash -c "/usr/bin/setdatetime-helper.sh || true"
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
