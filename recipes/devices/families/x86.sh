@@ -99,7 +99,7 @@ write_device_files() {
   declare -A CustomScripts=(
     [bytcr_init.sh]="bytcr-init/bytcr_init.sh"
     [handle_jackdetect_event.sh]="acpi/handlers/handle_jackdetect_event.sh"
-    [handle_mute_event.sh]="acpi/handlers/handle_mute_event.sh.sh"
+    [handle_mute_event.sh]="acpi/handlers/handle_mute_event.sh"
     [handle_brightness_event.sh]="acpi/handlers/handle_brightness_event.sh"
     [volumio_hda_intel_tweak.sh]="hda-intel-tweaks/volumio_hda_intel_tweak.sh"
     [x86Installer.sh]="x86Installer/x86Installer.sh"
