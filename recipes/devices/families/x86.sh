@@ -98,9 +98,9 @@ write_device_files() {
   mkdir -p "${ROOTFSMNT}"/usr/local/bin/
   declare -A CustomScripts=(
     [bytcr_init.sh]="bytcr-init/bytcr_init.sh"
-    [handle_jackdetect_event.sh]="acpi/handlers/handle_jackdetect_event.sh"
-    [handle_mute_event.sh]="acpi/handlers/handle_mute_button_event.sh"
-    [handle_brightness_event.sh]="acpi/handlers/handle_brightness_event.sh"
+    [handle_jack-headphone_event.sh]="acpi/handlers/handle_jack-headphone_event.sh"
+    [handle_mute-button_event.sh]="acpi/handlers/handle_mute-button_event.sh"
+    [handle_brightness-button_event.sh]="acpi/handlers/handle_brightness-button_event.sh"
     [volumio_hda_intel_tweak.sh]="hda-intel-tweaks/volumio_hda_intel_tweak.sh"
     [x86Installer.sh]="x86Installer/x86Installer.sh"
   )
@@ -139,12 +139,12 @@ EOF
   # Headphone detect currently only for atom z8350 with rt5640 codec
   # Evaluate additional requirements when they arrive
   log "Copying acpi events for headphone jack detect (z8350 with rt5640 only)" "info"
-  cp "${PLTDIR}/${DEVICE}"/utilities/acpi/events/jackdetect-event "${ROOTFSMNT}"/etc/acpi/events
+  cp "${PLTDIR}/${DEVICE}"/utilities/acpi/events/jack-headphone_event "${ROOTFSMNT}"/etc/acpi/events
   
   # Generic acpi events
   log "Copying acpi events for mute and brightness buttons" "info"
-  cp "${PLTDIR}/${DEVICE}"/utilities/acpi/events/brightness-event "${ROOTFSMNT}"/etc/acpi/events
-  cp "${PLTDIR}/${DEVICE}"/utilities/acpi/events/mute-event "${ROOTFSMNT}"/etc/acpi/events
+  cp "${PLTDIR}/${DEVICE}"/utilities/acpi/events/brightness-button_event "${ROOTFSMNT}"/etc/acpi/events
+  cp "${PLTDIR}/${DEVICE}"/utilities/acpi/events/mute-button_event "${ROOTFSMNT}"/etc/acpi/events
   
 }
 
