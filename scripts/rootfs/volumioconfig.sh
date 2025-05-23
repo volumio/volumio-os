@@ -454,6 +454,7 @@ log "Setting up wireless hostspot config" "info"
 log "Adding Volumio bits to dnsmasq and hostapd services"
 sed -i '/^After=network.target/a # For Volumio hotspot functionality\nAfter=hostapd.service\nPartOf=hostapd.service' /lib/systemd/system/dnsmasq.service
 sed -i '/^After=network.target/a # For Volumio hotspot functionality\nWants=dnsmasq.service' /lib/systemd/system/hostapd.service
+sed -i '/^After=network.target/a # Ensure rfkill unblocking before hostapd starts\nAfter=volumio_rfkill_unblock.service\nWants=volumio_rfkill_unblock.service' /lib/systemd/system/hostapd.service
 
 log "Configuring dnsmasq"
 # TODO listen on wlan* or only wlan0?
