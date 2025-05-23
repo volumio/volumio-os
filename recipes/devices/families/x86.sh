@@ -16,7 +16,7 @@ DEVICEFAMILY="x64"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEREPO="http://github.com/volumio/platform-${DEVICEFAMILY}"
-DEVICEREPO_BRANCH="6.12.30" # Branch to use for the device repo or empty for main
+DEVICEREPO_BRANCH="6.12.28" # Branch to use for the device repo or empty for main
 
 ### What features do we want to target
 # TODO: Not fully implemented
@@ -101,6 +101,7 @@ write_device_files() {
     [handle_jack-headphone_event.sh]="acpi/handlers/handle_jack-headphone_event.sh"
     [handle_mute-button_event.sh]="acpi/handlers/handle_mute-button_event.sh"
     [handle_brightness-button_event.sh]="acpi/handlers/handle_brightness-button_event.sh"
+    [move_screenshot.sh]="prtsc-button/move_screenshot.sh"
     [volumio_hda_intel_tweak.sh]="hda-intel-tweaks/volumio_hda_intel_tweak.sh"
     [x86Installer.sh]="x86Installer/x86Installer.sh"
   )
@@ -193,6 +194,20 @@ ExecStart=/usr/local/bin/soundcard-init.sh
 WantedBy=multi-user.target
 EOF
   ln -s "${ROOTFSMNT}/lib/systemd/system/soundcard-init.service" "${ROOTFSMNT}/etc/systemd/system/multi-user.target.wants/soundcard-init.service"
+
+ cat <<-EOF >"${ROOTFSMNT}/lib/systemd/system/screenshot.service"
+[Unit]
+Description = Process screenshots triggered by PrtSc-button
+After=volumio.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/move_screenshot.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  ln -s "${ROOTFSMNT}/lib/systemd/system/screenshot.service" "${ROOTFSMNT}/etc/systemd/system/multi-user.target.wants/screenshot.service"
 
   #log "Adding ACPID Service to Startup"
   #ln -s "${ROOTFSMNT}/lib/systemd/system/acpid.service" "${ROOTFSMNT}/etc/systemd/system/multi-user.target.wants/acpid.service"
