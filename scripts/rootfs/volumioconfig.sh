@@ -211,6 +211,9 @@ log " SSL Issues: ${CURLFAIL:-no}"
 #Volumio System#---------------------------------------------------
 ################
 log "Setting up Volumio system structure and permissions" "info"
+log "Updating firmware ownership"
+chown -R root:root /usr/lib/firmware
+
 log "Setting proper ownership"
 chown -R volumio:volumio /volumio
 
