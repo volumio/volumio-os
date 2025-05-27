@@ -555,8 +555,4 @@ log "Enable time sync helper and watchdog"  "info"
 ln -s /lib/systemd/system/setdatetime-helper.service /etc/systemd/system/multi-user.target.wants/setdatetime-helper.service
 ln -s /lib/systemd/system/setdatetime-helper.timer /etc/systemd/system/timers.target.wants/setdatetime-helper.timer
 
-#####################
-#Enable ALPHA#----------------------------------------
-#####################
-log "Enable ALPHA hosts OTA updater service"
-ln -s /lib/systemd/system/fix-alpha-hosts.path /etc/systemd/system/multi-user.target.wants/fix-alpha-hosts.path
+
