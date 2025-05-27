@@ -421,8 +421,6 @@ log "Set default hostname to volumio"
 cat <<-EOF >/etc/hosts
 127.0.0.1       localhost
 127.0.1.1       volumio
-136.144.163.173 updater.volumio.org
-136.144.163.173 updates.volumio.org
 
 # The following lines are desirable for IPv6 capable hosts
 ::1             localhost volumio ip6-localhost ip6-loopback
@@ -555,8 +553,4 @@ log "Enable time sync helper and watchdog"  "info"
 ln -s /lib/systemd/system/setdatetime-helper.service /etc/systemd/system/multi-user.target.wants/setdatetime-helper.service
 ln -s /lib/systemd/system/setdatetime-helper.timer /etc/systemd/system/timers.target.wants/setdatetime-helper.timer
 
-#####################
-#Enable ALPHA#----------------------------------------
-#####################
-log "Enable ALPHA hosts OTA updater service"
-ln -s /lib/systemd/system/fix-alpha-hosts.path /etc/systemd/system/multi-user.target.wants/fix-alpha-hosts.path
+

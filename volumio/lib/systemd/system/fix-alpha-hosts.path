@@ -1,8 +1,0 @@
-[Unit]
-Description=Watch /etc/hosts for changes
-
-[Path]
-PathChanged=/etc/hosts
-
-[Install]
-WantedBy=multi-user.target
