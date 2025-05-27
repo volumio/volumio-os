@@ -110,10 +110,6 @@ for timer in "${SRC}"/volumio/lib/systemd/system/*.timer ; do
   cp  "${timer}" "${ROOTFS}"/lib/systemd/system/
 done
 
-#UPDATE ALPHA OTA SERVERS
-cp -rp "${SRC}/volumio/bin/fix-alpha-hosts.sh" "${ROOTFS}/bin/fix-alpha-hosts.sh"
-chmod a+x "${ROOTFS}/bin/fix-alpha-hosts.sh"
-
 for path in "${SRC}"/volumio/lib/systemd/system/*.path; do
   log "Copying ${path}" 
   cp  "${path}" "${ROOTFS}"/lib/systemd/system/
