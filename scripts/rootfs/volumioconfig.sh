@@ -421,8 +421,6 @@ log "Set default hostname to volumio"
 cat <<-EOF >/etc/hosts
 127.0.0.1       localhost
 127.0.1.1       volumio
-136.144.163.173 updater.volumio.org
-136.144.163.173 updates.volumio.org
 
 # The following lines are desirable for IPv6 capable hosts
 ::1             localhost volumio ip6-localhost ip6-loopback
