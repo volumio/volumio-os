@@ -332,7 +332,7 @@ device_chroot_tweaks_pre() {
 
 	log "Changing external ethX priority" "info"
 	# As built-in eth _is_ on USB (smsc95xx or lan78xx drivers)
-	sed -i 's/KERNEL==\"eth/DRIVERS!=\"smsc95xx\", DRIVERS!=\"lan78xx\", &/' /etc/udev/rules.d/99-Volumio-net.rules
+	sed -i 's/KERNEL==\"eth/DRIVERS!=\"smsc95xx\", DRIVERS!=\"lan78xx\", &/' /etc/udev/rules.d/98-Volumio-net.rules
 
 	log "Adding volumio to gpio,i2c,spi group" "info"
 	usermod -a -G gpio,i2c,spi,input volumio
