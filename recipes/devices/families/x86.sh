@@ -27,14 +27,15 @@ KIOSKMODE=yes
 
 ## Partition info
 BOOT_START=1
-BOOT_END=258
-IMAGE_END=4865
-BOOT_TYPE=gpt        # msdos or gpt
-BOOT_USE_UUID=yes    # Add UUID to fstab
+BOOT_END=385           # 384 MiB boot partition, aligned
+IMAGE_END=6105         # BOOT_END + 4288 MiB (/img squashfs)
+BOOT_TYPE=gpt          # Keep gpt for SSD, NVMe switch to msdos if needed
+BOOT_USE_UUID=yes      # Use UUIDs in fstab for /boot mount
+INIT_TYPE="initv3"     # Volumio init type
 
-## initramfs info
-INIT_TYPE="initv3"
-PLYMOUTH_THEME="volumio-player"
+## Plymouth theme management
+PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
+INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
 # Modules that will be added to intramfs
 MODULES=("overlay" "squashfs"
