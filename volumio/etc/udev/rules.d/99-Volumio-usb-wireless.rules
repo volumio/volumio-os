@@ -1,0 +1,11 @@
+# WiFi rfkill unblock after renaming
+ACTION=="add|change", SUBSYSTEM=="net", SUBSYSTEMS=="usb", ATTR{type}=="1", KERNEL=="wlan[0-9]*", RUN+="/usr/sbin/rfkill unblock wifi"
+
+# Bluetooth rfkill unblock for USB hci devices
+ACTION=="add|change", SUBSYSTEM=="bluetooth", SUBSYSTEMS=="usb", KERNEL=="hci[0-9]*", RUN+="/usr/sbin/rfkill unblock bluetooth"
+
+# Unblock all USB WiFi adapters
+ACTION=="add|change", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:e00106:*", RUN+="/usr/sbin/rfkill unblock wifi"
+
+# Unblock all USB Bluetooth adapters
+ACTION=="add|change", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:e00101:*", RUN+="/usr/sbin/rfkill unblock bluetooth"
