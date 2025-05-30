@@ -33,13 +33,12 @@ KIOSKMODE=no
 
 ## Partition info
 BOOT_START=1
-BOOT_END=257
-IMAGE_END=3257
-BOOT_TYPE=msdos   # msdos or gpt
-BOOT_USE_UUID=yes # Add UUID to fstab
-INIT_TYPE="initv3"
-INIT_UUID_TYPE="pi" # Use block device GPEN if dynamic UUIDs are not handled.
-
+BOOT_END=385           # 384 MiB boot partition, aligned
+IMAGE_END=4673         # BOOT_END + 4288 MiB (/img squashfs)
+BOOT_TYPE=msdos        # Keep msdos for Pi SD boot, switch to gpt for NVMe if needed
+BOOT_USE_UUID=yes      # Use UUIDs in fstab for /boot mount
+INIT_TYPE="initv3"     # Volumio init type
+INIT_UUID_TYPE="pi"    # Use block device GPEN or PARTUUID fallback
 
 ## Plymouth theme management
 PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
