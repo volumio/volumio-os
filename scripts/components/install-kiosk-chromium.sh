@@ -31,8 +31,7 @@ log "${CMP_NAME} Dependencies installed!"
 # Browser
 ARCH=$(dpkg --print-architecture)
 log "${CMP_NAME} Detected architecture: $ARCH"
-# GITHUB_BASE_URL="https://github.com/volumio/volumio3-os-static-assets/raw/master/browsers/chromium"
-GITHUB_BASE_URL="https://github.com/foonerd/volumio3-os-static-assets/raw/master/browsers/chromium"
+GITHUB_BASE_URL="https://github.com/volumio/volumio3-os-static-assets/raw/master/browsers/chromium"
 declare -A DEB_FILES
   DEB_FILES["chromium"]="chromium_135.0.7049.95-1~deb12u1_${ARCH}.deb"
   DEB_FILES["chromium-common"]="chromium-common_135.0.7049.95-1~deb12u1_${ARCH}.deb"
