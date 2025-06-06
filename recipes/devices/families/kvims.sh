@@ -19,7 +19,7 @@ DEVICEFAMILY="khadas"
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEBASE="vims"
 DEVICEREPO="https://github.com/volumio/platform-khadas.git"
-DEVICEREPO_BRANCH="master" # Branch to use for the device repo or empty for main
+DEVICEREPO_BRANCH="bookworm" # Branch to use for the device repo or empty for main
 
 ### What features do we want to target
 # TODO: Not fully implement
