@@ -19,6 +19,7 @@ DEVICEFAMILY="khadas"
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEBASE="vims"
 DEVICEREPO="https://github.com/volumio/platform-khadas.git"
+DEVICEREPO_BRANCH="bookworm" # Branch to use for the device repo or empty for main
 
 ### What features do we want to target
 # TODO: Not fully implement
@@ -62,6 +63,7 @@ write_device_files() {
   cp -r "${PLTDIR}/${DEVICEBASE}/uboot-mainline" "${ROOTFSMNT}/boot"
 
   log "Copying modules & firmware"
+  rm -f "${ROOTFSMNT}/lib/firmware/regulatory.db" "${ROOTFSMNT}/lib/firmware/regulatory.db.p7s"
   cp -pR "${PLTDIR}/${DEVICEBASE}/lib/modules" "${ROOTFSMNT}/lib"
   cp -pR "${PLTDIR}/${DEVICEBASE}/lib/firmware" "${ROOTFSMNT}/lib"
 
