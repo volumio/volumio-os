@@ -23,7 +23,10 @@ jobs:
         id: branches
         run: |
           git fetch origin
-          BRANCHES=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -vE '^(origin/master|origin/HEAD)' | sed 's|origin/||')
+          BRANCHES=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin \
+            | grep -E '^origin/' \
+            | grep -vE '^origin/(master|HEAD)$' \
+            | sed 's|^origin/||')
           {
             echo "branches<<EOF"
             echo "$BRANCHES"
@@ -33,6 +36,10 @@ jobs:
       - name: Recreate each branch from master
         run: |
           while IFS= read -r branch; do
+            if [[ "$branch" == "origin" ]]; then
+              echo "Skipping invalid branch: origin"
+              continue
+            fi
             echo "Recreating branch: $branch"
             git push origin --delete "$branch" || echo "Branch $branch may not exist remotely"
             git checkout -b "$branch" origin/master
