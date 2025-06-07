@@ -24,13 +24,17 @@ jobs:
         run: |
           git fetch origin
           BRANCHES=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -vE '^(origin/master|origin/HEAD)' | sed 's|origin/||')
-          echo "branches=$BRANCHES" >> $GITHUB_OUTPUT
+          {
+            echo "branches<<EOF"
+            echo "$BRANCHES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Recreate each branch from master
         run: |
-          for branch in ${{ steps.branches.outputs.branches }}; do
+          while IFS= read -r branch; do
             echo "Recreating branch: $branch"
-            git push origin --delete $branch || echo "Branch $branch may not exist remotely"
-            git checkout -b $branch origin/master
-            git push origin $branch --force
-          done
+            git push origin --delete "$branch" || echo "Branch $branch may not exist remotely"
+            git checkout -b "$branch" origin/master
+            git push origin "$branch" --force
+          done <<< "${{ steps.branches.outputs.branches }}"
