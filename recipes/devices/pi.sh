@@ -333,7 +333,7 @@ device_chroot_tweaks_pre() {
 
 	log "Changing external ethX priority" "info"
 	# As built-in eth _is_ on USB (smsc95xx or lan78xx drivers)
-	sed -i 's/KERNEL==\"eth/DRIVERS!=\"smsc95xx\", DRIVERS!=\"lan78xx\", &/' /etc/udev/rules.d/98-Volumio-net.rules
+	sed -i 's/KERNEL==\"eth/DRIVERS!=\"smsc95xx\", DRIVERS!=\"lan78xx\", &/' /etc/udev/rules.d/99-Volumio-net.rules
 
 	log "Adding volumio to gpio,i2c,spi group" "info"
 	usermod -a -G gpio,i2c,spi,input volumio
@@ -563,4 +563,12 @@ device_image_tweaks_post() {
 		log "Updating plymouth systemd services" "info"
 		cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
 	fi
+
+	log "Override alsa UCM systemd services" "info"
+	mkdir -p "${ROOTFSMNT}"/etc/systemd/system/alsa-restore.service.d
+	cat <<'EOF' > "${ROOTFSMNT}"/etc/systemd/system/alsa-restore.service.d/pi-override.conf
+	[Service]
+	ExecStart=
+	ExecStart=/usr/sbin/alsactl restore --no-ucm
+	EOF
 }
