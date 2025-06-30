@@ -17,6 +17,14 @@ if [[ ${VOLUMIO_HARDWARE} == "pi" ]]; then
   echo "# Add your custom config.txt options to this file, which will be preserved during updates" > /boot/userconfig.txt
 fi
 
+echo "Disabling systemd alsa services"
+systemctl disable alsa-restore.service
+systemctl disable alsa-state.service
+
+echo "Blocking systemd alsa services"
+systemctl mask alsa-restore.service
+systemctl mask alsa-state.service
+
 echo "Removing default SSH host keys"
 # These should be created on first boot to ensure they are unique on each system
 rm -v /etc/ssh/ssh_host_*
