@@ -563,12 +563,4 @@ device_image_tweaks_post() {
 		log "Updating plymouth systemd services" "info"
 		cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
 	fi
-
-	log "Override alsa UCM systemd services" "info"
-	mkdir -p "${ROOTFSMNT}"/etc/systemd/system/alsa-restore.service.d
-	cat <<-EOF > "${ROOTFSMNT}"/etc/systemd/system/alsa-restore.service.d/pi-override.conf
-	[Service]
-	ExecStart=
-	ExecStart=/usr/sbin/alsactl restore --no-ucm
-	EOF
 }
