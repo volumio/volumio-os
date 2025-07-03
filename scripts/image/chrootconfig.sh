@@ -2,6 +2,8 @@
 
 set -eo pipefail
 set -o errtrace
+export LC_ALL=C
+
 # This script will be run in chroot under qemu.
 # Re import helpers in chroot
 # shellcheck source=./scripts/helpers.sh
