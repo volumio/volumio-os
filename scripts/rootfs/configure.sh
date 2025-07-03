@@ -115,10 +115,19 @@ for path in "${SRC}"/volumio/lib/systemd/system/*.path; do
   cp  "${path}" "${ROOTFS}"/lib/systemd/system/
 done
 
-log "Override alsa-restore systemd services" "info"
-mkdir -p "${ROOTF}"/etc/systemd/system/alsa-restore.service.d
-cp "${SRC}/volumio/etc/systemd/system/alsa-restore.service.d/override.conf" "${ROOTFS}/etc/systemd/system/alsa-restore.service.d/override.conf"
+log 'Done Copying Custom Volumio System Files' "okay"
+
+#VOLUMIO SERVICES OVERRIDE
+log "Volumio Service Overrides" "info"
+for override in "${SRC}"/volumio/etc/systemd/system/*/*.conf; do
+  log "Copying ${override}"
+  relpath="${override#${SRC}/volumio/}"  # strip leading prefix
+  mkdir -p "${ROOTFS}/$(dirname "${relpath}")"
+  cp "${override}" "${ROOTFS}/${relpath}"
+done
+
+# ALSA RESTORE OVERRIDE HELPER SCRIPT
 cp -rp "${SRC}/volumio/bin/wait-for-cards.sh" "${ROOTFS}/usr/bin/wait-for-cards.sh"
 chmod a+x "${ROOTFS}/usr/bin/wait-for-cards.sh"
 
-log 'Done Copying Custom Volumio System Files' "okay"
+log 'Done Volumio Service Overrides' "okay"
