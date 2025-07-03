@@ -118,7 +118,7 @@ done
 log "Override alsa-restore systemd services" "info"
 mkdir -p "${ROOTF}"/etc/systemd/system/alsa-restore.service.d
 cp "${SRC}/volumio/etc/systemd/system/alsa-restore.service.d/override.conf" "${ROOTFS}/etc/systemd/system/alsa-restore.service.d/override.conf"
-cp -rp "${SRC}/volumio//bin/wait-for-cards.sh" "${ROOTFS}/usr/bin/wait-for-cards.sh"
+cp -rp "${SRC}/volumio/bin/wait-for-cards.sh" "${ROOTFS}/usr/bin/wait-for-cards.sh"
 chmod a+x "${ROOTFS}/usr/bin/wait-for-cards.sh"
 
 log 'Done Copying Custom Volumio System Files' "okay"
