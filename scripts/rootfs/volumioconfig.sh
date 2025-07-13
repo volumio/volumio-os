@@ -372,14 +372,6 @@ ln -s /lib/systemd/system/volumiossh.service /etc/systemd/system/multi-user.targ
 log "Enable Volumio IP Change Monitoring Service"
 ln -s /lib/systemd/system/volumio-ipchange.service /etc/systemd/system/multi-user.target.wants/volumio-ipchange.service
 
-log "Enable Volumio Triggerhappy Rebind Service"
-ln -s /lib/systemd/system/th-udev-rebind.service /etc/systemd/system/multi-user.target.wants/th-udev-rebind.service
-
-log "Mute Default Triggerhappy udev rule"
-# This is to prevent triggerhappy from triggering on udev events before sockets are created
-# and before the triggerhappy service is started.
-ln -s /dev/null /etc/udev/rules.d/60-triggerhappy.rules
-
 log "Enable Volumio Welcome Service"
 ln -s /lib/systemd/system/welcome.service /etc/systemd/system/multi-user.target.wants/welcome.service
 
@@ -564,4 +556,19 @@ log "Enable time sync helper and watchdog"  "info"
 ln -s /lib/systemd/system/setdatetime-helper.service /etc/systemd/system/multi-user.target.wants/setdatetime-helper.service
 ln -s /lib/systemd/system/setdatetime-helper.timer /etc/systemd/system/timers.target.wants/setdatetime-helper.timer
 
+#####################
+#UDEV RULES#----------------------------------------
+#####################
+log "Fixing mismatched udev rules"  "info"
+log "Enable Volumio Triggerhappy Rebind Service"
+ln -s /lib/systemd/system/th-udev-rebind.service /etc/systemd/system/multi-user.target.wants/th-udev-rebind.service
 
+log "Mute Default Triggerhappy udev rule"
+# This is to prevent triggerhappy from triggering on udev events before sockets are created
+# and before the triggerhappy service is started.
+ln -s /dev/null /etc/udev/rules.d/60-triggerhappy.rules
+
+log "Mute Default HCI udev rule"
+# AutoEnable=true in /etc/bluetooth/main.conf confirms that BlueZ will automatically power up hci0 when bluetoothd starts.
+rm /etc/udev/rules.d/10-local.rules
+ln -s /dev/null /etc/udev/rules.d/10-local.rules
