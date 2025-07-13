@@ -1,0 +1,11 @@
+[Unit]
+Description=Late rebind of input devices to triggerhappy
+After=triggerhappy.socket triggerhappy.service
+Requires=triggerhappy.socket
+
+[Service]
+Type=oneshot
+ExecStart=/bin/th-udev-rebind.sh
+
+[Install]
+WantedBy=multi-user.target

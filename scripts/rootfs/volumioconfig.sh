@@ -372,6 +372,14 @@ ln -s /lib/systemd/system/volumiossh.service /etc/systemd/system/multi-user.targ
 log "Enable Volumio IP Change Monitoring Service"
 ln -s /lib/systemd/system/volumio-ipchange.service /etc/systemd/system/multi-user.target.wants/volumio-ipchange.service
 
+log "Enable Volumio Triggerhappy Rebind Service"
+ln -s /lib/systemd/system/th-udev-rebind.service /etc/systemd/system/multi-user.target.wants/th-udev-rebind.service
+
+log "Mute Default Triggerhappy udev rule"
+# This is to prevent triggerhappy from triggering on udev events before sockets are created
+# and before the triggerhappy service is started.
+ln -s /dev/null /etc/udev/rules.d/60-triggerhappy.rules
+
 log "Enable Volumio Welcome Service"
 ln -s /lib/systemd/system/welcome.service /etc/systemd/system/multi-user.target.wants/welcome.service
 
