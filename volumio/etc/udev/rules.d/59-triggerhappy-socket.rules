@@ -1,0 +1,1 @@
+ACTION=="add", SUBSYSTEM=="input", ATTRS{name}!="triggerhappy", ENV{SYSTEMD_WANTS}="triggerhappy.socket"

@@ -77,9 +77,12 @@ cp "${SRC}/volumio/bin/firststart.sh" "${ROOTFS}/bin/firststart.sh"
 #dynswap
 cp "${SRC}/volumio/bin/dynswap.sh" "${ROOTFS}/bin/dynswap.sh"
 
-#udev script
+#udev scripts
 cp "${SRC}/volumio/bin/rename_netiface0.sh" "${ROOTFS}/bin/rename_netiface0.sh"
 chmod a+x "${ROOTFS}/bin/rename_netiface0.sh"
+
+cp "${SRC}/volumio/bin/th-udev-rebind.sh" "${ROOTFS}/bin/th-udev-rebind.sh"
+chmod a+x "${ROOTFS}/bin/th-udev-rebind.sh"
 
 #Plymouth & upmpdcli files
 cp -rp "${SRC}"/volumio/usr/* "${ROOTFS}/usr/"
