@@ -567,8 +567,3 @@ log "Mute Default Triggerhappy udev rule"
 # This is to prevent triggerhappy from triggering on udev events before sockets are created
 # and before the triggerhappy service is started.
 ln -s /dev/null /etc/udev/rules.d/60-triggerhappy.rules
-
-log "Mute Default HCI udev rule"
-# AutoEnable=true in /etc/bluetooth/main.conf confirms that BlueZ will automatically power up hci0 when bluetoothd starts.
-rm /etc/udev/rules.d/10-local.rules
-ln -s /dev/null /etc/udev/rules.d/10-local.rules
