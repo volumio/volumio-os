@@ -1,7 +1,7 @@
 [Unit]
 Description=Late rebind of input devices to triggerhappy
-After=triggerhappy.socket triggerhappy.service
-Requires=triggerhappy.socket
+After=triggerhappy.service
+Wants=triggerhappy.service
 
 [Service]
 Type=oneshot
