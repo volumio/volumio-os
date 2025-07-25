@@ -80,6 +80,11 @@ PACKAGES=( # Bluetooth packages
 #Pi Specific
 RpiRepo="https://github.com/raspberrypi/rpi-firmware"
 RpiUpdateRepo="raspberrypi/rpi-update"
+## We ended with 10 versions od 6.12.34 kernels from master branch.
+## Using older branch to avoid boot failures
+RpiUpdateBranch="master"
+# RpiUpdateBranch="1dd909e2c8c2bae7adb3eff3aed73c3a6062e8c8"
+
 declare -A PI_KERNELS=(
 	#[KERNEL_VERSION]="SHA|Branch|Rev"
 	[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
@@ -95,9 +100,10 @@ declare -A PI_KERNELS=(
 	[6.6.56]="a5efb544aeb14338b481c3bdc27f709e8ee3cf8c|master|1803"
 	[6.6.62]="9a9bda382acec723c901e5ae7c7f415d9afbf635|master|1816"
 	[6.12.27]="f54e67fef6e726725d3a8f56d232194497bd247c|master|1876"
+	[6.12.34]="4f435f9e89a133baab3e2c9624b460af335bbe91|master|1889"
 )
 # Version we want
-KERNEL_VERSION="6.6.62"
+KERNEL_VERSION="6.12.34"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -139,7 +145,7 @@ device_image_tweaks() {
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/sources.list.d/raspi.list"
 		deb http://archive.raspberrypi.com/debian/ ${SUITE} main
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
-		#deb-src http://archive.raspberrypi.org/debian/ buster main ui
+		#deb-src http://archive.raspberrypi.com/debian/ ${SUITE} main
 		# https://github.com/volumio/volumio-os/issues/45 - mesa libs unmet dependencies
 		deb http://archive.raspberrypi.com/debian/ ${SUITE} untested
 
@@ -166,7 +172,7 @@ device_image_tweaks() {
 	EOF
 
 	log "Fetching rpi-update" "info"
-	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" "https://raw.githubusercontent.com/${RpiUpdateRepo}/master/rpi-update" &&
+	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" "https://raw.githubusercontent.com/${RpiUpdateRepo}/${RpiUpdateBranch}/rpi-update" &&
 		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
 
 	# For bleeding edge, check what is the latest on offer
@@ -199,7 +205,8 @@ device_image_tweaks() {
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
 	RpiUpdate_args=("UPDATE_SELF=0" "ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
 		"SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
-		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI4=1" "WANT_PI5=1"
+		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI2=1" "WANT_PI4=1"
+		"WANT_PI5=1" "WANT_16K=0" "WANT_64BIT_RT=0"
 		# "BRANCH=${KERNEL_BRANCH}"
 	)
 	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
@@ -234,24 +241,45 @@ device_chroot_tweaks_pre() {
 	# List of custom firmware -
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
+		[vfirmware]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/bookworm/firmware-volumio.tar.gz"
 		[PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
 		[MotivoCustom]="https://github.com/volumio/motivo-drivers/raw/main/output/modules-rpi-${KERNEL_VERSION}-motivo.tar.gz"
 		[RPiUserlandTools]="https://github.com/volumio/volumio3-os-static-assets/raw/master/tools/rpi-softfp-vc.tar.gz"
 	)
 
-	## Comment to keep RPi4/RPi5 64bit kernel
-	#if [ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]; then
-	#	log "Removing v8+ (Pi4/5) Kernel and modules" "info"
-	#	rm -rf /boot/kernel8.img
-	#	rm -rf "/lib/modules/${KERNEL_VERSION}-v8+"
-	#fi
+	# Define the kernel version (already parsed earlier)
 
-	## Comment to keep RPi5 64bit 16k page size kernel
+	# Remove Pi5 16K kernel
 	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]]; then
 		log "Removing v8-16k+ (Pi5 16k) Kernel and modules" "info"
-		rm -rf /boot/kernel_2712.img
+		rm -f /boot/kernel_2712.img
 		rm -rf "/lib/modules/${KERNEL_VERSION}-v8-16k+"
 	fi
+
+	# Remove 64-bit realtime kernel
+	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8-rt+" ]]; then
+		log "Removing v8-rt+ (64bit RT) Kernel and modules" "info"
+		rm -f /boot/kernel_2712_rt.img
+		rm -rf "/lib/modules/${KERNEL_VERSION}-v8-rt+"
+	fi
+
+	# Remove all unintended +rpt-rpi-* variants
+	for kdir in /lib/modules/*; do
+		kbase=$(basename "$kdir")
+		if [[ "$kbase" == *+rpt-rpi-* ]]; then
+			log "Removing stray kernel module folder: $kbase" "info"
+			rm -rf "/lib/modules/$kbase"
+		fi
+	done
+
+	# Optional: remove any empty module folders
+	for kdir in /lib/modules/${KERNEL_VERSION}*; do
+		if [[ -d "$kdir" && ! -f "$kdir/modules.builtin" ]]; then
+			kbase=$(basename "$kdir")
+			log "Removing empty kernel module folder: $kbase" "info"
+			rm -rf "$kdir"
+		fi
+	done
 
 	log "Finished Kernel installation" "okay"
 
@@ -512,6 +540,16 @@ device_chroot_tweaks_pre() {
 	cat <<-EOF >/boot/cmdline.txt
 		${kernel_params[@]}
 	EOF
+
+	log "Final cleanup: remove unintended +rpt-rpi-* kernel module folders" "info"
+	for kdir in /lib/modules/*+rpt-rpi-*; do
+		if [[ -d "$kdir" ]]; then
+			kbase=$(basename "$kdir")
+			log "Removing final-stage rpt-rpi kernel module folder:" "$kbase" "info"
+			rm -rf "$kdir"
+		fi
+	done
+	log "Raspi Kernel and Modules cleanup completed" "okay"
 
 	log "Finalise all kernels with depmod and other tricks" "info"
 	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
