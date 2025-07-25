@@ -59,6 +59,11 @@ PACKAGES=(
 #Pi Specific
 RpiRepo="https://github.com/raspberrypi/rpi-firmware"
 RpiUpdateRepo="raspberrypi/rpi-update"
+## We ended with 10 versions od 6.12.34 kernels from master branch.
+## Using older branch to avoid boot failures
+# RpiUpdateBranch="master"
+RpiUpdateBranch="1dd909e2c8c2bae7adb3eff3aed73c3a6062e8c8"
+
 declare -A PI_KERNELS=(
 	#[KERNEL_VERSION]="SHA|Branch|Rev"
 	[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
@@ -164,7 +169,7 @@ device_image_tweaks() {
 	EOF
 
 	log "Fetching rpi-update" "info"
-	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" "https://raw.githubusercontent.com/${RpiUpdateRepo}/master/rpi-update" &&
+	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" "https://raw.githubusercontent.com/${RpiUpdateRepo}/${RpiUpdateBranch}/rpi-update" &&
 		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
 
 	# For bleeding edge, check what is the latest on offer
