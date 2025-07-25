@@ -31,15 +31,9 @@ declare -A VOLBINS=(
 # Note the use of $BUILD (arm/armv7/armv8/x86/x64) and not $ARCH(armel/armhf/arm64/i386/amd64) thanks to raspberrypi compatibility naming quirks
 declare -A CUSTOM_PKGS=(
   [volumio_remote_updater]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/volumio-remote-updater/volumio-remote-updater_1.8.12-1"
-  # [libnpupnp1]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/upmpdcli/libnpupnp1_4.0.14-1"
-  # [libupnpp6]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/upmpdcli/libupnpp6_0.20.2-1"
-  # [upmpdcli]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/upmpdcli/upmpdcli_1.5.8-1"
-  # [shairport-sync]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/shairport-sync/shairport-sync_3.2.2-1"
     [mpd]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/mpd/mpd_0.24.5-2volumio1"
   # [mpc]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/mpc/mpc_0.34-2"
-    [alsacap]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/alsacap/alsacap_1.4-1"
-  # [libcurl]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/curl/00libcurl4_7.74.0-1.2~bpo10%2B1"
-  # [curl]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/curl/curl_7.74.0-1.2~bpo10%2B1"
+    [alsacap]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/alsacap/alsacap_1.4-2"
     [bluetooth]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/bluetooth_5.72-1volumio1"
     [bluez]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/bluez_5.72-1volumio1"
     [libbluetooth3]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/libbluetooth3_5.72-1volumio1"
