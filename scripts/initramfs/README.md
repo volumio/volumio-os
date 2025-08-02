@@ -38,7 +38,7 @@
 
 # **Volumio initramfs implementation**
 
-This readme gives a quick overview of the files involved and how to integrate them into **volumio3-os**.  
+This readme gives a quick overview of the files involved and how to integrate them into **volumio-os**.  
 This documentation is still WIP.
 
 One of the main reasons for refactoring this was the lack of debugging capabilities in the current init script versions.  

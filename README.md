@@ -39,7 +39,7 @@ zip
 - Clone the build repo, and launch the build script (requires root permissions).
 
 ```
-git clone https://github.com/volumio/volumio3-os.git build
+git clone https://github.com/volumio/volumio-os.git build
 cd ./build
 ./build.sh -b <architecture> -d <device> -v <version>
 ```

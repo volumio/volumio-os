@@ -48,8 +48,8 @@ write_device_files() {
   cp -pdR "${PLTDIR}/${DEVICEBASE}/lib/modules" "${ROOTFSMNT}/lib"
   cp -pdR "${PLTDIR}/${DEVICEBASE}/lib/firmware" "${ROOTFSMNT}/lib"
 
-  # Volumio 3 needs predictable device naming switched off
-  # Use a volumio3-specific version which adds "net.ifnames=0" to the kernel parameters
+  # Volumio needs predictable device naming switched off
+  # Use a volumio-specific version which adds "net.ifnames=0" to the kernel parameters
   cp "${PLTDIR}/${DEVICEBASE}/boot/boot.cmd.volumio-os3" "${ROOTFSMNT}/boot/boot.cmd"
 }
 
@@ -101,7 +101,7 @@ device_image_tweaks_post() {
     mkimage -v -A "${UINITRD_ARCH}" -O linux -T ramdisk -C none -a 0 -e 0 -n uInitrd -d "${ROOTFSMNT}"/boot/volumio.initrd "${ROOTFSMNT}"/boot/uInitrd
     rm "${ROOTFSMNT}"/boot/volumio.initrd
   fi
-  log "Creating boot.scr, compiling the volumio3 version of the .cmd" "info"
+  log "Creating boot.scr, compiling the volumio version of the .cmd" "info"
   mkimage -A arm -T script -C none -d "${ROOTFSMNT}"/boot/boot.cmd.volumio-os3 "${ROOTFSMNT}"/boot/boot.scr
 
 }
