@@ -31,7 +31,7 @@ declare -A VOLBINS=(
 # Note the use of $BUILD (arm/armv7/armv8/x86/x64) and not $ARCH(armel/armhf/arm64/i386/amd64) thanks to raspberrypi compatibility naming quirks
 declare -A CUSTOM_PKGS=(
   [volumio_remote_updater]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/volumio-remote-updater/volumio-remote-updater_1.8.12-1"
-    [mpd]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/mpd/mpd_0.24.5-2volumio1"
+    [mpd]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/mpd/mpd_0.24.6-1volumio1"
   # [mpc]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/mpc/mpc_0.34-2"
     [alsacap]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/alsacap/alsacap_1.4-2"
     [bluetooth]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/bluetooth_5.72-1volumio1"
