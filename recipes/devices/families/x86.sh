@@ -267,6 +267,8 @@ device_chroot_tweaks_pre() {
 
   # Build up the base parameters
   kernel_params+=(
+    # Boot delay
+	"bootdelay=5"
     # Bios stuff
     "biosdevname=0"
     # Boot params
