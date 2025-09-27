@@ -2,8 +2,8 @@
 Description=Volumio Time Sync Watchdog Timer
 
 [Timer]
-OnBootSec=30s
-OnUnitActiveSec=1m
+OnBootSec=60s
+OnUnitActiveSec=10m
 Unit=setdatetime-helper.service
 
 [Install]
