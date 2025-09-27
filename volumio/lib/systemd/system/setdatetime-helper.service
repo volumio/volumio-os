@@ -1,7 +1,7 @@
 [Unit]
 Description=Time Synchronization Helper Service
-After=network-online.target
-Wants=network-online.target
+After=network.target dhcpcd.service
+Wants=network.target
 ConditionPathExists=/usr/bin/setdatetime-helper.sh
 
 [Service]
