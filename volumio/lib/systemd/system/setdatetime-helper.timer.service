@@ -1,6 +1,0 @@
-[Unit]
-Description=Volumio Time Sync Watchdog Service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/setdatetime-helper.sh
