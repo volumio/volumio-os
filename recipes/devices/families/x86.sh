@@ -282,7 +282,7 @@ device_chroot_tweaks_pre() {
     # Disable cursor
     "vt.global_cursor_default=0"
     # backlight control (notebooks)
-    "acpi_backlight=vendor"
+    "acpi_backlight=native"
     # for legacy ifnames in bookworm
     "net.ifnames=0"   
   )
