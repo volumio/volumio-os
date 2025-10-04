@@ -546,7 +546,7 @@ device_chroot_tweaks_pre() {
 	EOF
 
 	log "Final cleanup: remove unintended +rpt-rpi-* kernel module folders" "info"
-	for kdir in /lib/modules/*+rpt-rpi-*; do
+	for kdir in /lib/modules/*-16k+ /lib/modules/*+rpt-rpi-*; do
 		if [[ -d "$kdir" ]]; then
 			kbase=$(basename "$kdir")
 			log "Removing final-stage rpt-rpi kernel module folder:" "$kbase" "info"
