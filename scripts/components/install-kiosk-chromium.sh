@@ -194,7 +194,7 @@ fi
 
 log "Installing ${CMP_NAME} Virtual Keyboard"
 mkdir /data/volumiokioskextensions
-git clone https://github.com/volumio/chrome-virtual-keyboard.git /data/volumiokioskextensions/VirtualKeyboard
+git clone https://github.com/volumio/chrome-virtual-keyboard-v3.git /data/volumiokioskextensions/VirtualKeyboard
 
 if [[ ${VOLUMIO_HARDWARE} != motivo ]]; then
 
