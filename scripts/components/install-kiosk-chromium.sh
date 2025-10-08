@@ -11,6 +11,8 @@ export DEBIAN_FRONTEND=noninteractive
 
 # Dependency packages
 CMP_PACKAGES=(
+  # Chromium browser
+  "chromium" "chromium-l10n" "chromium-common"
   # Keyboard config
   "keyboard-configuration"
   # Display stuff
@@ -27,38 +29,6 @@ log "Installing ${#CMP_PACKAGES[@]} ${CMP_NAME} packages:" "" "${CMP_PACKAGES[*]
 apt-get install -y "${CMP_PACKAGES[@]}" --no-install-recommends
 
 log "${CMP_NAME} Dependencies installed!"
-
-# Browser
-ARCH=$(dpkg --print-architecture)
-log "${CMP_NAME} Detected architecture: $ARCH"
-GITHUB_BASE_URL="https://github.com/volumio/volumio3-os-static-assets/raw/master/browsers/chromium"
-declare -A DEB_FILES
-  DEB_FILES["chromium"]="chromium_135.0.7049.95-1~deb12u1_${ARCH}.deb"
-  DEB_FILES["chromium-common"]="chromium-common_135.0.7049.95-1~deb12u1_${ARCH}.deb"
-  DEB_FILES["chromium-l10n"]="chromium-l10n_135.0.7049.95-1~deb12u1_all.deb"
-
-TMP_DEB_DIR="/tmp/volumio-chromium"
-mkdir -p "$TMP_DEB_DIR"
-
-for pkg in chromium-common chromium chromium-l10n; do
-  DEB_NAME="${DEB_FILES[$pkg]}"
-  URL="$GITHUB_BASE_URL/$DEB_NAME"
-  DEST="$TMP_DEB_DIR/$DEB_NAME"
-  log "Downloading $pkg from $URL"
-  curl -L -o "$DEST" "$URL"
-  dpkg -i "$DEST" || apt-get install -f -y
-done
-log "${CMP_NAME} Cleaning up downloaded .deb files"
-rm -rf "$TMP_DEB_DIR"
-log "${CMP_NAME} Browser installed!"
-
-log "Creating ${CMP_NAME} Policy to Enable Manifest V2"
-mkdir -p /etc/chromium/policies/managed
-cat <<-EOF >/etc/chromium/policies/managed/policies.json
-{
-  "ExtensionManifestV2Availability": 2
-}
-EOF
 
 log "Creating ${CMP_NAME} dirs and scripts"
 mkdir /data/volumiokiosk
