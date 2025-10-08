@@ -121,7 +121,7 @@ WantedBy=multi-user.target
 
 log "Installing Virtual Keyboard"
 mkdir /data/volumiokioskextensions
-git clone https://github.com/volumio/chrome-virtual-keyboard.git /data/volumiokioskextensions/VirtualKeyboard
+git clone https://github.com/volumio/chrome-virtual-keyboard-v3.git /data/volumiokioskextensions/VirtualKeyboard
 
 log "  Allowing volumio to start an xsession"
 #/bin/sed -i "s/allowed_users=console/allowed_users=anybody/" /etc/X11/Xwrapper.config
