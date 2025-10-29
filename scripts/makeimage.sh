@@ -220,6 +220,8 @@ fi
 if [[ -n "${PLYMOUTH_THEME}" ]]; then
   log "Copying selected plymouth ${PLYMOUTH_THEME} theme" "info"
   cp -dR "${SRC}/volumio/plymouth/themes/${PLYMOUTH_THEME}" "${ROOTFSMNT}"/usr/share/plymouth/themes/"${PLYMOUTH_THEME}"
+  log "Copying volumio-text fallback plymouth theme" "info"
+  cp -dR "${SRC}/volumio/plymouth/themes/volumio-text" "${ROOTFSMNT}"/usr/share/plymouth/themes/volumio-text"
 fi
 
 if [[ "${INIT_PLYMOUTH_DISABLE}" == yes ]]; then
