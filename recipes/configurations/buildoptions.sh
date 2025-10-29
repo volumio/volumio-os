@@ -24,3 +24,8 @@ export RPI_USE_LATEST_KERNEL=${RPI_USE_LATEST_KERNEL:-no} # Fetch latest Pi kern
 # Misc
 export USE_BUILD_TESTS=${USE_BUILD_TESTS:-no} # Run some simple build framework tests for debugging
 export APT_CACHE=${APT_CACHE:-}               # URL of local cache of the Debian mirror
+
+# Plymouth display detection options
+export PLYMOUTH_WAIT_TIMEOUT=${PLYMOUTH_WAIT_TIMEOUT:-5}          # Seconds to wait for display device
+export PLYMOUTH_TEXT_THEME=${PLYMOUTH_TEXT_THEME:-volumio-text}  # Text theme to use for problematic displays
+export PLYMOUTH_REQUIRE_DISPLAY=${PLYMOUTH_REQUIRE_DISPLAY:-no}  # Skip Plymouth if no display found

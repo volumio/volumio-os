@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Volumio Text
+Description=Text-mode Plymouth theme for Volumio with progress bar
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/volumio-text
+ScriptFile=/usr/share/plymouth/themes/volumio-text/volumio-text.script

@@ -17,6 +17,7 @@
 |20240422|foonerd|OEM device handling move to beta
 |20240508|foonerd|Beta testing start across all builds
 |20240528|foonerd|Release across all builds
+|20251029|foonerd|Reworked plymouth theme detection
 
 ## ```##TODO```
 
@@ -120,6 +121,98 @@ This is different from the way debugging is done with the current version, which
 Add "plymouth.debug" to the cmdline parameters. 
 Boot and just let it run. After boot, login (```ctrl-F1```) and check file ```/var/log/plymouth-debug.log```
 
+# Plymouth Display Detection
+
+Starting with initv3, Plymouth has built-in display detection and rotation support to handle SPI, DSI, and other non-standard display configurations.
+
+## Display Detection
+
+Plymouth will automatically wait for display devices to become available during init. The detection checks:
+
+1. DRM/KMS devices (/sys/class/drm/card*/status = connected)
+2. Framebuffer devices (/dev/fb0, /dev/fb1)
+3. DRI devices (/dev/dri/card*)
+
+If no display is found within the timeout period, Plymouth will be skipped automatically.
+
+## Configuration Options
+
+The following environment variables control Plymouth display behavior:
+
+**PLYMOUTH_WAIT_TIMEOUT** (default: 5)
+- Seconds to wait for display device during init
+- Set in buildoptions.sh or device recipe
+
+**PLYMOUTH_TEXT_THEME** (default: volumio-text)
+- Text-mode theme to use for problematic displays
+- Automatically selected for very small screens or when graphical mode fails
+
+**PLYMOUTH_REQUIRE_DISPLAY** (default: no)
+- If "yes", Plymouth will always try to start even without detected display
+- If "no", Plymouth skips when no display found
+
+## Rotation Detection
+
+Display rotation is detected from kernel command line parameters:
+
+Supported formats:
+- video=HDMI-A-1:1920x1080,rotate=90
+- video=DSI-1:800x480,rotate=270
+- fbcon=rotate:1 (where 0=0deg, 1=90deg, 2=180deg, 3=270deg)
+- rotation=90
+
+Rotation is applied before Plymouth starts.
+
+## Device-Specific Overrides
+
+Device recipes can override rotation detection by providing a custom function in their custom-functions file:
+```sh
+custom_detect_rotation() {
+  # Read rotation from config.txt, device tree, or other source
+  # Echo rotation value (0, 1, 2, 3) and return 0
+  # Or return 1 if no rotation detected
+  
+  # Example: read from config.txt
+  if [ -f /mnt/boot/config.txt ]; then
+    rotation=$(grep "^display_rotate=" /mnt/boot/config.txt | cut -d= -f2)
+    [ -n "$rotation" ] && echo "$rotation" && return 0
+  fi
+  
+  return 1
+}
+```
+
+## Volumio Text Theme
+
+The volumio-text theme provides a fallback for displays that cannot support graphical Plymouth:
+
+- Black background with white text
+- "Volumio Player" title centered
+- Progress bar below title
+- Message scrolling support
+- Responsive to screen size
+- Automatically selected for:
+  - Displays smaller than 320x240
+  - SPI displays without framebuffer bridge
+  - DSI displays with detection issues
+
+## Troubleshooting
+
+**Plymouth not showing:**
+- Check display is detected: `ls /sys/class/drm/card*/status`
+- Check framebuffer: `ls /dev/fb*`
+- Add `debug` to cmdline.txt and check /run/initramfs/initramfs.debug
+- Increase PLYMOUTH_WAIT_TIMEOUT if display takes long to initialize
+
+**Rotation not applied:**
+- Verify rotation parameter in /proc/cmdline
+- Check if custom_detect_rotation() is implemented for your device
+- Some displays require rotation at driver level, not Plymouth
+
+**Text mode instead of graphical:**
+- Check display resolution in /sys/class/graphics/fb0/virtual_size
+- Graphical theme requires minimum 320x240 resolution
+- Override by setting INIT_PLYMOUTH_DISABLE="yes" in device recipe
 
 # **Modifying kernel command parameters in an already built image**
 
