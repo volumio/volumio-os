@@ -14,6 +14,10 @@ case ${1} in
 		;;
 esac
 
+# Source required function libraries
+. /scripts/functions
+. /scripts/volumio-functions
+
 SPLASH="true"
 
 for ARGUMENT in $(cat /proc/cmdline)
@@ -31,7 +35,46 @@ done
 
 if [ "${SPLASH}" = "true" ]
 then
-	mkdir -m 0755 /run/plymouth
-	/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid
-	/usr/bin/plymouth --show-splash
+	# Wait for display device with configurable timeout
+	PLYMOUTH_WAIT_TIMEOUT="${PLYMOUTH_WAIT_TIMEOUT:-5}"
+	
+	if wait_for_display "${PLYMOUTH_WAIT_TIMEOUT}"; then
+		# Display found, check if suitable for Plymouth
+		plymouth_check_display
+		display_status=$?
+		
+		if [ $display_status -eq 0 ]; then
+			# Display OK for graphical Plymouth
+			PLYMOUTH_THEME=""
+		elif [ $display_status -eq 1 ]; then
+			# Use text theme for problematic displays
+			PLYMOUTH_THEME="${PLYMOUTH_TEXT_THEME:-volumio-text}"
+		else
+			# No suitable display, skip Plymouth
+			exit 0
+		fi
+		
+		# Detect and apply rotation if specified
+		rotation=$(detect_display_rotation)
+		if [ -n "$rotation" ]; then
+			# Apply rotation via fbcon if framebuffer present
+			if [ -c /dev/fb0 ]; then
+				echo "$rotation" > /sys/class/graphics/fbcon/rotate 2>/dev/null || true
+			fi
+		fi
+		
+		# Start Plymouth
+		mkdir -m 0755 /run/plymouth 2>/dev/null || true
+		
+		if [ -n "$PLYMOUTH_THEME" ]; then
+			/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid --tty=/dev/tty1 --theme="$PLYMOUTH_THEME"
+		else
+			/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid --tty=/dev/tty1
+		fi
+		
+		/usr/bin/plymouth --show-splash
+	else
+		# Timeout waiting for display - skip Plymouth
+		:
+	fi
 fi

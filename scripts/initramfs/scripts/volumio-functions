@@ -640,3 +640,165 @@ custom_update_UUID() {
   # Placeholder for custom-functions before "update_fstab()" 
   :
 }
+
+wait_for_display() {
+# Wait for display device to become available
+# Args: $1 = timeout in seconds (default 5)
+# Returns: 0 if display found, 1 if timeout
+
+  local timeout=${1:-5}
+  local elapsed=0
+  local display_found=0
+  
+  log_begin_msg "Waiting for display device (timeout ${timeout}s)"
+  
+  while [ $elapsed -lt $timeout ]; do
+    # Check DRM devices first (preferred for KMS)
+    for drm_dev in /sys/class/drm/card*/status; do
+      if [ -f "$drm_dev" ]; then
+        status=$(cat "$drm_dev" 2>/dev/null)
+        if [ "$status" = "connected" ]; then
+          log_end_msg
+          return 0
+        fi
+      fi
+    done
+    
+    # Check framebuffer devices (fallback)
+    if [ -c /dev/fb0 ] || [ -c /dev/fb1 ]; then
+      log_end_msg
+      return 0
+    fi
+    
+    # Check DRI devices (alternative)
+    if [ -c /dev/dri/card0 ] || [ -c /dev/dri/card1 ]; then
+      log_end_msg
+      return 0
+    fi
+    
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  
+  log_warning_msg "No display device found after ${timeout}s"
+  log_end_msg
+  return 1
+}
+
+detect_display_rotation() {
+# Detect display rotation from kernel command line
+# Supports multiple rotation parameter formats:
+#   video=HDMI-A-1:1920x1080,rotate=90
+#   video=DSI-1:800x480,rotate=270
+#   fbcon=rotate:1
+#   rotation=90
+# Returns: rotation value (0, 1, 2, 3) or empty if not found
+
+  local cmdline=$(cat /proc/cmdline)
+  local rotation=""
+  
+  # Parse video= parameter with rotate=
+  for param in $cmdline; do
+    case "$param" in
+      video=*rotate=*)
+        # Extract rotation value after rotate=
+        rotation=$(echo "$param" | sed -n 's/.*rotate=\([0-9]*\).*/\1/p')
+        # Convert degrees to fbcon format (0=0deg, 1=90deg, 2=180deg, 3=270deg)
+        case "$rotation" in
+          0) rotation=0 ;;
+          90) rotation=1 ;;
+          180) rotation=2 ;;
+          270) rotation=3 ;;
+          *) rotation="" ;;
+        esac
+        [ -n "$rotation" ] && echo "$rotation" && return 0
+        ;;
+      fbcon=*rotate:*)
+        # Extract rotation value after rotate:
+        rotation=$(echo "$param" | sed -n 's/.*rotate:\([0-3]\).*/\1/p')
+        [ -n "$rotation" ] && echo "$rotation" && return 0
+        ;;
+      rotation=*)
+        # Simple rotation parameter
+        rotation=$(echo "$param" | sed -n 's/rotation=\([0-9]*\).*/\1/p')
+        case "$rotation" in
+          0) rotation=0 ;;
+          90) rotation=1 ;;
+          180) rotation=2 ;;
+          270) rotation=3 ;;
+          *) rotation="" ;;
+        esac
+        [ -n "$rotation" ] && echo "$rotation" && return 0
+        ;;
+    esac
+  done
+  
+  # Check for custom rotation detection from device custom-functions
+  if type custom_detect_rotation >/dev/null 2>&1; then
+    rotation=$(custom_detect_rotation)
+    [ -n "$rotation" ] && echo "$rotation" && return 0
+  fi
+  
+  echo ""
+  return 1
+}
+
+plymouth_check_display() {
+# Verify display is suitable for Plymouth
+# Returns: 0 if display OK, 1 if should use text mode, 2 if should skip Plymouth
+
+  local display_type=""
+  
+  # Check if any DRM device is connected
+  for drm_dev in /sys/class/drm/card*/status; do
+    if [ -f "$drm_dev" ]; then
+      status=$(cat "$drm_dev" 2>/dev/null)
+      if [ "$status" = "connected" ]; then
+        display_type="drm"
+        break
+      fi
+    fi
+  done
+  
+  # Check framebuffer if no DRM found
+  if [ -z "$display_type" ]; then
+    if [ -c /dev/fb0 ]; then
+      display_type="fb"
+    elif [ -c /dev/fb1 ]; then
+      display_type="fb"
+    fi
+  fi
+  
+  # No display found
+  if [ -z "$display_type" ]; then
+    return 2
+  fi
+  
+  # Check if display has acceptable resolution for graphical Plymouth
+  # Text mode is safer for very small displays or problematic configurations
+  if [ "$display_type" = "fb" ]; then
+    # Check framebuffer resolution from /sys if available
+    if [ -f /sys/class/graphics/fb0/virtual_size ]; then
+      fb_size=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null)
+      fb_width=$(echo "$fb_size" | cut -d',' -f1)
+      fb_height=$(echo "$fb_size" | cut -d',' -f2)
+      
+      # If resolution is very small (less than 320x240), suggest text mode
+      if [ -n "$fb_width" ] && [ -n "$fb_height" ]; then
+        if [ "$fb_width" -lt 320 ] || [ "$fb_height" -lt 240 ]; then
+          return 1
+        fi
+      fi
+    fi
+  fi
+  
+  # Display appears OK for graphical Plymouth
+  return 0
+}
+
+custom_detect_rotation() {
+  # Placeholder for device-specific rotation detection
+  # Override this function in device custom-functions if needed
+  # Should echo rotation value (0, 1, 2, 3) and return 0, or return 1
+  return 1
+}
