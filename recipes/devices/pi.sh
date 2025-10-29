@@ -50,7 +50,30 @@ INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initializati
 UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="yes" # yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
 
 # Modules that will be added to initramfs
-MODULES=("fuse" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas")
+MODULES=(
+  # Core filesystem and storage modules
+  "fuse" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas"  
+  # DRM/KMS foundation (required for plymouth, see line 213-214 warning)
+  "drm" "drm_kms_helper" "vc4"
+  # DSI display panels
+  # Official Pi 7" touchscreen (original 800x480)
+  "panel-raspberrypi-touchscreen"
+  # Official Pi Touch Display 2 (720x1280, Nov 2024)
+  "panel-ilitek-ili9881c"
+  # Waveshare DSI v1 displays
+  "panel-waveshare-dsi"
+  # Waveshare DSI v2 displays
+  "panel-waveshare-dsi-v2"
+  # SPI/FBTFT displays (legacy framebuffer)
+  "fbtft"
+  "fb_ili9340" "fb_ili9341"
+  "fb_ili9488"
+  "fb_st7735r" "fb_st7789v"
+  "fb_hx8357d"
+  # Touch controller support
+  "goodix"
+  "ads7846"
+)
 # Packages that will be installed
 PACKAGES=(
 	# GPIO stuff
