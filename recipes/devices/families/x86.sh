@@ -45,7 +45,7 @@ MODULES=("overlay" "squashfs"
   "hid" "nls_cp437" "nls_utf8" "vfat" "fuse" "uas"
   # nls_ascii might be needed on some kernels (debian upstream for example)
   # Plymouth modules
-  "intel_agp" "drm" "i915 modeset=1" "nouveau modeset=1" "radeon modeset=1"
+  "intel_agp" "drm" "drm_kms_helper" "i915 modeset=1" "nouveau modeset=1" "radeon modeset=1" "amdgpu modeset=1"
   # Ata modules
   "acard-ahci" "ahci" "ata_generic" "ata_piix" "libahci" "libata"
   "pata_ali" "pata_amd" "pata_artop" "pata_atiixp" "pata_atp867x" "pata_cmd64x" "pata_cs5520" "pata_cs5530"
