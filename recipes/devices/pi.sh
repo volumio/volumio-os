@@ -42,7 +42,7 @@ INIT_TYPE="initv3"     # Volumio init type
 INIT_UUID_TYPE="pi"    # Use block device GPEN or PARTUUID fallback
 
 ## Plymouth theme management
-PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
+PLYMOUTH_THEME="volumio-adaptive" # Choices are: {volumio,volumio-logo,volumio-player}
 INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
 ## TODO: for any KMS DRM panel mudule, which does not create frambuffer bridge, set this variable to yes, otherwise no
@@ -52,28 +52,81 @@ UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="yes" # yes/no or empty. Replaces default p
 # Modules that will be added to initramfs
 MODULES=(
   # Core filesystem and storage modules
-  "fuse" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "squashfs" "uas"  
-  # DRM/KMS foundation (required for plymouth, see line 213-214 warning)
-  "drm" "drm_kms_helper" "vc4"
-  # DSI display panels
-  # Official Pi 7" touchscreen (original 800x480)
+  "fuse" 
+  "nls_iso8859_1" 
+  "nvme" 
+  "nvme_core" 
+  "overlay" 
+  "squashfs" 
+  "uas"  
+  # ALSA sound subsystem - required for vc4/HDMI audio during boot
+  # Base ALSA module - must load before any other sound modules
+  "snd"
+  # ALSA timer and PCM support
+  "snd-timer"
+  "snd-pcm"
+  "snd-pcm-dmaengine"
+  "snd-compress"
+  # ASoC core - required by vc4 for HDMI audio
+  "snd-soc-core"
+  # Audio codecs - Pi hardware audio support
+  # HDMI audio codec - all Pi models with HDMI
+  "snd-soc-hdmi-codec"
+  # Built-in audio jack - Pi 0-4
+  "snd-bcm2835"
+  # I2S audio interface - all Pi models
+  "snd-soc-bcm2835-i2s"
+  # I2C and SPI controllers - required for display panel communication
+  # I2C controller for Pi 0-4
+  "i2c-bcm2835"
+  # I2C controller for Pi 5
+  "i2c-brcmstb"
+  # SPI controller - all Pi models
+  "spi-bcm2835"
+  # Pi 5 RP1 I/O controller - must load before RP1 peripherals
+  # RP1 firmware base
+  "rp1-fw"
+  # RP1 mailbox interface
+  "rp1-mailbox"
+  # RP1 PIO support
+  "rp1-pio"
+  # Display infrastructure - required for Plymouth splash
+  # Backlight control for display panels
+  "backlight"
+  # Panel orientation detection
+  "drm_panel_orientation_quirks"
+  # DRM/KMS foundation - required for Plymouth graphical boot
+  "drm" 
+  "drm_kms_helper"
+  # Display helper for vc4
+  "drm_display_helper"
+  # DMA helper for vc4
+  "drm_dma_helper"
+  # HDMI CEC support
+  "cec"
+  # VideoCore IV GPU driver - Pi 0-4
+  "vc4"
+  # DSI display panels - touchscreen support during boot
+  # Official Pi 7" touchscreen
   "panel-raspberrypi-touchscreen"
-  # Official Pi Touch Display 2 (720x1280, Nov 2024)
+  # Official Pi Touch Display 2
   "panel-ilitek-ili9881c"
-  # Waveshare DSI v1 displays
+  # Waveshare DSI displays
   "panel-waveshare-dsi"
-  # Waveshare DSI v2 displays
   "panel-waveshare-dsi-v2"
-  # SPI/FBTFT displays (legacy framebuffer)
+  # SPI/FBTFT displays - legacy framebuffer support
   "fbtft"
-  "fb_ili9340" "fb_ili9341"
+  "fb_ili9340" 
+  "fb_ili9341"
   "fb_ili9488"
-  "fb_st7735r" "fb_st7789v"
+  "fb_st7735r" 
+  "fb_st7789v"
   "fb_hx8357d"
-  # Touch controller support
+  # Touch controller drivers
   "goodix"
   "ads7846"
 )
+
 # Packages that will be installed
 PACKAGES=(
 	# GPIO stuff
