@@ -1,37 +1,60 @@
-# volumio-text.script - Text mode Plymouth theme with progress bar
+#  volumio-text.script - Text mode Plymouth theme
 #
-# Copyright (C) 2025 Volumio Srl
+#  Copyright (C) 2025 Volumio Srl
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2, or (at your option)
+#  any later version.
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2, or (at your option)
-# any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+#  02111-1307, USA.
+#
+#  Written by: Volumio Team
+#
+#  References:
+#    Freedesktop.org:
+#      https://www.freedesktop.org/wiki/Software/Plymouth/Scripts/
+#
+#  NOTE: This theme relies on fbcon rotation for display rotation.
+#        Use kernel parameters: video=HDMI-A-1:...,rotate=90 or fbcon=rotate:1
+#        Plymouth Script API does not support rotating text images.
 
 # --------------------------------- SETUP -------------------------------------
 
 Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
 Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
+# Get screen dimensions
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+
 # --------------------------------- TITLE TEXT --------------------------------
 
 # Create "Volumio Player" text - white color (1, 1, 1)
-# Use larger font for main title
 title_font = "Sans Bold 16";
 
 # Adapt font size to screen dimensions
-if (Window.GetHeight() < 480) {
+if (screen_height < 480) {
   title_font = "Sans Bold 12";
 }
-if (Window.GetHeight() < 240) {
+if (screen_height < 240) {
   title_font = "Sans Bold 10";
 }
 
 title_image = Image.Text("Volumio Player", 1, 1, 1, 1, title_font);
 title_sprite = Sprite(title_image);
 
-# Center title horizontally and position in upper-middle area
-title_x = Window.GetWidth() / 2 - title_image.GetWidth() / 2;
-title_y = Window.GetHeight() / 2 - 60;
+# Center title
+title_x = screen_width / 2 - title_image.GetWidth() / 2;
+title_y = screen_height / 2 - 40;
 
 # Ensure title is visible even on small screens
 if (title_y < 20) {
@@ -40,109 +63,65 @@ if (title_y < 20) {
 
 title_sprite.SetPosition(title_x, title_y, 10);
 
-# --------------------------------- PROGRESS BAR ------------------------------
-
-# Progress bar dimensions
-bar_width = 200;
-bar_height = 8;
-
-# Adapt to screen size
-if (Window.GetWidth() < 320) {
-  bar_width = Window.GetWidth() - 40;
-}
-
-# Create progress bar background (dark gray box)
-# RGB: 0.2, 0.2, 0.2
-bar_bg_image = Image("progress_bg.png");
-if (!bar_bg_image) {
-  # Fallback: create simple rectangle if image not available
-  # We'll draw this procedurally
-}
-
-bar_bg_sprite = Sprite();
-
-bar_x = Window.GetWidth() / 2 - bar_width / 2;
-bar_y = title_y + title_image.GetHeight() + 20;
-
-# Progress bar position
-bar_bg_sprite.SetPosition(bar_x, bar_y, 5);
-
-# Create progress bar fill (Volumio blue/white)
-# Start with empty progress
-progress_sprite = Sprite();
-progress_sprite.SetPosition(bar_x, bar_y, 6);
-
-global.progress_bar = progress_sprite;
-global.bar_width = bar_width;
-global.bar_height = bar_height;
-global.bar_x = bar_x;
-global.bar_y = bar_y;
-
-# --------------------------------- PROGRESS RENDERING ------------------------
-
-fun progress_callback(duration, progress) {
-  # Create filled portion of progress bar
-  # Volumio colors: white fill
-  fill_width = Math.Int(global.bar_width * progress);
-  
-  if (fill_width > 0) {
-    # Create a simple white rectangle for progress
-    # Since we cannot easily create colored rectangles, we use text as fallback
-    # This creates a series of white blocks to simulate a progress bar
-    fill_text = "";
-    blocks = Math.Int(fill_width / 4);
-    for (i = 0; i < blocks; i++) {
-      fill_text = fill_text + "#";
-    }
-    
-    if (fill_text != "") {
-      fill_image = Image.Text(fill_text, 1, 1, 1, 1, "Monospace 8");
-      global.progress_bar.SetImage(fill_image);
-      global.progress_bar.SetPosition(global.bar_x, global.bar_y + 2, 6);
-    }
-  }
-}
-
-Plymouth.SetBootProgressFunction(progress_callback);
-
 # --------------------------------- MESSAGE HANDLING --------------------------
 
-# Message display area below progress bar
+# Message display area below title
 message_font = "Sans 10";
 
-if (Window.GetHeight() < 480) {
+if (screen_height < 480) {
   message_font = "Sans 8";
+}
+if (screen_height < 240) {
+  message_font = "Sans 6";
 }
 
 message_sprite = Sprite();
-message_y = bar_y + bar_height + 15;
-message_sprite.SetPosition(0, message_y, 10);
+
+# Calculate message position
+message_y = title_y + title_image.GetHeight() + 15;
+
+# Store for callback
+global.message_font = message_font;
+global.message_y = message_y;
+global.screen_width = screen_width;
 
 fun message_callback(text) {
-  # Display message centered below progress bar
+  # Display message centered below title
   # Truncate if too long
   max_chars = 60;
   
-  if (Window.GetWidth() < 640) {
+  if (global.screen_width < 640) {
     max_chars = 40;
   }
+  if (global.screen_width < 320) {
+    max_chars = 30;
+  }
   
-  # Simple string length check and truncation
   display_text = text;
   
-  message_image = Image.Text(display_text, 0.8, 0.8, 0.8, 1, message_font);
+  # Create message image
+  message_image = Image.Text(display_text, 0.9, 0.9, 0.9, 1, global.message_font);
   message_sprite.SetImage(message_image);
   
   # Center the message
-  message_x = Window.GetWidth() / 2 - message_image.GetWidth() / 2;
-  message_sprite.SetPosition(message_x, message_y, 10);
+  message_x = global.screen_width / 2 - message_image.GetWidth() / 2;
+  message_sprite.SetPosition(message_x, global.message_y, 10);
 }
 
 Plymouth.SetMessageFunction(message_callback);
 
+# --------------------------------- BOOT PROGRESS -----------------------------
+
+# Simple progress callback - we show messages only
+fun progress_callback(duration, progress) {
+  # Progress is shown through system messages
+  # No visual progress bar in text theme
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
 # --------------------------------- PASSWORD PROMPT ---------------------------
 
-# Simple password prompt support
 fun password_callback(prompt, bullets) {
   # Clear any existing password sprites
   if (global.password_prompt) {
@@ -159,8 +138,9 @@ fun password_callback(prompt, bullets) {
   }
   global.password_prompt.SetImage(prompt_image);
   
-  prompt_x = Window.GetWidth() / 2 - prompt_image.GetWidth() / 2;
-  prompt_y = Window.GetHeight() / 2 + 40;
+  # Center prompt
+  prompt_x = global.screen_width / 2 - prompt_image.GetWidth() / 2;
+  prompt_y = global.screen_height / 2 + 40;
   global.password_prompt.SetPosition(prompt_x, prompt_y, 100);
   
   # Create bullets
@@ -175,12 +155,15 @@ fun password_callback(prompt, bullets) {
   }
   global.password_bullets.SetImage(bullet_image);
   
-  bullet_x = Window.GetWidth() / 2 - bullet_image.GetWidth() / 2;
+  bullet_x = global.screen_width / 2 - bullet_image.GetWidth() / 2;
   bullet_y = prompt_y + 25;
   global.password_bullets.SetPosition(bullet_x, bullet_y, 100);
 }
 
 Plymouth.SetDisplayPasswordFunction(password_callback);
+
+# Store screen dimensions globally for password callback
+global.screen_height = screen_height;
 
 # --------------------------------- QUIT HANDLER ------------------------------
 

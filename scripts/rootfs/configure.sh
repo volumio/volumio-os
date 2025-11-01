@@ -87,6 +87,10 @@ chmod a+x "${ROOTFS}/bin/th-udev-rebind.sh"
 #Plymouth & upmpdcli files
 cp -rp "${SRC}"/volumio/usr/* "${ROOTFS}/usr/"
 
+#Plymouth rotation helper
+cp "${SRC}/volumio/bin/plymouth-rotation.sh" "${ROOTFS}/bin/plymouth-rotation.sh"
+chmod a+x "${ROOTFS}/bin/plymouth-rotation.sh"
+
 #CPU TWEAK
 cp "${SRC}/volumio/bin/volumio_cpu_tweak" "${ROOTFS}/bin/volumio_cpu_tweak"
 chmod a+x "${ROOTFS}/bin/volumio_cpu_tweak"

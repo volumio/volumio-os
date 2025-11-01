@@ -547,6 +547,12 @@ usermod -a -G volumio root
 #EOF
 
 #####################
+#PLYMOUTH HELPER#------------------------------------
+#####################
+log "Enable plymouth rotation helper"  "info"
+ln -s /lib/systemd/system/plymouth-rotation.service /etc/systemd/system/multi-user.target.wants/plymouth-rotation.service
+
+#####################
 #TIME HELPER#----------------------------------------
 #####################
 log "Enable time sync helper and watchdog"  "info"
