@@ -203,7 +203,15 @@ if [[ -d "${SRC}/scripts/initramfs/scripts" ]] && [[ "${INIT_TYPE}" == "initv3" 
   [[ -d "${ROOTFSMNT}/root/scripts" ]] || mkdir "${ROOTFSMNT}/root/scripts"
   cp -pdR "${SRC}"/scripts/initramfs/scripts/* "${ROOTFSMNT}/root/scripts"
   # Add in our device specific scripts
-  [[ -n ${INIT_UUID_TYPE} ]] && cp "${SRC}/scripts/initramfs/custom/${INIT_UUID_TYPE}/custom-functions" "${ROOTFSMNT}/root/scripts"
+  [[ -n ${INIT_UUID_TYPE} ]] && cp "${SRC}/scripts/initramfs/custom/${INIT_UUID_TYPE}/custom-functions" "${ROOTFSMNT}"/root/scripts
+fi
+
+# Copy init-premount scripts for Plymouth rotation support
+if [[ -d "${SRC}/scripts/initramfs/scripts/init-premount" ]]; then
+  log "Adding init-premount scripts to initramfs-tools" "info"
+  mkdir -p "${ROOTFSMNT}/usr/share/initramfs-tools/scripts/init-premount"
+  cp -pdR "${SRC}"/scripts/initramfs/scripts/init-premount/plymouth "${ROOTFSMNT}"/usr/share/initramfs-tools/scripts/init-premount
+  chmod +x "${ROOTFSMNT}"/usr/share/initramfs-tools/scripts/init-premount/*
 fi
 
 cp "${SRC}"/scripts/initramfs/mkinitramfs-custom.sh "${ROOTFSMNT}"/usr/local/sbin
@@ -221,7 +229,13 @@ if [[ -n "${PLYMOUTH_THEME}" ]]; then
   log "Copying selected plymouth ${PLYMOUTH_THEME} theme" "info"
   cp -dR "${SRC}/volumio/plymouth/themes/${PLYMOUTH_THEME}" "${ROOTFSMNT}"/usr/share/plymouth/themes/"${PLYMOUTH_THEME}"
   log "Copying volumio-text fallback plymouth theme" "info"
-  cp -dR "${SRC}/volumio/plymouth/themes/volumio-text" "${ROOTFSMNT}"/usr/share/plymouth/themes/volumio-text"
+  cp -dR "${SRC}/volumio/plymouth/themes/volumio-text" "${ROOTFSMNT}"/usr/share/plymouth/themes/volumio-text
+  
+  # Copy custom Plymouth initramfs hook to ensure both themes get into initramfs
+  log "Copying custom Plymouth initramfs hook" "info"
+  mkdir -p "${ROOTFSMNT}"/etc/initramfs-tools/hooks
+  cp -dR "${SRC}"/volumio/etc/initramfs-tools/hooks/volumio-plymouth "${ROOTFSMNT}"/etc/initramfs-tools/hooks/
+  chmod +x "${ROOTFSMNT}"/etc/initramfs-tools/hooks/volumio-plymouth
 fi
 
 if [[ "${INIT_PLYMOUTH_DISABLE}" == yes ]]; then

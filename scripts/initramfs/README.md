@@ -18,6 +18,9 @@
 |20240508|foonerd|Beta testing start across all builds
 |20240528|foonerd|Release across all builds
 |20251029|foonerd|Reworked plymouth theme detection
+|20251030|foonerd|Added 00-plymouth-rotation init-premount script for theme-specific rotation
+|||Added volumio-adaptive theme with pre-rendered rotation support
+|||Updated volumio-text theme (cleaned version, uses fbcon rotation)
 
 ## ```##TODO```
 
@@ -163,24 +166,22 @@ Supported formats:
 
 Rotation is applied before Plymouth starts.
 
-## Device-Specific Overrides
+## Theme-Specific Rotation (00-plymouth-rotation)
 
-Device recipes can override rotation detection by providing a custom function in their custom-functions file:
-```sh
-custom_detect_rotation() {
-  # Read rotation from config.txt, device tree, or other source
-  # Echo rotation value (0, 1, 2, 3) and return 0
-  # Or return 1 if no rotation detected
-  
-  # Example: read from config.txt
-  if [ -f /mnt/boot/config.txt ]; then
-    rotation=$(grep "^display_rotate=" /mnt/boot/config.txt | cut -d= -f2)
-    [ -n "$rotation" ] && echo "$rotation" && return 0
-  fi
-  
-  return 1
-}
-```
+The init-premount script `00-plymouth-rotation` provides theme-specific rotation support for volumio-adaptive by patching the theme script before Plymouth loads. This enables the volumio-adaptive theme to display pre-rendered rotated animation sequences correctly.
+
+Supported parameter:
+- plymouth=0|90|180|270  (for volumio-adaptive theme only)
+
+The script runs before the main plymouth init-premount script and patches the `plymouth_rotation` variable in volumio-adaptive.script.
+
+This parameter works alongside the standard video= and fbcon= rotation parameters. Use both for complete display rotation:
+- plymouth=90 - selects correct image sequence in volumio-adaptive
+- video=HDMI-A-1:...,rotate=90 - rotates framebuffer for console
+
+A companion systemd service (plymouth-rotation.service) ensures rotation settings persist for shutdown and reboot displays.
+
+Note: The volumio-text theme does not use the plymouth= parameter. It relies on fbcon rotation (video= or fbcon= parameters) which rotates the entire framebuffer.
 
 ## Volumio Text Theme
 
@@ -191,10 +192,21 @@ The volumio-text theme provides a fallback for displays that cannot support grap
 - Progress bar below title
 - Message scrolling support
 - Responsive to screen size
+- Rotation support via fbcon (video= or fbcon= cmdline parameters)
 - Automatically selected for:
   - Displays smaller than 320x240
   - SPI displays without framebuffer bridge
   - DSI displays with detection issues
+
+
+## Volumio Adaptive Theme
+
+The volumio-adaptive theme provides an animated Plymouth experience with full rotation support:
+
+- Based on volumio-player animation
+- Pre-rendered image sequences for all four rotations (0, 90, 180, 270 degrees)
+- Rotation support via plymouth= cmdline parameter
+
 
 ## Troubleshooting
 

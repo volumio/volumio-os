@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Volumio Adaptive
+Description=Universal Volumio boot splash with adaptive rotation support via plymouth= parameter
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/volumio-adaptive
+ScriptFile=/usr/share/plymouth/themes/volumio-adaptive/volumio-adaptive.script
