@@ -1,0 +1,20 @@
+#!/bin/sh
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case $1 in prereqs) prereqs; exit 0;; esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+# Copy main theme
+if [ -n "${PLYMOUTH_THEME}" ] && [ -d "/usr/share/plymouth/themes/${PLYMOUTH_THEME}" ]; then
+  mkdir -p "${DESTDIR}/usr/share/plymouth/themes"
+  cp -a "/usr/share/plymouth/themes/${PLYMOUTH_THEME}" "${DESTDIR}/usr/share/plymouth/themes/"
+fi
+
+# Always copy text fallback
+if [ -d "/usr/share/plymouth/themes/volumio-text" ]; then
+  mkdir -p "${DESTDIR}/usr/share/plymouth/themes"
+  cp -a "/usr/share/plymouth/themes/volumio-text" "${DESTDIR}/usr/share/plymouth/themes/"
+fi
+
+exit 0

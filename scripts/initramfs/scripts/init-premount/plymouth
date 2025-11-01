@@ -18,6 +18,41 @@ esac
 . /scripts/functions
 . /scripts/volumio-functions
 
+# -------------------------------------------------------------------
+# PHASE 1: Handle plymouth= rotation parameter for theme images
+# -------------------------------------------------------------------
+
+CMDLINE=$(cat /proc/cmdline)
+ROTATION=0
+
+# Detect plymouth= parameter (for volumio-adaptive theme)
+if echo "$CMDLINE" | grep -q "plymouth=90"; then ROTATION=90; fi
+if echo "$CMDLINE" | grep -q "plymouth=180"; then ROTATION=180; fi
+if echo "$CMDLINE" | grep -q "plymouth=270"; then ROTATION=270; fi
+
+# Only patch theme if non-zero rotation requested
+if [ "$ROTATION" != "0" ]; then
+  ADAPTIVE_SCRIPT="/usr/share/plymouth/themes/volumio-adaptive/volumio-adaptive.script"
+  
+  # Check if volumio-adaptive theme is installed
+  if [ -f "$ADAPTIVE_SCRIPT" ]; then
+    PATCHED_SCRIPT="/tmp/volumio-adaptive.script"
+    
+    # Copy original script to writable location
+    if cp "$ADAPTIVE_SCRIPT" "$PATCHED_SCRIPT" 2>/dev/null; then
+      # Patch the rotation value in the copy
+      if sed -i "s/^plymouth_rotation = [0-9]*;/plymouth_rotation = ${ROTATION};/" "$PATCHED_SCRIPT" 2>/dev/null; then
+        # Bind mount the patched script over the original
+        mount --bind "$PATCHED_SCRIPT" "$ADAPTIVE_SCRIPT" 2>/dev/null || true
+      fi
+    fi
+  fi
+fi
+
+# -------------------------------------------------------------------
+# PHASE 2: Start Plymouth daemon
+# -------------------------------------------------------------------
+
 SPLASH="true"
 
 for ARGUMENT in $(cat /proc/cmdline)
@@ -69,6 +104,7 @@ then
 		if [ -n "$PLYMOUTH_THEME" ]; then
 			/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid --tty=/dev/tty1 --theme="$PLYMOUTH_THEME"
 		else
+			# Should never reach here, but fallback without theme
 			/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid --tty=/dev/tty1
 		fi
 		

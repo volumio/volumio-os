@@ -1,0 +1,13 @@
+[Unit]
+Description=Plymouth rotation detection for shutdown/reboot
+DefaultDependencies=no
+Before=plymouth-start.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/plymouth-rotation.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

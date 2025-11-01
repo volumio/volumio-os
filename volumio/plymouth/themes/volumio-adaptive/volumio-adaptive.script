@@ -1,0 +1,223 @@
+#  volumio-adaptive.script - universal boot splash with rotation support
+#
+#  Copyright (C) 2025 Volumio Srl
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2, or (at your option)
+#  any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+#  02111-1307, USA.
+#
+#  Written by: Andrew Seredyn
+#  Modified by: Nerd (adaptive rotation support)
+#
+#  References:
+#    Freedesktop.org:
+#      https://www.freedesktop.org/wiki/Software/Plymouth/Scripts/
+#
+#
+#    Splash screen from video frames:
+#     https://github.com/ToddServo/Plymouth-Animated-Boot-Screen-Creator
+#
+
+# --------------------------------- HELPER FUNCTIONS ------------------------------
+
+fun StringLength(string) {
+  pos = 0;
+  str = String(string);
+  while(str.CharAt(pos)) pos++;
+  return pos;
+}
+
+# --------------------------------- DEBUG TOGGLE ----------------------------------
+
+# To enable debug overlays (background + text), use:
+# enable_debug_overlay = (Window.GetWidth() > -1);  # always true at runtime
+
+# To disable debug overlays safely, use:
+enable_debug_overlay = (Window.GetWidth() < 0);  # always false
+
+# ------------------------------------ SEQUENCE -----------------------------------
+
+Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+progress = 1;
+
+# Rotation value patched at runtime by init-premount script
+# Default value (0 = landscape, no rotation)
+# Runtime detection will replace this line with actual plymouth= value
+plymouth_rotation = 0;
+
+# Build image subdirectory path
+image_subdir = "sequence" + plymouth_rotation + "/";
+
+# Determine effective dimensions for micro sequence test
+# When plymouth=90 or 270, the display is in portrait mode
+# but Window.GetWidth/Height returns raw framebuffer dimensions
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+
+if (plymouth_rotation == 90 || plymouth_rotation == 270) {
+  # Swap dimensions for portrait orientations
+  temp = screen_width;
+  screen_width = screen_height;
+  screen_height = temp;
+}
+
+# Use micro sequence for small or square framebuffers
+use_micro_sequence = (screen_width <= 640) && (screen_height <= 640);
+
+# -------------------------------- CALIBRATION BACKGROUND -------------------------
+
+if (enable_debug_overlay) {
+  layout_background = Image(image_subdir + "layout-constraint.png");
+  bg_sprite = Sprite();
+  bg_sprite.SetImage(layout_background);
+  bg_sprite.SetX(Window.GetWidth() / 2 - layout_background.GetWidth() / 2);
+  bg_sprite.SetY(Window.GetHeight() / 2 - layout_background.GetHeight() / 2);
+  bg_sprite.SetZ(0);
+}
+
+# -------------------------------- DEBUG TEXT OVERLAY -----------------------------
+
+if (enable_debug_overlay) {
+  dbg_txt = Image.Text("ADAPTIVE SCRIPT OK", 1, 1, 1, 1, "Sans 8");
+  dbg_sprite = Sprite();
+  dbg_sprite.SetImage(dbg_txt);
+  dbg_sprite.SetX(140);
+  dbg_sprite.SetY(10);
+  dbg_sprite.SetZ(9999);
+
+  fb_txt = Image.Text("FB: " + String(Window.GetWidth()) + "x" + String(Window.GetHeight()), 1, 1, 0, 1, "Sans 8");
+  fb_sprite = Sprite();
+  fb_sprite.SetImage(fb_txt);
+  fb_sprite.SetX(140);
+  fb_sprite.SetY(30);
+  fb_sprite.SetZ(9999);
+
+  rot_txt = Image.Text("ROTATION: " + String(plymouth_rotation), 1, 1, 1, 1, "Sans 8");
+  rot_sprite = Sprite();
+  rot_sprite.SetImage(rot_txt);
+  rot_sprite.SetX(140);
+  rot_sprite.SetY(50);
+  rot_sprite.SetZ(9999);
+
+  mode_txt = Image.Text("MICRO: " + String(use_micro_sequence), 1, 1, 1, 1, "Sans 8");
+  mode_sprite = Sprite();
+  mode_sprite.SetImage(mode_txt);
+  mode_sprite.SetX(140);
+  mode_sprite.SetY(70);
+  mode_sprite.SetZ(9999);
+}
+
+# ---------------------------------- ANIMATION SETUP ------------------------------
+
+logo_sprite = Sprite();
+
+if (use_micro_sequence) {
+  for (i = 1; i <= 6; i++)
+    micro_image[i] = Image(image_subdir + "micro-" + i + ".png");
+
+  logo_sprite.SetImage(micro_image[1]);
+  logo_sprite.SetX(Window.GetWidth() / 2 - micro_image[1].GetWidth() / 2);
+  logo_sprite.SetY(Window.GetHeight() / 2 - micro_image[1].GetHeight() / 2);
+
+} else {
+  for (i = 1; i <= 90; i++)
+    progress_image[i] = Image(image_subdir + "progress-" + i + ".png");
+
+  logo_sprite.SetImage(progress_image[1]);
+  logo_sprite.SetX(Window.GetWidth() / 2 - progress_image[1].GetWidth() / 2);
+  logo_sprite.SetY(Window.GetHeight() / 2 - progress_image[1].GetHeight() / 2);
+}
+
+# ---------------------------------- SCROLL TEXT SETUP ----------------------------
+
+num_scroll_lines = 5;
+line_width = 80;
+line_height = 20;
+font_size = "Sans 8";
+
+if (Window.GetHeight() < 240) {
+  font_size = "Sans 6";
+  line_height = 14;
+  num_scroll_lines = 3;
+}
+
+scroll_block_height = num_scroll_lines * line_height;
+sprite_height = logo_sprite.GetImage().GetHeight();
+sprite_bottom_y = Window.GetHeight() / 2 + sprite_height / 2;
+
+message_y = sprite_bottom_y + 10;
+max_y = Window.GetHeight() - scroll_block_height - 10;
+if (message_y > max_y) message_y = max_y;
+if (message_y < 10) message_y = 10;
+
+for (index = 0; index < num_scroll_lines; index++) {
+  lines[index] = Image.Text("", 1, 1, 1, 1, font_size);
+  message[index] = Sprite();
+  message[index].SetImage(lines[index]);
+  message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
+  message[index].SetY(message_y + (index * line_height));
+  message[index].SetZ(10000);
+  fade = 0.2 + (index * 0.2);
+  message[index].SetOpacity(fade);
+}
+
+# ---------------------------------- SCROLL LOGIC ---------------------------------
+
+fun scroll_message_callback(text) {
+  if (StringLength(text) > line_width) {
+    text = text.SubString(0, line_width - 3) + "...";
+  }
+
+  for (index = 0; index < num_scroll_lines - 1; index++) {
+    lines[index] = lines[index + 1];
+  }
+
+  lines[num_scroll_lines - 1] = Image.Text(text, 1, 1, 1, 1, font_size);
+
+  for (index = 0; index < num_scroll_lines; index++) {
+    message[index].SetImage(lines[index]);
+    message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
+    message[index].SetY(message_y + (index * line_height));
+    message[index].SetZ(10000);
+    fade = 0.2 + (index * 0.2);
+    message[index].SetOpacity(fade);
+  }
+}
+
+# ------------------------------------- STATUS ------------------------------------
+
+# Plymouth.SetUpdateStatusFunction(scroll_message_callback);
+
+# ------------------------------------- RENDER ------------------------------------
+
+Plymouth.SetMessageFunction(scroll_message_callback);
+
+# ---------------------------------- REFRESH ANIMATION ----------------------------
+
+fun refresh_callback() {
+  if (use_micro_sequence) {
+    frame = Math.Int(progress / 20) % 6 + 1;
+    if (micro_image[frame])
+      logo_sprite.SetImage(micro_image[frame]);
+  } else {
+    frame = Math.Int(progress / 3) % 90 + 1;
+    if (progress_image[frame])
+      logo_sprite.SetImage(progress_image[frame]);
+  }
+  progress++;
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);

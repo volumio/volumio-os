@@ -769,6 +769,13 @@ plymouth_check_display() {
     fi
   fi
   
+  # Check DRI devices if no framebuffer found
+  if [ -z "$display_type" ]; then
+    if [ -c /dev/dri/card0 ] || [ -c /dev/dri/card1 ]; then
+      display_type="drm"
+    fi
+  fi
+
   # No display found
   if [ -z "$display_type" ]; then
     return 2

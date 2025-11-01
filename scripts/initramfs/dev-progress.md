@@ -41,6 +41,7 @@ INIT_TYPE=initv3
 Selection of plymouth themes:
 PLYMOUTH_THEME="volumio-logo"
 PLYMOUTH_THEME="volumio-player" (default)
+PLYMOUTH_THEME="volumio-adaptive" (with rotation support)
 
 ## Environment overrides
 Some devices using KMS MIPI screens will not have user framebuffer present in the init. As the result of it,
