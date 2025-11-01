@@ -37,25 +37,129 @@ INIT_TYPE="initv3"     # Volumio init type
 PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
 INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
-# Modules that will be added to intramfs
-MODULES=("overlay" "squashfs"
-  # USB/FS modules
-  "usbcore" "usb_common" "mmc_core" "mmc_block" "nvme_core" "nvme-core" "nvme" "sdhci" "sdhci_pci" "sdhci_acpi"
-  "ehci_pci" "ohci_pci" "uhci_hcd" "ehci_hcd" "xhci_hcd" "ohci_hcd" "usbhid" "hid_cherry" "hid_generic"
-  "hid" "nls_cp437" "nls_utf8" "vfat" "fuse" "uas"
-  # nls_ascii might be needed on some kernels (debian upstream for example)
-  # Plymouth modules
-  "intel_agp" "drm" "drm_kms_helper" "i915 modeset=1" "nouveau modeset=1" "radeon modeset=1" "amdgpu modeset=1"
-  # Ata modules
-  "acard-ahci" "ahci" "ata_generic" "ata_piix" "libahci" "libata"
-  "pata_ali" "pata_amd" "pata_artop" "pata_atiixp" "pata_atp867x" "pata_cmd64x" "pata_cs5520" "pata_cs5530"
-  "pata_cs5535" "pata_cs5536" "pata_efar" "pata_hpt366" "pata_hpt37x" "pata_isapnp" "pata_it8213"
-  "pata_it821x" "pata_jmicron" "pata_legacy" "pata_marvell" "pata_mpiix" "pata_netcell" "pata_ninja32"
-  "pata_ns87410" "pata_ns87415" "pata_oldpiix" "pata_opti" "pata_pcmcia" "pata_pdc2027x"
-  "pata_pdc202xx_old" "pata_piccolo" "pata_rdc" "pata_rz1000" "pata_sc1200" "pata_sch" "pata_serverworks"
-  "pata_sil680" "pata_sis" "pata_triflex" "pata_via" "pdc_adma" "sata_mv" "sata_nv" "sata_promise"
-  "sata_qstor" "sata_sil24" "sata_sil" "sata_sis" "sata_svw" "sata_sx4" "ata_uli" "sata_via" "sata_vsc"
+# Modules that will be added to initramfs
+MODULES=(
+  # Core filesystem
+  "overlay"
+  "squashfs"
+  "fuse"
+  # NLS and filesystem support
+  "nls_cp437"
+  "nls_utf8"
+  "vfat"
+  # Storage controllers - NVMe
+  "nvme_core"
+  "nvme"
+  # Storage controllers - MMC/SD
+  "mmc_core"
+  "mmc_block"
+  "sdhci"
+  "sdhci_pci"
+  "sdhci_acpi"
+  # USB core and HID
+  "usbcore"
+  "usb_common"
+  "usbhid"
+  "hid"
+  "hid_generic"
+  "hid_cherry"
+  # USB host controllers
+  "ehci_pci"
+  "ehci_hcd"
+  "ohci_pci"
+  "ohci_hcd"
+  "uhci_hcd"
+  "xhci_hcd"
+  # USB storage
+  "uas"
+  "usb_storage"
+  # ALSA sound subsystem - required for HDMI/DP audio during boot
+  # Base ALSA module
+  "snd"
+  "snd-timer"
+  "snd-pcm"
+  # Intel HDA audio - required for HDMI/DP audio on Intel/AMD/Nvidia GPUs
+  "snd-hda-core"
+  "snd-hda-codec"
+  "snd-hda-codec-generic"
+  "snd-hda-intel"
+  # HDMI/DisplayPort audio codec
+  "snd-hda-codec-hdmi"
+  # Display infrastructure - required for Plymouth splash
+  "backlight"
+  "drm_panel_orientation_quirks"
+  # DRM/KMS foundation - required for Plymouth graphical boot
+  "drm"
+  "drm_kms_helper"
+  "intel_agp"
+  # GPU drivers with KMS enabled
+  "i915 modeset=1"
+  "nouveau modeset=1"
+  "radeon modeset=1"
+  "amdgpu modeset=1"
+  # AHCI/libATA foundation
+  "libata"
+  "libahci"
+  "ahci"
+  "ata_generic"
+  "ata_piix"
+  "acard-ahci"
+  # PATA controllers
+  "pata_ali"
+  "pata_amd"
+  "pata_artop"
+  "pata_atiixp"
+  "pata_atp867x"
+  "pata_cmd64x"
+  "pata_cs5520"
+  "pata_cs5530"
+  "pata_cs5535"
+  "pata_cs5536"
+  "pata_efar"
+  "pata_hpt366"
+  "pata_hpt37x"
+  "pata_isapnp"
+  "pata_it8213"
+  "pata_it821x"
+  "pata_jmicron"
+  "pata_legacy"
+  "pata_marvell"
+  "pata_mpiix"
+  "pata_netcell"
+  "pata_ninja32"
+  "pata_ns87410"
+  "pata_ns87415"
+  "pata_oldpiix"
+  "pata_opti"
+  "pata_pcmcia"
+  "pata_pdc2027x"
+  "pata_pdc202xx_old"
+  "pata_piccolo"
+  "pata_rdc"
+  "pata_rz1000"
+  "pata_sc1200"
+  "pata_sch"
+  "pata_serverworks"
+  "pata_sil680"
+  "pata_sis"
+  "pata_triflex"
+  "pata_via"
+  # SATA controllers
+  "pdc_adma"
+  "sata_mv"
+  "sata_nv"
+  "sata_promise"
+  "sata_qstor"
+  "sata_sil24"
+  "sata_sil"
+  "sata_sis"
+  "sata_svw"
+  "sata_sx4"
+  "ata_uli"
+  "sata_via"
+  "sata_vsc"
 )
+
 # Packages that will be installed
 PACKAGES=()
 
