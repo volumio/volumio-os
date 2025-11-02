@@ -1,4 +1,4 @@
-#  volumio-adaptive.script - universal boot splash with rotation support
+#  volumio-adaptive.script - universal boot splash with rotation and overlay messages
 #
 #  Copyright (C) 2025 Volumio Srl
 #  
@@ -18,7 +18,7 @@
 #  02111-1307, USA.
 #
 #  Written by: Andrew Seredyn
-#  Modified by: Nerd (adaptive rotation support)
+#  Modified by: Nerd (adaptive rotation support with overlay messages)
 #
 #  References:
 #    Freedesktop.org:
@@ -36,6 +36,61 @@ fun StringLength(string) {
   str = String(string);
   while(str.CharAt(pos)) pos++;
   return pos;
+}
+
+fun StringContains(haystack, needle) {
+  haystack_len = StringLength(haystack);
+  needle_len = StringLength(needle);
+  
+  if (needle_len > haystack_len) return 0;
+  if (needle_len == 0) return 0;
+  
+  for (i = 0; i <= haystack_len - needle_len; i++) {
+    match = 1;
+    for (j = 0; j < needle_len; j++) {
+      if (haystack.CharAt(i + j) != needle.CharAt(j)) {
+        match = 0;
+        break;
+      }
+    }
+    if (match == 1) return 1;
+  }
+  return 0;
+}
+
+# Map message text to overlay filename
+# Note: Some messages contain variables (e.g., Version number)
+# Pattern matching uses common substrings to handle variations
+fun GetOverlayFilename(message_text) {
+  if (StringContains(message_text, "Player preparing startup"))
+    return "overlay-player-preparing";
+  if (StringContains(message_text, "Finishing storage preparations"))
+    return "overlay-finishing-storage";
+  # Match on common part - actual message is "Version X.XXX prepared, please wait..."
+  if (StringContains(message_text, "prepared, please wait for startup to finish"))
+    return "overlay-player-prepared";
+  if (StringContains(message_text, "Player re-starting now"))
+    return "overlay-player-restarting";
+  if (StringContains(message_text, "Receiving player update from USB"))
+    return "overlay-receiving-update";
+  if (StringContains(message_text, "Player update from USB completed"))
+    return "overlay-update-complete";
+  if (StringContains(message_text, "Remove USB used for update"))
+    return "overlay-remove-usb";
+  if (StringContains(message_text, "Performing factory reset"))
+    return "overlay-factory-reset";
+  if (StringContains(message_text, "Performing player update"))
+    return "overlay-performing-update";
+  if (StringContains(message_text, "Success, player restarts"))
+    return "overlay-success-restart";
+  if (StringContains(message_text, "Expanding internal storage"))
+    return "overlay-expanding-storage";
+  if (StringContains(message_text, "Waiting for USB devices"))
+    return "overlay-waiting-usb";
+  if (StringContains(message_text, "Player internal"))
+    return "overlay-internal-update";
+  
+  return "";  # No match
 }
 
 # --------------------------------- DEBUG TOGGLE ----------------------------------
@@ -57,6 +112,10 @@ progress = 1;
 # Default value (0 = landscape, no rotation)
 # Runtime detection will replace this line with actual plymouth= value
 plymouth_rotation = 0;
+
+# Fallback to system detection if available
+detected_rotation = Plymouth.GetRotation();
+if (detected_rotation) plymouth_rotation = detected_rotation;
 
 # Build image subdirectory path
 image_subdir = "sequence" + plymouth_rotation + "/";
@@ -123,6 +182,7 @@ if (enable_debug_overlay) {
 # ---------------------------------- ANIMATION SETUP ------------------------------
 
 logo_sprite = Sprite();
+logo_sprite.SetZ(1);  # Logo below overlay
 
 if (use_micro_sequence) {
   for (i = 1; i <= 6; i++)
@@ -141,59 +201,50 @@ if (use_micro_sequence) {
   logo_sprite.SetY(Window.GetHeight() / 2 - progress_image[1].GetHeight() / 2);
 }
 
-# ---------------------------------- SCROLL TEXT SETUP ----------------------------
+# ---------------------------------- MESSAGE OVERLAY SETUP ------------------------
 
-num_scroll_lines = 5;
-line_width = 80;
-line_height = 20;
-font_size = "Sans 8";
-
-if (Window.GetHeight() < 240) {
-  font_size = "Sans 6";
-  line_height = 14;
-  num_scroll_lines = 3;
+# Determine overlay size based on smaller dimension breakpoint
+smaller_dimension = Window.GetWidth();
+if (Window.GetHeight() < smaller_dimension) {
+  smaller_dimension = Window.GetHeight();
 }
 
-scroll_block_height = num_scroll_lines * line_height;
-sprite_height = logo_sprite.GetImage().GetHeight();
-sprite_bottom_y = Window.GetHeight() / 2 + sprite_height / 2;
-
-message_y = sprite_bottom_y + 10;
-max_y = Window.GetHeight() - scroll_block_height - 10;
-if (message_y > max_y) message_y = max_y;
-if (message_y < 10) message_y = 10;
-
-for (index = 0; index < num_scroll_lines; index++) {
-  lines[index] = Image.Text("", 1, 1, 1, 1, font_size);
-  message[index] = Sprite();
-  message[index].SetImage(lines[index]);
-  message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
-  message[index].SetY(message_y + (index * line_height));
-  message[index].SetZ(10000);
-  fade = 0.2 + (index * 0.2);
-  message[index].SetOpacity(fade);
+if (smaller_dimension < 400) {
+  overlay_size_suffix = "-compact";
+} else {
+  overlay_size_suffix = "";
 }
 
-# ---------------------------------- SCROLL LOGIC ---------------------------------
+# Create overlay sprite (positioned on top of logo, Z=2, with transparent background)
+message_overlay_sprite = Sprite();
+message_overlay_sprite.SetZ(2);
+message_overlay_sprite.SetOpacity(0);  # Hidden by default
 
-fun scroll_message_callback(text) {
-  if (StringLength(text) > line_width) {
-    text = text.SubString(0, line_width - 3) + "...";
-  }
+# Store globals for message callback
+global.image_subdir = image_subdir;
+global.overlay_size_suffix = overlay_size_suffix;
 
-  for (index = 0; index < num_scroll_lines - 1; index++) {
-    lines[index] = lines[index + 1];
-  }
+# ---------------------------------- MESSAGE HANDLER ------------------------------
 
-  lines[num_scroll_lines - 1] = Image.Text(text, 1, 1, 1, 1, font_size);
-
-  for (index = 0; index < num_scroll_lines; index++) {
-    message[index].SetImage(lines[index]);
-    message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
-    message[index].SetY(message_y + (index * line_height));
-    message[index].SetZ(10000);
-    fade = 0.2 + (index * 0.2);
-    message[index].SetOpacity(fade);
+fun message_callback(text) {
+  # Get overlay filename for this message
+  overlay_filename = GetOverlayFilename(text);
+  
+  if (overlay_filename != "") {
+    # Load appropriate overlay image
+    overlay_path = global.image_subdir + overlay_filename + global.overlay_size_suffix + ".png";
+    overlay_image = Image(overlay_path);
+    
+    if (overlay_image) {
+      # Center overlay in framebuffer
+      message_overlay_sprite.SetImage(overlay_image);
+      message_overlay_sprite.SetX(Window.GetWidth() / 2 - overlay_image.GetWidth() / 2);
+      message_overlay_sprite.SetY(Window.GetHeight() / 2 - overlay_image.GetHeight() / 2);
+      message_overlay_sprite.SetOpacity(1);
+    }
+  } else {
+    # No matching overlay, hide overlay sprite
+    message_overlay_sprite.SetOpacity(0);
   }
 }
 
@@ -203,7 +254,7 @@ fun scroll_message_callback(text) {
 
 # ------------------------------------- RENDER ------------------------------------
 
-Plymouth.SetMessageFunction(scroll_message_callback);
+Plymouth.SetMessageFunction(message_callback);
 
 # ---------------------------------- REFRESH ANIMATION ----------------------------
 
@@ -221,3 +272,5 @@ fun refresh_callback() {
 }
 
 Plymouth.SetRefreshFunction(refresh_callback);
+# ------------------------------------ END OF SCRIPT ------------------------------ 
+# ---------------------------------------- V1.02 ----------------------------------
