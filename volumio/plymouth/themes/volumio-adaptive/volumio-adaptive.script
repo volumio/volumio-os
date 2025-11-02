@@ -143,54 +143,69 @@ if (use_micro_sequence) {
 
 # ---------------------------------- SCROLL TEXT SETUP ----------------------------
 
-num_scroll_lines = 5;
-line_width = 80;
-line_height = 20;
-font_size = "Sans 8";
+# Text only enabled for rotation=0 (native portrait orientation)
+# Rotated displays (90, 180, 270) have insufficient space and positioning challenges
+if (plymouth_rotation == 0) {
+  num_scroll_lines = 5;
+  line_width = 80;
+  line_height = 20;
+  font_size = "Sans 8";
 
-if (Window.GetHeight() < 240) {
-  font_size = "Sans 6";
-  line_height = 14;
-  num_scroll_lines = 3;
-}
+  if (screen_height < 240) {
+    font_size = "Sans 6";
+    line_height = 14;
+    num_scroll_lines = 3;
+  }
 
-scroll_block_height = num_scroll_lines * line_height;
-sprite_height = logo_sprite.GetImage().GetHeight();
-sprite_bottom_y = Window.GetHeight() / 2 + sprite_height / 2;
+  scroll_block_height = num_scroll_lines * line_height;
+  sprite_height = logo_sprite.GetImage().GetHeight();
+  sprite_bottom_y = Window.GetHeight() / 2 + sprite_height / 2;
 
-message_y = sprite_bottom_y + 10;
-max_y = Window.GetHeight() - scroll_block_height - 10;
-if (message_y > max_y) message_y = max_y;
-if (message_y < 10) message_y = 10;
+  message_y = sprite_bottom_y + 10;
+  max_y = Window.GetHeight() - scroll_block_height - 10;
+  if (message_y > max_y) message_y = max_y;
+  if (message_y < 10) message_y = 10;
 
-for (index = 0; index < num_scroll_lines; index++) {
-  lines[index] = Image.Text("", 1, 1, 1, 1, font_size);
-  message[index] = Sprite();
-  message[index].SetImage(lines[index]);
-  message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
-  message[index].SetY(message_y + (index * line_height));
-  message[index].SetZ(10000);
-  fade = 0.2 + (index * 0.2);
-  message[index].SetOpacity(fade);
+  for (index = 0; index < num_scroll_lines; index++) {
+    lines[index] = Image.Text("", 1, 1, 1, 1, font_size);
+    message[index] = Sprite();
+    message[index].SetImage(lines[index]);
+    message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
+    message[index].SetY(message_y + (index * line_height));
+    message[index].SetZ(10000);
+    fade = 0.2 + (index * 0.2);
+    message[index].SetOpacity(fade);
+  }
+
+  # Store global values for callback function
+  global.message_y = message_y;
+  global.line_height = line_height;
+  global.font_size = font_size;
+  global.num_scroll_lines = num_scroll_lines;
 }
 
 # ---------------------------------- SCROLL LOGIC ---------------------------------
 
 fun scroll_message_callback(text) {
+  # Only process messages if rotation=0
+  if (plymouth_rotation != 0) {
+    return;
+  }
+  
   if (StringLength(text) > line_width) {
     text = text.SubString(0, line_width - 3) + "...";
   }
 
-  for (index = 0; index < num_scroll_lines - 1; index++) {
+  for (index = 0; index < global.num_scroll_lines - 1; index++) {
     lines[index] = lines[index + 1];
   }
 
-  lines[num_scroll_lines - 1] = Image.Text(text, 1, 1, 1, 1, font_size);
+  lines[global.num_scroll_lines - 1] = Image.Text(text, 1, 1, 1, 1, global.font_size);
 
-  for (index = 0; index < num_scroll_lines; index++) {
+  for (index = 0; index < global.num_scroll_lines; index++) {
     message[index].SetImage(lines[index]);
     message[index].SetX(Window.GetWidth() / 2 - lines[index].GetWidth() / 2);
-    message[index].SetY(message_y + (index * line_height));
+    message[index].SetY(global.message_y + (index * global.line_height));
     message[index].SetZ(10000);
     fade = 0.2 + (index * 0.2);
     message[index].SetOpacity(fade);
@@ -221,3 +236,5 @@ fun refresh_callback() {
 }
 
 Plymouth.SetRefreshFunction(refresh_callback);
+# ------------------------------------- END ---------------------------------------
+# ------------------------------------ V1.01 --------------------------------------
