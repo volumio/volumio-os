@@ -13,6 +13,6 @@ DEVICENAME="Odroid-N2"
 DEVICE="odroidn2"
 
 # Plymouth theme?
-PLYMOUTH_THEME="volumio-player"
+PLYMOUTH_THEME="volumio-adaptive"
 # Debug image?
 DEBUG_IMAGE="no"
