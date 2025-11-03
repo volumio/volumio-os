@@ -11,7 +11,7 @@ ARCH="armhf"
 BUILD="armv7"
 UINITRD_ARCH="arm"
 
-PLYMOUTH_THEME="volumio-player"
+PLYMOUTH_THEME="volumio-adaptive"
 # Debug image
 DEBUG_IMAGE=no
 

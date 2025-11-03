@@ -40,7 +40,7 @@ x86 | yes | yes | yes | yes
 INIT_TYPE=initv3
 Selection of plymouth themes:
 PLYMOUTH_THEME="volumio-logo"
-PLYMOUTH_THEME="volumio-player" (default)
+PLYMOUTH_THEME="volumio-adaptive" (default)
 PLYMOUTH_THEME="volumio-adaptive" (with rotation support)
 
 ## Environment overrides
