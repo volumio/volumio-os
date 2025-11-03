@@ -28,7 +28,7 @@ MYVOLUMIO=no
 VOLINITUPDATER=yes
 KIOSKMODE=yes
 KIOSKBROWSER=vivaldi
-PLYMOUTH_THEME="volumio-player"
+PLYMOUTH_THEME="volumio-adaptive"
 
 ## Partition info
 BOOT_START=16
@@ -37,7 +37,7 @@ BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=yes        # Add UUID to fstab
 IMAGE_END=3800
 INIT_TYPE="initv3"
-PLYMOUTH_THEME="volumio-player"
+PLYMOUTH_THEME="volumio-adaptive"
 
 # Modules that will be added to intramsfs
 MODULES=("overlay" "squashfs" "nls_cp437")

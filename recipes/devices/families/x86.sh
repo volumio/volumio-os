@@ -34,7 +34,7 @@ BOOT_USE_UUID=yes      # Use UUIDs in fstab for /boot mount
 INIT_TYPE="initv3"     # Volumio init type
 
 ## Plymouth theme management
-PLYMOUTH_THEME="volumio-player" # Choices are: {volumio,volumio-logo,volumio-player}
+PLYMOUTH_THEME="volumio-adaptive" # Choices are: {volumio-player, volumio-text, volumio-adaptive}
 INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
 # Modules that will be added to initramfs

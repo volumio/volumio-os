@@ -42,7 +42,7 @@ INIT_TYPE="initv3"     # Volumio init type
 INIT_UUID_TYPE="pi"    # Use block device GPEN or PARTUUID fallback
 
 ## Plymouth theme management
-PLYMOUTH_THEME="volumio-adaptive" # Choices are: {volumio,volumio-logo,volumio-player}
+PLYMOUTH_THEME="volumio-adaptive" # Choices are: {volumio-player, volumio-text, volumio-adaptive}
 INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
 ## TODO: for any KMS DRM panel mudule, which does not create frambuffer bridge, set this variable to yes, otherwise no

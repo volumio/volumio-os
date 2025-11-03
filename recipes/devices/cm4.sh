@@ -41,7 +41,7 @@ INIT_TYPE="initv3"
 INIT_UUID_TYPE="pi" # Use block device GPEN if dynamic UUIDs are not handled.
 
 ## Plymouth theme management
-PLYMOUTH_THEME="volumio-player"	# Choices are: {volumio,volumio-logo,volumio-player}
+PLYMOUTH_THEME="volumio-adaptive"	# Choices are: {volumio-player, volumio-text, volumio-adaptive}
 
 log "VARIANT is ${VARIANT}." "info"
 ## INIT_PLYMOUTH_DISABLE removes plymouth initialization in init if "yes" is selected

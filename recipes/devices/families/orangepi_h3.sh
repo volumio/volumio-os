@@ -23,7 +23,7 @@ DEVICEREPO="https://github.com/volumio/platform-${DEVICEFAMILY}"
 VOLVARIANT=no # Custom Volumio (Motivo/Primo etc)
 MYVOLUMIO=no
 VOLINITUPDATER=yes
-PLYMOUTH_THEME="volumio-player"
+PLYMOUTH_THEME="volumio-adaptive"
 
 ## Partition info
 BOOT_START=1

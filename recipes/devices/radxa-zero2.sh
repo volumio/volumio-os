@@ -13,6 +13,6 @@ DEVICENAME="Radxa Zero 2"
 DEVICE="radxa-zero2"
 
 # Plymouth theme?
-PLYMOUTH_THEME="volumio-player"
+PLYMOUTH_THEME="volumio-adaptive"
 # Debug image?
 DEBUG_IMAGE="no"
