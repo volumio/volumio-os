@@ -54,8 +54,8 @@ Build a base root filesystem using multistrap.
 
 Available architectures:
 
-- arm - Raspbian armhf ARMv6 32-bit (Pi 1, Zero, Zero W, CM1)
-- armv7 - Debian armhf ARMv7 32-bit (Pi 2+, ODROID, Tinkerboard)
+- arm - Raspbian armhf ARM 32-bit (Raspberry Pi 2 and newer)
+- armv7 - Debian armhf ARMv7 32-bit (ODROID, Tinkerboard, other ARM devices)
 - armv8 - Debian arm64 64-bit (64-bit ARM devices)
 - x64 - Debian amd64 64-bit (x86-64 PCs)
 
@@ -84,7 +84,7 @@ Specify version as dot-separated number. Example: 4.001
 Build Raspberry Pi image from scratch:
 
 ```
-./build.sh -b armv7 -d pi -v 4.0
+./build.sh -b arm -d pi -v 4.0
 ```
 
 Build x86-64 image from scratch:
@@ -110,29 +110,32 @@ Build one base for multiple devices:
 
 ```
 ./build.sh -b armv7
-./build.sh -d pi -v 4.001
 ./build.sh -d odroidc4 -v 4.001
 ./build.sh -d tinkerboard -v 4.001
+```
+
+Build Raspberry Pi base for multiple Pi models:
+
+```
+./build.sh -b arm
+./build.sh -d pi -v 4.001
+./build.sh -d cm4 -v 4.001
 ```
 
 ## Architecture Details
 
 ### Raspberry Pi Builds
 
-ARMv7 builds recommended for Pi 2 and newer models.
+Raspberry Pi 2 and newer models use the arm architecture.
 
-ARMv7 advantages:
+Raspberry Pi support:
 
-- Debian packages optimized for ARMv7 instruction set
-- Thumb-2 and VFPv3 support
-- 10-25% performance improvement over ARMv6
-- Supported: Pi 2, 3, 3+, 4, 400, 5, Zero 2 W, CM3, CM3+, CM4
+- Single unified build for Pi 2 and newer hardware
+- Raspbian armhf packages with hardware floating point
+- Supported models: Pi 2, 3, 3+, 4, 400, 500, 500+, 5, Zero 2 W, CM3, CM3+, CM4, CM5
+- Automatic CPU optimization at runtime
 
-ARMv6 builds for legacy hardware:
-
-- Raspbian packages for ARMv6 compatibility
-- Required: Pi 1 (all models), Pi Zero, Pi Zero W, CM1
-- Works on newer Pi models with reduced performance
+Note: Pi 1, Pi Zero, Pi Zero W, and CM1 are not supported (ARMv6 architecture).
 
 ### Build System Architecture
 
@@ -144,7 +147,7 @@ The -d flag reads device recipe BUILD variable to locate matching base tarball.
 
 Architecture specified with -b must match device recipe BUILD variable.
 
-Example: pi.sh contains BUILD="armv7" therefore use -b armv7 for Pi base.
+Example: pi.sh contains BUILD="arm" therefore use -b arm for Pi base.
 
 ## Package Sources
 
@@ -204,7 +207,7 @@ export APT_CACHE='http://localhost:3142'
 Run build with preserved environment:
 
 ```
-sudo -E ./build.sh -b armv7 -d pi -v 4.0
+sudo -E ./build.sh -b arm -d pi -v 4.0
 ```
 
 Monitor cache activity:
