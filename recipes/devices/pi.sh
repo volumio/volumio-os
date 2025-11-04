@@ -8,7 +8,7 @@ DEVICE_STATUS="T"       # First letter (Planned|Test|Maintenance)
 # Base system
 BASE="Raspbian"
 ARCH="armhf"
-BUILD="armv7"
+BUILD="arm"
 
 ### Build image with initramfs debug info?
 DEBUG_IMAGE="no" # yes/no or empty. Also changes SHOW_SPLASH in cmdline.txt
@@ -337,32 +337,7 @@ device_image_tweaks() {
 
 # Will be run in chroot (before other things)
 device_chroot_tweaks() {
-	log "Running device_chroot_tweaks" "ext"
-	
-	# Determine suite from the actual rootfs (works for bookworm, trixie, etc.)
-	if [[ -f /etc/os-release ]]; then
-		CHROOT_SUITE=$(grep VERSION_CODENAME /etc/os-release | cut -d'=' -f2)
-		log "Detected suite from /etc/os-release: ${CHROOT_SUITE}" "info"
-	else
-		log "Could not detect suite, defaulting to bookworm" "wrn"
-		CHROOT_SUITE="bookworm"
-	fi
-	
-	log "Adding Pi repository for ${CHROOT_SUITE}" "info"
-cat >/etc/apt/sources.list.d/raspi.list <<EOF
-deb http://archive.raspberrypi.com/debian/ ${CHROOT_SUITE} main untested
-EOF
-
-	log "Installing Pi-specific packages" "info"
-	apt-get update
-	apt-get install -y --no-install-recommends \
-		pi-bluetooth \
-		raspberrypi-sys-mods \
-		rpi-eeprom \
-		raspi-utils \
-		libdtovl0 \
-		firmware-libertas \
-		firmware-mediatek
+	log "Running device_image_tweaks" "ext"
 }
 
 # Will be run in chroot - Pre initramfs
