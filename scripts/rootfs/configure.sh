@@ -68,6 +68,10 @@ chmod a+x "${ROOTFS}/bin/volumio_rfkill_unblock.sh"
 echo " " >"${ROOTFS}"/etc/wpa_supplicant/wpa_supplicant.conf
 chmod 777 "${ROOTFS}"/etc/wpa_supplicant/wpa_supplicant.conf
 
+# Dhcpcd config
+cp "${SRC}/volumio/etc/dhcpcd.conf" "${ROOTFS}/etc/dhcpcd.conf"
+chmod 644 "${ROOTFS}/etc/dhcpcd.conf"
+
 #nsswitch
 cp "${SRC}/volumio/etc/nsswitch.conf" "${ROOTFS}/etc/nsswitch.conf"
 
