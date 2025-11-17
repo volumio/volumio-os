@@ -4,7 +4,12 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // USB WiFi Fix & Refactoring: Just a Nerd
-// Version: 13.0
+// Version: 14.0
+// 
+// Version 14 Changes:
+// - Fixed IP change notification for hotspot mode (192.168.211.1)
+// - Triggers ip-changed@wlan0.target after static IP assignment  
+// - Ensures welcome screen/QR code updates on first boot with hotspot
 // 
 // Version 13 Changes:
 // - Reduced connection timeout from 55 to 30 seconds (faster fallback)
@@ -258,6 +263,17 @@ function startHotspot(callback) {
         } else {
             launch(ifconfigHotspot, "confighotspot", true, function(err) {
                 loggerDebug("ifconfig " + err);
+                
+                // Trigger IP change notification for hotspot IP (192.168.211.1)
+                // Static IP assignment doesn't trigger dhcpcd hooks, so trigger manually
+                // This updates welcome screen, QR code, and /etc/issue display
+                try {
+                    execSync(SYSTEMCTL + ' start ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
+                    loggerDebug("Triggered ip-changed@" + wlan + ".target for hotspot IP");
+                } catch (e) {
+                    loggerDebug("Could not trigger ip-changed target: " + e);
+                }
+                
                 launch(starthostapd,"hotspot" , false, function() {
                     updateNetworkState("hotspot");
                     if (callback) callback();
@@ -270,9 +286,17 @@ function startHotspot(callback) {
 // Force start hotspot even if disabled (used for factory reset scenarios)
 function startHotspotForce(callback) {
     stopHotspot(function(err) {
-        loggerInfo('Starting Force Hotspot')
         launch(ifconfigHotspot, "confighotspot", true, function(err) {
             loggerDebug("ifconfig " + err);
+            
+            // Trigger IP change notification for forced hotspot
+            try {
+                execSync(SYSTEMCTL + ' start ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
+                loggerDebug("Triggered ip-changed@" + wlan + ".target for forced hotspot IP");
+            } catch (e) {
+                loggerDebug("Could not trigger ip-changed target: " + e);
+            }
+            
             launch(starthostapd,"hotspot" , false, function() {
                 updateNetworkState("hotspot");
                 if (callback) callback();
