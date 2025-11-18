@@ -3,61 +3,23 @@
 //===================================================================
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
-// USB WiFi Fix & Refactoring: Just a Nerd
-// Version: 20.9
+// Maintainer: Just a Nerd
+// Version: 4.0-rc1
 // 
-// Version 20.9 Changes (CORRECT HOTSPOT IP TRIGGER FIX):
-// - Trigger ip-changed on ACTUAL hostapd process exit (not callback)
-// - Custom hostapd launcher hooks into 'close' event
-// - Eliminates race condition where trigger fires before process completes
-// - Small 500ms delay after process exit ensures system stability
-// - Removes all TRACE debugging (clean production code)
-// 
-// Version 20.6 Changes (HOTSPOT IP TRIGGER TIMING FIX):
-// - Moved ip-changed trigger to AFTER hostapd completes startup
-// 
-// Version 20.5 Changes (HOTSPOT IP TIMING FIX - INCORRECT):
-// - Attempted fix with delay before trigger (wrong approach)
-// 
-// Version 20.4 Changes (CONSOLE LOGGING REFINEMENT):
-// - Removed timestamps from console INFO messages (journalctl adds them)
-// 
-// Version 20.3 Changes (SNM DEFAULT BEHAVIOR):
-// - Single Network Mode now ENABLED by default (production-ready)
-// 
-// Version 18 Changes:
-// - Fixed timeout bug: separated interface UP and wpa_cli reconfigure into individual commands
-// - Each command has independent timeout and error handling
-// - Added 1 second stabilization delay between operations
-// - Prevents entire sequence from failing if one step times out
-// 
-// Version 17 Changes:
-// - Fixed wpa_supplicant INTERFACE_DISABLED on boot
-// - Bring interface UP then trigger wpa_cli reconfigure
-// - Forces wpa_supplicant to read config and connect to saved networks
-// 
-// Version 15 Changes:
-// - Fixed /tmp/networkstatus file creation in refreshNetworkStatusFile()
-// - Changed ip-changed trigger from 'start' to 'restart' for proper reload
-// - Ensures volumio backend sees hotspot network state changes
-// 
-// Version 14 Changes:
-// - Fixed IP change notification for hotspot mode (192.168.211.1)
-// - Triggers ip-changed@wlan0.target after static IP assignment  
-// - Ensures welcome screen/QR code updates on first boot with hotspot
-// 
-// Version 13 Changes:
-// - Reduced connection timeout from 55 to 30 seconds (faster fallback)
-// - Fixed systemd timeout issue: call notifyWirelessReady() early
-// - Prevents systemd from killing service before emergency mode triggers
-// 
-// Version 12 Changes:
-// - CRITICAL FIX: Emergency hotspot fallback when system inaccessible
-// - Forces hotspot if both ethernet and WiFi down (recovery mode)
-// 
-// Version 11 Changes:
-// - Fixed ethernet state validation (hardware carrier check)
-// - Restored node notifier integration
+// Production wireless network management daemon for Volumio with
+// enhanced reliability and event-driven interface state tracking.
+//
+// Key Features:
+// - Single Network Mode (configurable via .env)
+// - Event-driven interface validation
+// - Real-time WPA state machine monitoring
+// - USB WiFi adapter support with automatic fallback
+// - Emergency hotspot recovery for system accessibility
+//
+// Configuration (.env):
+// - SINGLE_NETWORK_MODE=false : Enable multi-network mode (development)
+// - DEBUG_WIRELESS=true : Enable debug logging to /tmp/wireless.log
+//===================================================================
 // - Added USB WiFi capability detection
 //===================================================================
 //===================================================================
@@ -192,7 +154,7 @@ var WPA_STATE_TIMEOUTS = {
 // ===================================================================
 // STATE VARIABLES
 // ===================================================================
-var singleNetworkMode = true;  // Default ON for production (AirPlay 2 compliance)
+var singleNetworkMode = true;  // Default ON for production
 var isWiredNetworkActive = false;
 var currentEthStatus = 'disconnected';
 var usbWifiCapabilities = null;  // Cached USB capabilities
@@ -1944,7 +1906,7 @@ function getWirelessWPADriverString() {
 
 // Read environment parameters from /volumio/.env
 // Checks for SINGLE_NETWORK_MODE and DEBUG_WIRELESS settings
-// Note: Single Network Mode is ON by default for production (AirPlay 2 compliance)
+// Note: Single Network Mode is ON by default for production
 // Set SINGLE_NETWORK_MODE=false in .env to allow multi-network mode (development only)
 function retrieveEnvParameters() {
     // Facility function to read env parameters, without the need for external modules
