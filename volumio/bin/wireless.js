@@ -4,30 +4,26 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // USB WiFi Fix & Refactoring: Just a Nerd
-// Version: 20.1
+// Version: 20.9
 // 
-// Version 20.1 Changes (STAGE 2 FIX):
-// - Fixed redundant monitoring loop issue
-// - Added stage2Failed flag to skip afterAPStart polling when Stage 2 detects failure
-// - Wrong password now detected in 10-15s (was 60s in V20.0)
-// - Network not found now detected in 15-20s (was 60s in V20.0)
-// - Stage 2 failure triggers hotspot directly without 30s afterAPStart wait
+// Version 20.9 Changes (CORRECT HOTSPOT IP TRIGGER FIX):
+// - Trigger ip-changed on ACTUAL hostapd process exit (not callback)
+// - Custom hostapd launcher hooks into 'close' event
+// - Eliminates race condition where trigger fires before process completes
+// - Small 500ms delay after process exit ensures system stability
+// - Removes all TRACE debugging (clean production code)
 // 
-// Version 20 Changes (STAGE 2: WPA STATE MACHINE):
-// - Added WpaStateMachine: Event-driven wpa_supplicant monitoring via wpa_cli
-// - Immediate detection of auth failures (1-2s vs 30s polling)
-// - State-specific recovery actions for INTERFACE_DISABLED, 4WAY_HANDSHAKE failure
-// - Eliminates 30-second polling timeout on connection attempts
-// - Real-time state transitions: SCANNING -> AUTHENTICATING -> COMPLETED
-// - Diagnostic logging for all wpa_supplicant state changes
+// Version 20.6 Changes (HOTSPOT IP TRIGGER TIMING FIX):
+// - Moved ip-changed trigger to AFTER hostapd completes startup
 // 
-// Version 19 Changes (STAGE 1: INTERFACE IDENTITY & STATE TRACKING):
-// - Added InterfaceMonitor: Event-driven interface state tracking
-// - Added InterfaceValidator: Physical device verification and readiness checks
-// - Added UdevCoordinator: Synchronization with udev rename operations
-// - Replaced polling-based waits with event-driven validation
-// - Eliminates 30+ second blind polling, validates readiness in 2-5 seconds
-// - Detects interface rename race conditions and recovers automatically
+// Version 20.5 Changes (HOTSPOT IP TIMING FIX - INCORRECT):
+// - Attempted fix with delay before trigger (wrong approach)
+// 
+// Version 20.4 Changes (CONSOLE LOGGING REFINEMENT):
+// - Removed timestamps from console INFO messages (journalctl adds them)
+// 
+// Version 20.3 Changes (SNM DEFAULT BEHAVIOR):
+// - Single Network Mode now ENABLED by default (production-ready)
 // 
 // Version 18 Changes:
 // - Fixed timeout bug: separated interface UP and wpa_cli reconfigure into individual commands
@@ -69,10 +65,12 @@
 // ===================================================================
 // CONFIGURATION CONSTANTS
 // ===================================================================
+// Debug flag - set via DEBUG_WIRELESS=true in /volumio/.env
 var debug = false;
 var settleTime = 3000;
 var totalSecondsForConnection = 30;
 var pollingTime = 1;
+var hostapdExitDelay = 500; // Delay after hostapd exits before IP notification (ms)
 
 // ===================================================================
 // COMMAND BINARIES - Single source of truth for all executable paths
@@ -194,7 +192,7 @@ var WPA_STATE_TIMEOUTS = {
 // ===================================================================
 // STATE VARIABLES
 // ===================================================================
-var singleNetworkMode = false;
+var singleNetworkMode = true;  // Default ON for production (AirPlay 2 compliance)
 var isWiredNetworkActive = false;
 var currentEthStatus = 'disconnected';
 var usbWifiCapabilities = null;  // Cached USB capabilities
@@ -340,21 +338,42 @@ function startHotspot(callback) {
             launch(ifconfigHotspot, "confighotspot", true, function(err) {
                 loggerDebug("ifconfig " + err);
                 
-                // Trigger IP change notification for hotspot IP (192.168.211.1)
-                // Static IP assignment doesn't trigger dhcpcd hooks, so trigger manually
-                // This updates welcome screen, QR code, and /etc/issue display
-                // Use 'restart' to stop then start target (like dhcpcd does for ethernet)
-                try {
-                    execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
-                    loggerDebug("Triggered ip-changed@" + wlan + ".target for hotspot IP");
-                } catch (e) {
-                    loggerDebug("Could not trigger ip-changed target: " + e);
+                // Launch hostapd with custom completion handling
+                var all = starthostapd.split(" ");
+                var process = all[0];
+                if (all.length > 0) {
+                    all.splice(0, 1);
                 }
+                loggerDebug("launching " + process + " args: ");
+                loggerDebug(all);
                 
-                launch(starthostapd,"hotspot" , false, function() {
-                    updateNetworkState("hotspot");
-                    if (callback) callback();
+                var hostapdChild = thus.spawn(process, all, {});
+                
+                hostapdChild.stdout.on('data', function(data) {
+                    loggerDebug("hotspot stdout: " + data);
                 });
+                
+                hostapdChild.stderr.on('data', function(data) {
+                    loggerDebug("hotspot stderr: " + data);
+                });
+                
+                hostapdChild.on('close', function(code) {
+                    loggerDebug("hotspotchild process exited with code " + code);
+                    
+                    // Trigger ip-changed AFTER hostapd actually completes
+                    setTimeout(function() {
+                        try {
+                            execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
+                            loggerDebug("Triggered ip-changed@" + wlan + ".target for hotspot IP");
+                        } catch (e) {
+                            loggerDebug("Could not trigger ip-changed target: " + e);
+                        }
+                    }, hostapdExitDelay);
+                });
+                
+                // Continue with immediate callback for flow control
+                updateNetworkState("hotspot");
+                if (callback) callback();
             });
         }
     });
@@ -366,19 +385,43 @@ function startHotspotForce(callback) {
         launch(ifconfigHotspot, "confighotspot", true, function(err) {
             loggerDebug("ifconfig " + err);
             
-            // Trigger IP change notification for forced hotspot
-            // Use 'restart' to properly reload welcome.service
-            try {
-                execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
-                loggerDebug("Triggered ip-changed@" + wlan + ".target for forced hotspot IP");
-            } catch (e) {
-                loggerDebug("Could not trigger ip-changed target: " + e);
+            // Launch hostapd with custom completion handling
+            var all = starthostapd.split(" ");
+            var process = all[0];
+            if (all.length > 0) {
+                all.splice(0, 1);
             }
+            loggerDebug("launching " + process + " args: ");
+            loggerDebug(all);
             
-            launch(starthostapd,"hotspot" , false, function() {
-                updateNetworkState("hotspot");
-                if (callback) callback();
+            var hostapdChild = thus.spawn(process, all, {});
+            
+            hostapdChild.stdout.on('data', function(data) {
+                loggerDebug("hotspot stdout: " + data);
             });
+            
+            hostapdChild.stderr.on('data', function(data) {
+                loggerDebug("hotspot stderr: " + data);
+            });
+            
+            hostapdChild.on('close', function(code) {
+                loggerDebug("hotspotchild process exited with code " + code);
+                
+                // Trigger ip-changed AFTER forced hostapd actually completes
+                setTimeout(function() {
+                    try {
+                        execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
+                        loggerDebug("Triggered ip-changed@" + wlan + ".target for forced hotspot IP");
+                    } catch (e) {
+                        loggerDebug("Could not trigger ip-changed target: " + e);
+                    }
+                }, hostapdExitDelay);
+            });
+            
+            // Continue with immediate callback for flow control
+            // Continue with immediate callback for flow control
+            updateNetworkState("hotspot");
+            if (callback) callback();
         });
     });
 }
@@ -1793,15 +1836,18 @@ function updateNetworkState(state) {
 
 // Logging helper - outputs to both console and /tmp/wireless.log
 function loggerDebug(message) {
+    if (!debug) return; // Only log debug messages if debug flag is enabled
     var now = new Date();
-    console.log("[" + now.toISOString() + "] DEBUG: " + message);
+    // Debug messages go ONLY to file (with timestamp), not console
     fs.appendFileSync(WIRELESS_LOG, "[" + now.toISOString() + "] DEBUG: " + message + "\n");
 }
 
 // Logging helper for informational messages
 function loggerInfo(message) {
     var now = new Date();
-    console.log("[" + now.toISOString() + "] INFO: " + message);
+    // Info to console: NO timestamp (journalctl adds it)
+    console.log("INFO: " + message);
+    // Info to file: WITH timestamp (for manual reading)
     fs.appendFileSync(WIRELESS_LOG, "[" + now.toISOString() + "] INFO: " + message + "\n");
 }
 
@@ -1897,16 +1943,31 @@ function getWirelessWPADriverString() {
 }
 
 // Read environment parameters from /volumio/.env
-// Checks for SINGLE_NETWORK_MODE setting
+// Checks for SINGLE_NETWORK_MODE and DEBUG_WIRELESS settings
+// Note: Single Network Mode is ON by default for production (AirPlay 2 compliance)
+// Set SINGLE_NETWORK_MODE=false in .env to allow multi-network mode (development only)
 function retrieveEnvParameters() {
     // Facility function to read env parameters, without the need for external modules
     try {
         var envParameters = fs.readFileSync(VOLUMIO_ENV, { encoding: 'utf8'});
-        if (envParameters.includes('SINGLE_NETWORK_MODE=true')) {
-            singleNetworkMode = true;
-            loggerInfo('Single Network Mode enabled, only one network device can be active at a time between ethernet and wireless');
+        
+        // Check if Single Network Mode is explicitly disabled (development mode)
+        if (envParameters.includes('SINGLE_NETWORK_MODE=false')) {
+            singleNetworkMode = false;
+            loggerInfo('Multi-Network Mode enabled (development) - both ethernet and wireless can be active simultaneously');
+        } else {
+            // Default behavior or explicitly set to true
+            loggerInfo('Single Network Mode enabled (default) - only one network device can be active at a time between ethernet and wireless');
+        }
+        
+        // Check for debug logging
+        if (envParameters.includes('DEBUG_WIRELESS=true')) {
+            debug = true;
+            loggerInfo('Debug logging enabled via .env');
         }
     } catch(e) {
+        // If .env file doesn't exist, use defaults (SNM=true, debug=false)
+        loggerInfo('Single Network Mode enabled (default) - only one network device can be active at a time between ethernet and wireless');
         loggerDebug('Could not read ' + VOLUMIO_ENV + ' file: ' + e);
     }
 }
