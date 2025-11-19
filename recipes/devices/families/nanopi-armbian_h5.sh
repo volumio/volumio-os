@@ -17,6 +17,7 @@ DEVICEFAMILY="armbian"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEREPO="https://github.com/volumio/platform-nanopi-${DEVICEFAMILY}"
+DEVICEREPO_BRANCH="master" # Branch to use for the device repo or empty for main
 
 ### What features do we want to target
 # TODO: Not fully implement
@@ -25,16 +26,17 @@ MYVOLUMIO=no
 VOLINITUPDATER=yes
 
 ## Partition info
-BOOT_START=1
-BOOT_END=64
+BOOT_START=17
+BOOT_END=273
+IMAGE_END=3985           # BOOT_END + 3712 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 INIT_TYPE="initv3"
 INIT_UUID_TYPE="non-uuid-devices" # Use block device GPEN if dynamic UUIDs are not handled.
 
 # Modules that will be added to intramsfs
-MODULES=("overlay" "overlayfs" "squashfs" "nls_cp437" "nls_iso8859_1")
+MODULES=("fuse" "nls_cp437" "nls_iso8859_1" "overlay" "overlayfs" "squashfs")
 # Packages that will be installed
-PACKAGES=("bluez-firmware" "bluetooth" "bluez" "bluez-tools")
+PACKAGES=("abootimg" "bluetooth" "bluez" "bluez-firmware" "bluez-tools" "device-tree-compiler" "fbset" "linux-base" "lirc" "mc" "triggerhappy")
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -48,7 +50,6 @@ write_device_files() {
 
 write_device_bootloader() {
   log "Running write_device_bootloader" "ext"
-
   dd if="${PLTDIR}/${DEVICE}/u-boot/u-boot-sunxi-with-spl.bin" of="${LOOP_DEV}" bs=1024 seek=8 conv=notrunc
 }
 
@@ -61,12 +62,6 @@ device_image_tweaks() {
 # Will be run in chroot - Pre initramfs
 device_chroot_tweaks_pre() {
   log "Performing device_chroot_tweaks_pre" "ext"
-
-  echo "Install device tree compiler with overlays support"
-  wget -P /tmp http://ftp.debian.org/debian/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-4_armhf.deb
-  dpkg -i /tmp/device-tree-compiler_1.4.7-4_armhf.deb
-  rm /tmp/device-tree-compiler_1.4.7-4_armhf.deb
-
   log "Adding gpio group and udev rules"
   groupadd -f --system gpio
   usermod -aG gpio volumio
