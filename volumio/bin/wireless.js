@@ -21,6 +21,7 @@
 // - Force fresh DHCP request on WiFi reconnect (prevents rebind timeout)
 // - Eliminates 50-second DHCP timeout after ethernet unplug
 // - Fixes WiFi reconnection failure causing hotspot fallback
+// - Fixed regdomain log output showing on two lines (cosmetic)
 //
 // Production release: v4.0-rc3
 //===================================================================
@@ -2289,7 +2290,9 @@ function detectAndApplyRegdomain(callback) {
     var appropriateRegDom = '00';
     try {
         // Use timeout to prevent blocking startup for too long
-        var currentRegDomain = execSync(ifconfigUp + " && " + iwRegGet + " | " + GREP + " country | " + CUT + " -f1 -d':'", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_MEDIUM }).replace(/country /g, '').trim();
+        // FIX v4.0-rc3: Use grep -m 1 to limit to first match and split('\n')[0] to handle multi-line output
+        // Prevents "Regdomain already set to: 00\n99" appearing on two lines in logs
+        var currentRegDomain = execSync(ifconfigUp + " && " + iwRegGet + " | " + GREP + " -m 1 country | " + CUT + " -f1 -d':'", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_MEDIUM }).replace(/country /g, '').split('\n')[0].trim();
         
         loggerDebug('CURRENT REG DOMAIN: ' + currentRegDomain);
         
