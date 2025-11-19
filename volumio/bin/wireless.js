@@ -4,24 +4,23 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // Maintainer: Just a Nerd
-// Version: 4.0-rc1
+// Volumio Wireless Daemon - Version 4.0-rc2
+// Maintainer: Development Team
 // 
-// Production wireless network management daemon for Volumio with
-// enhanced reliability and event-driven interface state tracking.
+// RELEASE CANDIDATE 2 - Field Testing
+// 
+// Major Changes in v4.0:
+// - Single Network Mode (SNM) with ethernet/WiFi coordination
+// - Emergency hotspot fallback when no network available
+// - Improved transition handling and state management
+// - Fixed deadlock and infinite loop issues
+// - Enhanced logging and diagnostics
 //
-// Key Features:
-// - Single Network Mode (configurable via .env)
-// - Event-driven interface validation
-// - Real-time WPA state machine monitoring
-// - USB WiFi adapter support with automatic fallback
-// - Emergency hotspot recovery for system accessibility
+// Release Notes:
+// RC2 fixes critical issues with network transitions, ethernet plug/unplug
+// handling, and Single Network Mode operation. Ready for production testing.
 //
-// Configuration (.env):
-// - SINGLE_NETWORK_MODE=false : Enable multi-network mode (development)
-// - DEBUG_WIRELESS=true : Enable debug logging to /tmp/wireless.log
-//===================================================================
-// - Added USB WiFi capability detection
-//===================================================================
+// Production release: v4.0-rc2
 //===================================================================
 
 // ===================================================================
@@ -33,6 +32,20 @@ var settleTime = 3000;
 var totalSecondsForConnection = 30;
 var pollingTime = 1;
 var hostapdExitDelay = 500; // Delay after hostapd exits before IP notification (ms)
+
+// ===================================================================
+// TIMEOUT CONSTANTS - Single source of truth for all timeout values
+// ===================================================================
+var EXEC_TIMEOUT_SHORT = 2000;      // General command execution (2s)
+var EXEC_TIMEOUT_MEDIUM = 3000;     // Medium operations like regdomain detection (3s)
+var EXEC_TIMEOUT_LONG = 5000;       // Long operations like service restarts (5s)
+var EXEC_TIMEOUT_SCAN = 10000;      // Network scanning for regdomain (10s)
+var KILL_TIMEOUT = 5000;            // kill() timeout wrapper (5s)
+var RECONNECT_WAIT = 3000;          // Wait for wpa_supplicant association (3s)
+var USB_SETTLE_WAIT = 2000;         // USB WiFi adapter settle time (2s)
+var HOTSPOT_RETRY_DELAY = 3000;     // Hotspot fallback retry delay (3s)
+var STARTAP_RETRY_DELAY = 2000;     // startAP retry delay (2s)
+var INTERFACE_CHECK_INTERVAL = 500; // Interface ready polling interval (500ms)
 
 // ===================================================================
 // COMMAND BINARIES - Single source of truth for all executable paths
@@ -69,6 +82,7 @@ var WLAN_STATIC = CONFIG_DIR + "/wlanstatic";
 var NETWORK_CONFIG = CONFIG_DIR + "/system_controller/network/config.json";
 var WLAN_STATUS_FILE = DATA_DIR + "/wlan0status";
 var ETH_STATUS_FILE = DATA_DIR + "/eth0status";
+var SNM_STATUS_FILE = DATA_DIR + "/snm_status";  // Single Network Mode status for backend
 var FLAG_DIR = DATA_DIR + "/flagfiles";
 var WIRELESS_ESTABLISHED_FLAG = FLAG_DIR + "/wirelessEstablishedOnce";
 
@@ -93,7 +107,9 @@ var eth = "eth0";
 // COMPOSED COMMANDS - Built from binary paths above
 // ===================================================================
 var dhclient = SUDO + " " + DHCPCD + " " + wlan;
-var justdhclient = SUDO + " " + DHCPCD;
+var justdhclient = DHCPCD + ".*" + wlan;  // Pattern for killing wlan0 dhcpcd only
+var wpasupp = WPA_SUPPLICANT + " -s -B -D" + wirelessWPADriver + " -c" + WPA_SUPPLICANT_CONF + " -i" + wlan;
+var wpasuppPattern = WPA_SUPPLICANT + ".*" + wlan;  // Pattern for killing wlan0 wpa_supplicant only
 var restartdhcpcd = SUDO + " " + SYSTEMCTL + " restart dhcpcd.service";
 var starthostapd = SYSTEMCTL + " start hostapd.service";
 var stophostapd = SYSTEMCTL + " stop hostapd.service";
@@ -167,6 +183,7 @@ var lesstimer;
 var actualTime = 0;
 var apstopped = 0;
 var stage2Failed = false;  // Stage 2 connection failure flag
+var transitionStartTime = 0;  // Track transition timing for diagnostics
 
 // WPA State machine context (Stage 2)
 var wpaStateContext = {
@@ -230,13 +247,66 @@ function initializeWirelessFlow() {
 // PROCESS MANAGEMENT FUNCTIONS
 // ===================================================================
 
-// Kill a process by name using pgrep pattern matching
-function kill(process, callback) {
-    var all = process.split(" ");
-    var process = all[0];
-    var command = 'kill `' + PGREP + ' -f "^' + process + '"` || true';
-    loggerDebug("killing: " + command);
-    return thus.exec(command, callback);
+// Kill a process by pattern using pkill
+// Use pkill to terminate processes matching pattern
+// Patterns should be interface-specific (e.g., "dhcpcd.*wlan0", "wpa_supplicant.*wlan0")
+function kill(pattern, callback) {
+    loggerDebug("kill(): Pattern: " + pattern);
+    
+    // Use pkill directly to avoid blocking in fs.watch() callback contexts
+    var command = 'pkill -f "' + pattern + '"';
+    
+    // Timeout protection to prevent indefinite blocking
+    var callbackFired = false;
+    var timeoutHandle = setTimeout(function() {
+        if (!callbackFired) {
+            callbackFired = true;
+            loggerInfo("WARNING: kill() timed out after " + (KILL_TIMEOUT/1000) + "s for: " + pattern);
+            callback(new Error('Kill operation timeout'));
+        }
+    }, KILL_TIMEOUT);
+    
+    return thus.exec(command, function(err, stdout, stderr) {
+        if (!callbackFired) {
+            callbackFired = true;
+            clearTimeout(timeoutHandle);
+            
+            // pkill returns 1 if no processes found - NOT an error
+            // Since exec() doesn't give us direct access to exit code,
+            // we treat ANY pkill error as "not found" (safe assumption)
+            // pkill only fails if: no processes (1) or syntax error (2+)
+            // Our patterns are static, so syntax errors won't happen in production
+            if (err) {
+                // Assume "no processes found" which is normal
+                loggerDebug("kill(): No processes found: " + pattern);
+                return callback(null);
+            }
+            
+            loggerDebug("kill(): Success: " + pattern);
+            callback(null);
+        }
+    });
+}
+
+// Extract target process from command string - DEPRECATED
+// Process matching now uses interface-specific patterns for reliability
+// Keeping function for compatibility but it's not called
+function extractTargetProcess(commandString) {
+    var parts = commandString.split(" ");
+    var firstPart = parts[0];
+    
+    // Check if command is sudo-wrapped
+    if (firstPart === SUDO || firstPart === "/usr/bin/sudo") {
+        // Return actual target command (element after sudo)
+        if (parts.length > 1) {
+            loggerDebug("extractTargetProcess(): Skipping sudo wrapper, target is: " + parts[1]);
+            return parts[1];
+        }
+    }
+    
+    // Not sudo-wrapped, return first element
+    loggerDebug("extractTargetProcess(): Direct command, target is: " + firstPart);
+    return firstPart;
 }
 
 // Launch a command either synchronously or asynchronously with logging
@@ -325,7 +395,7 @@ function startHotspot(callback) {
                     // Trigger ip-changed AFTER hostapd actually completes
                     setTimeout(function() {
                         try {
-                            execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
+                            execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
                             loggerDebug("Triggered ip-changed@" + wlan + ".target for hotspot IP");
                         } catch (e) {
                             loggerDebug("Could not trigger ip-changed target: " + e);
@@ -372,7 +442,7 @@ function startHotspotForce(callback) {
                 // Trigger ip-changed AFTER forced hostapd actually completes
                 setTimeout(function() {
                     try {
-                        execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: 2000 });
+                        execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
                         loggerDebug("Triggered ip-changed@" + wlan + ".target for forced hotspot IP");
                     } catch (e) {
                         loggerDebug("Could not trigger ip-changed target: " + e);
@@ -405,7 +475,7 @@ function startHotspotFallbackSafe(retry = 0) {
         if (err) {
             loggerInfo(`Hotspot launch failed. Retry ${retry + 1} of ${hotspotMaxRetries}`);
             if (retry + 1 < hotspotMaxRetries) {
-                setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+                setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
             } else {
                 loggerInfo("Hotspot failed after maximum retries. System remains offline.");
                 notifyWirelessReady();
@@ -419,7 +489,7 @@ function startHotspotFallbackSafe(retry = 0) {
             if (hostapdStatus !== "active") {
                 loggerInfo("Hostapd did not reach active state. Retrying fallback.");
                 if (retry + 1 < hotspotMaxRetries) {
-                    setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+                    setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
                 } else {
                     loggerInfo("Hostapd failed after maximum retries. System remains offline.");
                     notifyWirelessReady();
@@ -432,7 +502,7 @@ function startHotspotFallbackSafe(retry = 0) {
         } catch (e) {
             loggerInfo("Error checking hostapd status: " + e.message);
             if (retry + 1 < hotspotMaxRetries) {
-                setTimeout(() => startHotspotFallbackSafe(retry + 1), 3000);
+                setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
             } else {
                 loggerInfo("Could not confirm hostapd status. System remains offline.");
                 notifyWirelessReady();
@@ -485,7 +555,7 @@ function queryUsbWifiCapabilities() {
     };
     
     try {
-        var iwListOutput = execSync(iwList, { encoding: 'utf8', timeout: 5000 });
+        var iwListOutput = execSync(iwList, { encoding: 'utf8', timeout: EXEC_TIMEOUT_LONG });
         var modesMatch = iwListOutput.match(/Supported interface modes:([\s\S]*?)(?=\n\s*Band|$)/);
         if (modesMatch && modesMatch[1]) {
             capabilities.supportsAP = modesMatch[1].includes('AP');
@@ -616,7 +686,7 @@ function proceedWithWpaSupplicant(validation, callback) {
         
         // Bring interface UP first (separate command with own timeout)
         try {
-            execSync(SUDO + " " + IFCONFIG + " " + wlan + " up", { encoding: 'utf8', timeout: 2000 });
+            execSync(SUDO + " " + IFCONFIG + " " + wlan + " up", { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
             loggerDebug("Brought " + wlan + " interface up");
         } catch (e) {
             loggerDebug("Could not bring interface up: " + e);
@@ -624,14 +694,14 @@ function proceedWithWpaSupplicant(validation, callback) {
         
         // Give interface time to stabilize (1 second)
         try {
-            execSync("sleep 1", { encoding: 'utf8', timeout: 2000 });
+            execSync("sleep 1", { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
         } catch (e) {
             loggerDebug("Sleep interrupted: " + e);
         }
         
         // Tell wpa_supplicant to reconfigure (separate command with own timeout)
         try {
-            execSync(wpacli + " reconfigure", { encoding: 'utf8', timeout: 2000 });
+            execSync(wpacli + " reconfigure", { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
             loggerDebug("Triggered wpa_cli reconfigure");
         } catch (e) {
             loggerDebug("Could not trigger reconfigure: " + e);
@@ -666,14 +736,14 @@ function proceedWithWpaSupplicant(validation, callback) {
                             
                             loggerInfo("Restarting dhcpcd.service for reliable DHCP");
                             try {
-                                execSync(restartdhcpcd, { encoding: 'utf8', timeout: 5000 });
+                                execSync(restartdhcpcd, { encoding: 'utf8', timeout: EXEC_TIMEOUT_LONG });
                                 loggerDebug("dhcpcd.service restarted successfully");
                             } catch (e) {
                                 loggerInfo("WARNING: Failed to restart dhcpcd.service: " + e);
                             }
                             setTimeout(function() {
                                 callback();
-                            }, 2000);
+                            }, USB_SETTLE_WAIT);
                         } else {
                             loggerInfo("Onboard WiFi adapter detected, using standard dhcpcd flow");
                             // Wait 1 second then launch dhcpcd
@@ -702,7 +772,7 @@ function proceedWithWpaSupplicant(validation, callback) {
                                             loggerInfo("Warning: dhcpcd may not be managing " + wlan);
                                         }
                                         callback();
-                                    }, 2000);
+                                    }, USB_SETTLE_WAIT);
                                 });
                             }, 1000);
                         }
@@ -764,8 +834,28 @@ function waitForWlanRelease(attempt, onReleased) {
 
 // Stop WiFi client mode by killing dhcpcd and wpa_supplicant
 function stopAP(callback) {
+    // Use interface-specific patterns to avoid killing eth0 dhcpcd
+    loggerDebug("stopAP: BEGIN");
+    var startTime = Date.now();
+    
     kill(justdhclient, function(err) {
-        kill(wpasupp, function(err) {
+        var dhcpTime = Date.now() - startTime;
+        if (err) {
+            loggerInfo("stopAP: dhclient kill error (" + dhcpTime + "ms): " + err);
+        } else {
+            loggerDebug("stopAP: dhclient killed successfully (" + dhcpTime + "ms)");
+        }
+        
+        kill(wpasuppPattern, function(err) {
+            var wpaTime = Date.now() - startTime - dhcpTime;
+            if (err) {
+                loggerInfo("stopAP: wpa_supplicant kill error (" + wpaTime + "ms): " + err);
+            } else {
+                loggerDebug("stopAP: wpa_supplicant killed successfully (" + wpaTime + "ms)");
+            }
+            
+            var totalTime = Date.now() - startTime;
+            loggerDebug("stopAP: END - total time " + totalTime + "ms");
             callback();
         });
     });
@@ -795,7 +885,7 @@ function waitForInterfaceReleaseAndStartAP() {
                     loggerInfo(`startAP failed. Retry ${retryCount} of ${maxRetries}`);
                     if (retryCount < maxRetries) {
                         apStartInProgress = false; // Reset before retry
-                        setTimeout(waitForInterfaceReleaseAndStartAP, 2000);
+                        setTimeout(waitForInterfaceReleaseAndStartAP, STARTAP_RETRY_DELAY);
                     } else {
                         loggerInfo("startAP reached max retries. Attempting fallback.");
                         apStartInProgress = false;
@@ -813,7 +903,7 @@ function waitForInterfaceReleaseAndStartAP() {
                     loggerInfo(`startAP failed. Retry ${retryCount} of ${maxRetries}`);
                     if (retryCount < maxRetries) {
                         apStartInProgress = false; // Reset before retry
-                        setTimeout(waitForInterfaceReleaseAndStartAP, 2000);
+                        setTimeout(waitForInterfaceReleaseAndStartAP, STARTAP_RETRY_DELAY);
                     } else {
                         loggerInfo("startAP reached max retries. Attempting fallback.");
                         apStartInProgress = false;
@@ -1006,7 +1096,7 @@ function afterAPStart() {
                 
                 // Check if wpa_supplicant has actually connected
                 try {
-                    var wpaState = execSync(wpacli + " status | " + GREP + " wpa_state", { encoding: 'utf8', timeout: 2000 }).trim();
+                    var wpaState = execSync(wpacli + " status | " + GREP + " wpa_state", { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT }).trim();
                     loggerDebug("wpa_supplicant state: " + wpaState);
                     
                     if (wpaState.includes("COMPLETED")) {
@@ -1144,11 +1234,28 @@ function startFlow() {
             notifyWirelessReady();
         });
     } else if (isWirelessDisabled()) {
-        loggerInfo('Wireless Networking DISABLED, not starting wireless flow');
-        notifyWirelessReady();
+        // Emergency override - if no ethernet, force hotspot despite WiFi disabled
+        if (!isWiredNetworkActive) {
+            loggerInfo('=== EMERGENCY OVERRIDE ===');
+            loggerInfo('WiFi DISABLED in config, but no ethernet available');
+            loggerInfo('Forcing hotspot for system accessibility');
+            loggerInfo('User can disable hotspot after connecting via emergency AP');
+            loggerInfo('==========================');
+            startHotspotFallbackSafe();
+        } else {
+            loggerInfo('Wireless Networking DISABLED, not starting wireless flow');
+            notifyWirelessReady();
+        }
     } else if (singleNetworkMode && isWiredNetworkActive) {
-        loggerInfo('Single Network Mode: Wired network active, not starting wireless flow');
-        notifyWirelessReady();
+        // Keep wlan0 UP without IP for scanning capability
+        loggerInfo('Single Network Mode: Ethernet active, maintaining WiFi scan capability');
+        keepWlanUpWithoutIP(function(err) {
+            if (err) {
+                loggerInfo('Failed to maintain scan mode: ' + err);
+                loggerInfo('Falling back to interface DOWN');
+            }
+            notifyWirelessReady();
+        });
     } else if (directhotspot){
         startHotspot(function () {
             notifyWirelessReady();
@@ -1163,6 +1270,234 @@ function startFlow() {
 function stop(callback) {
     stopAP(function() {
         stopHotspot(callback);
+    });
+}
+
+// ===================================================================
+// SNM SCAN MODE FUNCTIONS
+// ===================================================================
+
+// Keep wlan0 UP without IP for scanning capability (SNM ethernet active)
+function keepWlanUpWithoutIP(callback) {
+    // Check if wireless is disabled in config
+    if (isWirelessDisabled()) {
+        loggerInfo("SNM: WiFi disabled in config, not starting scan mode");
+        loggerInfo("SNM: Ethernet has exclusive access");
+        return callback(null);
+    }
+    
+    loggerInfo("SNM: Maintaining wlan0 UP without IP (scan mode)");
+    loggerInfo("SNM: Users can configure WiFi via WebUI while ethernet is active");
+    
+    // Step 1: Stop any existing connections and clear state
+    stopAP(function(err) {
+        if (err) loggerInfo("keepWlanUpWithoutIP: stopAP error: " + err);
+        
+        // Step 2: Bring interface UP
+        launch(ifconfigUp, "ifconfig_up", true, function(err) {
+            if (err) {
+                loggerInfo("keepWlanUpWithoutIP: Failed to bring interface UP: " + err);
+                return callback(err);
+            }
+            
+            loggerDebug("keepWlanUpWithoutIP: Interface brought UP");
+            
+            // Step 3: Flush any existing IP addresses
+            var flushCmd = SUDO + " " + IP + " addr flush dev " + wlan;
+            launch(flushCmd, "flush_ip", true, function(err) {
+                if (err) loggerDebug("keepWlanUpWithoutIP: IP flush error (may be expected): " + err);
+                
+                loggerDebug("keepWlanUpWithoutIP: IP addresses flushed");
+                
+                // Step 4: Start wpa_supplicant (for scanning capability)
+                launch(wpasupp, "wpa_supplicant", true, function(err) {
+                    if (err) {
+                        loggerInfo("keepWlanUpWithoutIP: wpa_supplicant failed: " + err);
+                        return callback(err);
+                    }
+                    
+                    loggerDebug("keepWlanUpWithoutIP: wpa_supplicant started");
+                    
+                    // Step 5: Tell wpa_supplicant to disconnect (don't associate)
+                    // This keeps it in DISCONNECTED state - interface UP, no connection
+                    var disconnectCmd = wpacli + " disconnect";
+                    launch(disconnectCmd, "wpa_disconnect", true, function(err) {
+                        if (err) loggerDebug("keepWlanUpWithoutIP: disconnect command error: " + err);
+                        
+                        // Calculate transition time for diagnostics
+                        if (transitionStartTime > 0) {
+                            var transitionTime = Date.now() - transitionStartTime;
+                            loggerInfo("SNM: Transition to scan mode completed in " + transitionTime + "ms");
+                            transitionStartTime = 0;
+                        }
+                        
+                        loggerInfo("SNM: wlan0 is UP without IP, scan capable");
+                        
+                        // Write SNM status for backend notification
+                        try {
+                            fs.writeFileSync(SNM_STATUS_FILE, 'scan_mode', 'utf8');
+                        } catch (e) {
+                            loggerDebug("Could not write SNM status: " + e);
+                        }
+                        
+                        // Verify final state (diagnostic)
+                        verifyWlanScanState();
+                        
+                        callback(null);
+                    });
+                });
+            });
+        });
+    });
+}
+
+// Verify wlan0 is in scan-capable state (UP without IP)
+// Verify wlan0 is in correct scan mode state (diagnostic)
+function verifyWlanScanState() {
+    try {
+        // Check interface state
+        var linkState = execSync(ipLink, { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
+        var isUP = linkState.includes('state UP');
+        var hasCarrier = !linkState.includes('NO-CARRIER');
+        
+        loggerDebug("wlan0 verification: UP=" + isUP + " CARRIER=" + hasCarrier);
+        
+        // Check IP address
+        var addrState = execSync(ipAddr, { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
+        var hasIPv4 = addrState.match(/inet (\d+\.\d+\.\d+\.\d+)/);
+        
+        if (hasIPv4) {
+            loggerInfo("WARNING: wlan0 has IP " + hasIPv4[1] + " but should have none");
+        } else {
+            loggerDebug("wlan0 verification: No IP (correct)");
+        }
+        
+        // Check wpa_supplicant state
+        var wpaState = execSync(wpacli + " status | " + GREP + " wpa_state", { 
+            encoding: 'utf8', 
+            timeout: EXEC_TIMEOUT_SHORT 
+        }).trim();
+        loggerDebug("wlan0 verification: " + wpaState);
+        
+        if (wpaState.includes("DISCONNECTED") || wpaState.includes("INACTIVE")) {
+            loggerDebug("wlan0 verification: PASSED - interface ready for scanning");
+        } else {
+            loggerInfo("wlan0 state: " + wpaState + " (expected DISCONNECTED or INACTIVE)");
+        }
+        
+    } catch (e) {
+        loggerDebug("wlan0 verification error: " + e);
+    }
+}
+
+// Reconnect WiFi after ethernet disconnect in Single Network Mode
+// Uses wpa_cli reconnect for fast transition without full flow restart
+// Reconnect WiFi after ethernet disconnected (SNM fast reconnection)
+function reconnectWiFiAfterEthernet(callback) {
+    loggerInfo("SNM: Ethernet disconnected, reconnecting WiFi");
+    
+    // Check if wpa_supplicant is running
+    try {
+        var wpaCheck = execSync(PGREP + " -f 'wpa_supplicant.*" + wlan + "'", { 
+            encoding: 'utf8',
+            timeout: EXEC_TIMEOUT_SHORT 
+        });
+        loggerDebug("reconnectWiFi: wpa_supplicant already running: " + wpaCheck.trim());
+    } catch (e) {
+        // wpa_supplicant not running, need to start it
+        loggerInfo("reconnectWiFi: wpa_supplicant not running, starting full wireless flow");
+        return initializeWirelessFlow();
+    }
+    
+    // wpa_supplicant is running, just reconnect
+    var reconnectCmd = wpacli + " reconnect";
+    launch(reconnectCmd, "wpa_reconnect", true, function(err) {
+        if (err) {
+            loggerInfo("reconnectWiFi: Reconnect command failed: " + err);
+            loggerInfo("reconnectWiFi: Falling back to full wireless flow restart");
+            wirelessFlowInProgress = false;  // Reset to allow restart
+            return initializeWirelessFlow();
+        }
+        
+        loggerInfo("reconnectWiFi: WiFi reconnection triggered");
+        
+        // Wait for connection to establish before launching dhcpcd
+        // Give wpa_supplicant time to associate and authenticate
+        setTimeout(function() {
+            // Check connection state
+            try {
+                var wpaState = execSync(wpacli + " status | " + GREP + " wpa_state", {
+                    encoding: 'utf8',
+                    timeout: EXEC_TIMEOUT_SHORT
+                }).trim();
+                
+                loggerDebug("reconnectWiFi: WiFi state after reconnect: " + wpaState);
+                
+                if (wpaState.includes("COMPLETED")) {
+                    loggerInfo("reconnectWiFi: WiFi reconnected successfully");
+                    
+                    // Check if this is a USB WiFi adapter
+                    if (isUsbWifiAdapter()) {
+                        loggerInfo("reconnectWiFi: USB adapter detected, restarting dhcpcd.service");
+                        try {
+                            execSync(restartdhcpcd, { encoding: 'utf8', timeout: EXEC_TIMEOUT_LONG });
+                            loggerDebug("reconnectWiFi: dhcpcd.service restarted successfully");
+                        } catch (e) {
+                            loggerInfo("reconnectWiFi: WARNING - Failed to restart dhcpcd.service: " + e);
+                        }
+                        setTimeout(function() {
+                            // Calculate transition time for diagnostics
+                            if (transitionStartTime > 0) {
+                                var reconnectTime = Date.now() - transitionStartTime;
+                                loggerInfo("SNM: WiFi reconnection completed in " + reconnectTime + "ms");
+                                transitionStartTime = 0;
+                            }
+                            
+                            loggerInfo("reconnectWiFi: WiFi reconnection complete with USB adapter");
+                            updateNetworkState("ap");
+                            restartAvahi();
+                            if (callback) callback(null);
+                        }, USB_SETTLE_WAIT);
+                    } else {
+                        // Launch dhcpcd to get IP address
+                        let staticDhcpFile;
+                        try {
+                            staticDhcpFile = fs.readFileSync(WLAN_STATIC, 'utf8');
+                            loggerInfo("reconnectWiFi: Using static IP configuration");
+                        } catch (e) {
+                            staticDhcpFile = dhclient;
+                            loggerInfo("reconnectWiFi: Using DHCP for IP");
+                        }
+                        
+                        launch(staticDhcpFile, "dhclient", false, function() {
+                            // Calculate transition time for diagnostics
+                            if (transitionStartTime > 0) {
+                                var reconnectTime = Date.now() - transitionStartTime;
+                                loggerInfo("SNM: WiFi reconnection completed in " + reconnectTime + "ms");
+                                transitionStartTime = 0;
+                            }
+                            
+                            loggerInfo("reconnectWiFi: WiFi reconnection complete, obtaining IP");
+                            updateNetworkState("ap");
+                            restartAvahi();
+                            if (callback) callback(null);
+                        });
+                    }
+                    
+                } else {
+                    loggerInfo("reconnectWiFi: WiFi reconnect incomplete (" + wpaState + "), reinitializing wireless flow");
+                    wirelessFlowInProgress = false;  // Reset to allow restart
+                    initializeWirelessFlow();
+                }
+                
+            } catch (e) {
+                loggerInfo("reconnectWiFi: Could not verify WiFi state: " + e);
+                loggerInfo("reconnectWiFi: Falling back to full wireless flow");
+                wirelessFlowInProgress = false;  // Reset to allow restart
+                initializeWirelessFlow();
+            }
+            
+        }, RECONNECT_WAIT); // Wait for wpa_supplicant association
     });
 }
 
@@ -1347,7 +1682,7 @@ function waitForInterfaceReady(interfaceName, maxWaitMs, callback) {
         }
         
         // Wait 500ms and check again
-        setTimeout(checkReady, 500);
+        setTimeout(checkReady, INTERFACE_CHECK_INTERVAL);
     }
     
     checkReady();
@@ -1464,7 +1799,7 @@ function startWpaStateMonitor(interfaceName, callback) {
         try {
             var status = execSync(WPA_CLI + ' -i ' + interfaceName + ' status', {
                 encoding: 'utf8',
-                timeout: 2000
+                timeout: EXEC_TIMEOUT_SHORT
             });
             
             // Parse wpa_state from status
@@ -1728,7 +2063,7 @@ function restartAvahi() {
             } catch (e) {
                 loggerInfo('Could not verify Avahi status: ' + e);
             }
-        }, 2000);
+        }, USB_SETTLE_WAIT);
     } catch (e) {
         loggerInfo('Could not restart Avahi: ' + e);
     }
@@ -1948,14 +2283,14 @@ function detectAndApplyRegdomain(callback) {
     var appropriateRegDom = '00';
     try {
         // Use timeout to prevent blocking startup for too long
-        var currentRegDomain = execSync(ifconfigUp + " && " + iwRegGet + " | " + GREP + " country | " + CUT + " -f1 -d':'", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: 3000 }).replace(/country /g, '').replace('\n','');
+        var currentRegDomain = execSync(ifconfigUp + " && " + iwRegGet + " | " + GREP + " country | " + CUT + " -f1 -d':'", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_MEDIUM }).replace(/country /g, '').trim();
         
         loggerDebug('CURRENT REG DOMAIN: ' + currentRegDomain);
         
         // Only scan if current regdomain is default (00)
         if (currentRegDomain === '00' || currentRegDomain === '0099' || !currentRegDomain) {
             loggerDebug('Current regdomain is default, scanning for appropriate regdomain...');
-            var countryCodesInScan = execSync(ifconfigUp + " && " + iwScan + " | " + GREP + " Country: | " + CUT + " -f 2", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: 10000 }).replace(/Country: /g, '').split('\n');
+            var countryCodesInScan = execSync(ifconfigUp + " && " + iwScan + " | " + GREP + " Country: | " + CUT + " -f 2", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_SCAN }).replace(/Country: /g, '').split('\n');
             var appropriateRegDomain = determineMostAppropriateRegdomain(countryCodesInScan);
             loggerDebug('APPROPRIATE REG DOMAIN: ' + appropriateRegDomain);
             if (isValidRegDomain(appropriateRegDomain) && appropriateRegDomain !== currentRegDomain) {
@@ -2084,39 +2419,91 @@ function checkWiredNetworkStatus(isFirstStart) {
             actualState = 'disconnected';
         }
         
-        // Update file with actual state
-        try {
-            fs.writeFileSync(ETH_STATUS_FILE, actualState, 'utf8');
-        } catch (e) {
-            loggerDebug('Could not update eth0status: ' + e);
-        }
-        
-        // Check if state changed
+        // Check if state changed BEFORE writing to file
+        // Writing to file triggers fs.watch() callback - only write when state actually changes
         if (actualState !== currentEthStatus) {
+            // Update file ONLY when state changes (prevents infinite loop)
+            try {
+                fs.writeFileSync(ETH_STATUS_FILE, actualState, 'utf8');
+            } catch (e) {
+                loggerDebug('Could not update eth0status: ' + e);
+            }
+            
+            // Start timing transition for diagnostics
+            transitionStartTime = Date.now();
+            
+            // Enhanced transition logging
+            loggerInfo("=== SNM TRANSITION ===");
+            loggerInfo("Previous ethernet state: " + currentEthStatus);
+            loggerInfo("New ethernet state: " + actualState);
+            loggerInfo("Single Network Mode: " + (singleNetworkMode ? "enabled" : "disabled"));
+            loggerInfo("First start: " + (isFirstStart ? "yes" : "no"));
+            
             currentEthStatus = actualState;
-            loggerInfo('Wired network status changed to: ---' + actualState + '---');
             
             if (actualState === 'connected') {
+                // Ethernet connected
                 isWiredNetworkActive = true;
-            } else {
-                isWiredNetworkActive = false;
-            }
-            
-            if (!isFirstStart && singleNetworkMode) {
-                try {
-                    var wifiSSID = execSync(iwgetid, { uid: 1000, gid: 1000, encoding: 'utf8' }).replace('\n','');
-                    if (wifiSSID && wifiSSID.length > 0 && actualState === 'disconnected') {
-                        loggerInfo('WiFi already connected, not reinitializing');
-                        return;
-                    }
-                } catch (e) {}
+                loggerInfo("Action: Switch to ethernet (WiFi scan mode)");
+                loggerInfo("=== END TRANSITION ===");
                 
-                loggerInfo('Triggering wireless flow restart due to ethernet change');
-                initializeWirelessFlow();
+                if (!isFirstStart && singleNetworkMode) {
+                    loggerInfo('SNM: Ethernet connected, switching to ethernet (WiFi scan mode)');
+                    // Use setImmediate to break out of fs.watch() callback context
+                    // Direct call causes deadlock in thus.exec()
+                    loggerDebug('SNM: Scheduling wireless flow restart via setImmediate()');
+                    setImmediate(function() {
+                        loggerDebug('SNM: setImmediate() callback FIRED - calling initializeWirelessFlow()');
+                        try {
+                            initializeWirelessFlow();
+                        } catch (e) {
+                            loggerInfo('SNM: ERROR in initializeWirelessFlow(): ' + e);
+                            loggerInfo('SNM: Stack: ' + e.stack);
+                        }
+                    });
+                    loggerDebug('SNM: setImmediate() scheduled, continuing...');
+                }
+                
+            } else {
+                // Ethernet disconnected
+                isWiredNetworkActive = false;
+                loggerInfo("Action: Reconnect WiFi");
+                loggerInfo("=== END TRANSITION ===");
+                
+                if (!isFirstStart && singleNetworkMode) {
+                    // Check if WiFi is already connected
+                    try {
+                        var wifiSSID = execSync(iwgetid, { uid: 1000, gid: 1000, encoding: 'utf8' }).replace('\n','');
+                        if (wifiSSID && wifiSSID.length > 0) {
+                            loggerInfo('SNM: WiFi already connected to: ' + wifiSSID);
+                            return;
+                        }
+                    } catch (e) {
+                        loggerDebug('SNM: Could not check WiFi status: ' + e);
+                    }
+                    
+                    // WiFi not connected, trigger reconnection
+                    loggerInfo('SNM: Ethernet disconnected, reconnecting WiFi');
+                    // Use setImmediate to break out of fs.watch() callback context
+                    loggerDebug('SNM: Scheduling WiFi reconnect via setImmediate()');
+                    setImmediate(function() {
+                        loggerDebug('SNM: setImmediate() callback FIRED - calling reconnectWiFiAfterEthernet()');
+                        try {
+                            reconnectWiFiAfterEthernet();
+                        } catch (e) {
+                            loggerInfo('SNM: ERROR in reconnectWiFiAfterEthernet(): ' + e);
+                            loggerInfo('SNM: Stack: ' + e.stack);
+                        }
+                    });
+                    loggerDebug('SNM: setImmediate() scheduled, continuing...');
+                }
             }
         }
+        
+        loggerDebug('checkWiredNetworkStatus: Function complete');
     } catch (e) {
-        loggerDebug('Error in checkWiredNetworkStatus: ' + e);
+        loggerInfo('Error in checkWiredNetworkStatus: ' + e);
+        loggerInfo('Stack: ' + e.stack);
     }
 }
 
