@@ -33,22 +33,22 @@ PLYMOUTH_THEME="volumio-adaptive"
 DEBUG_IMAGE=no
 
 ## Partition info
-BOOT_START=20
-BOOT_END=148
+BOOT_START=25
+BOOT_END=281
+IMAGE_END=3993     # BOOT_END + 3712 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=yes        # Add UUID to fstab
 INIT_TYPE="initv3"
 
 # Modules that will be added to intramsfs
-MODULES=("overlay" "overlayfs" "squashfs" "nls_cp437"  "fuse")
+MODULES=("fuse" "nls_cp437" "overlay" "overlayfs" "squashfs")
 # Packages that will be installed
-PACKAGES=("bluez-firmware" "bluetooth" "bluez" "bluez-tools")
+PACKAGES=("abootimg" "bluetooth" "bluez" "bluez-firmware" "bluez-tools" "fbset" "linux-base" "lirc" "mc" "triggerhappy")
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
 write_device_files() {
   log "Running write_device_files" "ext"
-
   cp -dR "${PLTDIR}/${DEVICE}/boot" "${ROOTFSMNT}"
   cp -pdR "${PLTDIR}/${DEVICE}/lib/modules" "${ROOTFSMNT}/lib"
   cp -pdR "${PLTDIR}/${DEVICE}/lib/firmware" "${ROOTFSMNT}/lib"
@@ -56,7 +56,6 @@ write_device_files() {
 
 write_device_bootloader() {
   log "Running write_device_bootloader" "ext"
-
   dd if="${PLTDIR}/${DEVICE}/u-boot/idbloader.img" of="${LOOP_DEV}" seek=64 conv=notrunc status=none
   dd if="${PLTDIR}/${DEVICE}/u-boot/u-boot.itb" of="${LOOP_DEV}" seek=16384 conv=notrunc status=none
 }
