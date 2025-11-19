@@ -18,6 +18,7 @@ DEVICEFAMILY="nanopi-a"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEREPO="https://github.com/volumio/platform-${DEVICEFAMILY}"
+DEVICEREPO_BRANCH="master" # Branch to use for the device repo or empty for main
 
 ### What features do we want to target
 # TODO: Not fully implement
@@ -27,16 +28,17 @@ VOLINITUPDATER=yes
 DISABLE_DISPLAY=yes
 
 ## Partition info
-BOOT_START=1
-BOOT_END=96
+BOOT_START=17
+BOOT_END=273
+IMAGE_END=3985           # BOOT_END + 3712 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 INIT_TYPE="initv3"
 INIT_UUID_TYPE="non-uuid-devices" # Use block device GPEN if dynamic UUIDs are not handled.
 
 # Modules that will be added to intramsfs
-MODULES=("overlay" "overlayfs" "squashfs" "nls_cp437" "fuse" "nls_iso8859_1")
+MODULES=("fuse" "nls_cp437" "nls_iso8859_1" "overlay" "overlayfs" "squashfs")
 # Packages that will be installed
-PACKAGES=("bluez-firmware" "bluetooth" "bluez" "bluez-tools")
+PACKAGES=("abootimg" "bluetooth" "bluez" "bluez-firmware" "bluez-tools" "device-tree-compiler" "fbset" "linux-base" "lirc" "mc" "triggerhappy")
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
