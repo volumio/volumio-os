@@ -4,10 +4,10 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // Maintainer: Just a Nerd
-// Volumio Wireless Daemon - Version 4.0-rc2
+// Volumio Wireless Daemon - Version 4.0-rc3
 // Maintainer: Development Team
 // 
-// RELEASE CANDIDATE 2 - Field Testing
+// RELEASE CANDIDATE 3 - DHCP Reconnection Fix
 // 
 // Major Changes in v4.0:
 // - Single Network Mode (SNM) with ethernet/WiFi coordination
@@ -16,11 +16,13 @@
 // - Fixed deadlock and infinite loop issues
 // - Enhanced logging and diagnostics
 //
-// Release Notes:
-// RC2 fixes critical issues with network transitions, ethernet plug/unplug
-// handling, and Single Network Mode operation. Ready for production testing.
+// RC3 Changes (DHCP Reconnection Fix):
+// - Release DHCP lease before ethernet transition (prevents stale lease)
+// - Force fresh DHCP request on WiFi reconnect (prevents rebind timeout)
+// - Eliminates 50-second DHCP timeout after ethernet unplug
+// - Fixes WiFi reconnection failure causing hotspot fallback
 //
-// Production release: v4.0-rc2
+// Production release: v4.0-rc3
 //===================================================================
 
 // ===================================================================
@@ -1438,12 +1440,16 @@ function reconnectWiFiAfterEthernet(callback) {
                     
                     // Check if this is a USB WiFi adapter
                     if (isUsbWifiAdapter()) {
-                        loggerInfo("reconnectWiFi: USB adapter detected, restarting dhcpcd.service");
+                        // FIX v4.0-rc3: Use dhcpcd -n to force fresh lease instead of service restart
+                        // Service restart may attempt to rebind old/expired lease which can fail or timeout
+                        // The -n flag forces new DISCOVER/REQUEST cycle instead of rebind attempt
+                        loggerInfo("reconnectWiFi: USB adapter detected, requesting fresh DHCP lease");
                         try {
-                            execSync(restartdhcpcd, { encoding: 'utf8', timeout: EXEC_TIMEOUT_LONG });
-                            loggerDebug("reconnectWiFi: dhcpcd.service restarted successfully");
+                            var freshDhcpCmd = SUDO + ' ' + DHCPCD + ' -n ' + wlan;
+                            execSync(freshDhcpCmd, { encoding: 'utf8', timeout: EXEC_TIMEOUT_LONG });
+                            loggerDebug("reconnectWiFi: Fresh DHCP lease requested for " + wlan);
                         } catch (e) {
-                            loggerInfo("reconnectWiFi: WARNING - Failed to restart dhcpcd.service: " + e);
+                            loggerInfo("reconnectWiFi: WARNING - Failed to request fresh DHCP: " + e);
                         }
                         setTimeout(function() {
                             // Calculate transition time for diagnostics
@@ -2449,6 +2455,22 @@ function checkWiredNetworkStatus(isFirstStart) {
                 
                 if (!isFirstStart && singleNetworkMode) {
                     loggerInfo('SNM: Ethernet connected, switching to ethernet (WiFi scan mode)');
+                    
+                    // FIX v4.0-rc3: Release wlan0 DHCP lease before transition to prevent stale lease rebind
+                    // When reconnecting later, dhcpcd will request fresh lease instead of trying to rebind
+                    // expired lease which can fail or timeout on some routers
+                    try {
+                        loggerDebug('SNM: Releasing wlan0 DHCP lease before ethernet transition');
+                        execSync(SUDO + ' ' + DHCPCD + ' -k ' + wlan, { 
+                            encoding: 'utf8', 
+                            timeout: EXEC_TIMEOUT_SHORT 
+                        });
+                        loggerDebug('SNM: wlan0 DHCP lease released successfully');
+                    } catch (e) {
+                        // Non-fatal - may not have active lease
+                        loggerDebug('SNM: DHCP release skipped (no active lease): ' + e.message);
+                    }
+                    
                     // Use setImmediate to break out of fs.watch() callback context
                     // Direct call causes deadlock in thus.exec()
                     loggerDebug('SNM: Scheduling wireless flow restart via setImmediate()');
