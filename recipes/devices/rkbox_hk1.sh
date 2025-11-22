@@ -18,6 +18,7 @@ DEVICEFAMILY="rkbox"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
 DEVICEREPO="https://github.com/volumio/platform-${DEVICEFAMILY}.git"
+DEVICEREPO_BRANCH="main" # Branch to use for the device repo or empty for main
 
 ### What features do we want to target
 # TODO: Not fully implement
@@ -33,22 +34,22 @@ PLYMOUTH_THEME="volumio-adaptive"
 DEBUG_IMAGE=no
 
 ## Partition info
-BOOT_START=20
-BOOT_END=148
+BOOT_START=25
+BOOT_END=281
+IMAGE_END=3993     # BOOT_END + 3712 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=yes        # Add UUID to fstab
 INIT_TYPE="initv3"
 
 # Modules that will be added to intramsfs
-MODULES=("overlay" "overlayfs" "squashfs" "nls_cp437"  "fuse")
+MODULES=("fuse" "nls_cp437" "overlay" "overlayfs" "squashfs")
 # Packages that will be installed
-PACKAGES=("lirc" "fbset" "mc" "abootimg" "bluez-firmware" "bluetooth" "bluez" "bluez-tools" "linux-base" "triggerhappy")
+PACKAGES=("abootimg" "bluetooth" "bluez" "bluez-firmware" "bluez-tools" "fbset" "linux-base" "lirc" "mc" "triggerhappy")
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
 write_device_files() {
   log "Running write_device_files" "ext"
-
   cp -dR "${PLTDIR}/${DEVICE}/boot" "${ROOTFSMNT}"
   cp -pdR "${PLTDIR}/${DEVICE}/lib/modules" "${ROOTFSMNT}/lib"
   cp -pdR "${PLTDIR}/${DEVICE}/lib/firmware" "${ROOTFSMNT}/lib"
@@ -75,6 +76,7 @@ device_chroot_tweaks() {
 # Will be run in chroot - Pre initramfs
 device_chroot_tweaks_pre() {
   log "Performing device_chroot_tweaks_pre" "ext"
+
   log "Fixing armv8 deprecated instruction emulation with armv7 rootfs"
   cat <<-EOF >>/etc/sysctl.conf
 abi.cp15_barrier=2
