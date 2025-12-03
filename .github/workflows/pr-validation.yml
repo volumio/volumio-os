@@ -1,0 +1,113 @@
+# Workflow to validate PR targets and commit message format
+
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches:
+      - '**'
+
+jobs:
+  validate-pr-target:
+    name: Validate PR Target
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR target rules
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "PR from: $HEAD_REF ($PR_HEAD_REPO)"
+          echo "PR to: $BASE_REF ($REPO)"
+
+          # Check if PR targets master
+          if [[ "$BASE_REF" == "master" ]]; then
+            # Check if PR is from a fork
+            if [[ "$PR_HEAD_REPO" != "$REPO" ]]; then
+              echo "::error::PRs to master from forks are not allowed."
+              echo "::error::Please target a feature branch (common, pi, amd64, etc.) instead."
+              echo ""
+              echo "Workflow:"
+              echo "  1. Fork -> PR -> target/feature-branch (e.g., common)"
+              echo "  2. feature-branch -> PR -> master (maintainers only)"
+              exit 1
+            fi
+            echo "PR to master from local branch - allowed (maintainer)"
+          else
+            echo "PR to feature branch - allowed"
+          fi
+
+  validate-commits:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit message format
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "Validating commit messages..."
+
+          # Allowed commit types
+          TYPES="fix|feat|docs|chore|refactor|test|build|ci|perf|revert|hotfix|emergency"
+
+          # Pattern: type: desc OR type/ desc OR type(scope): desc
+          # Allows flexible spacing around separators
+          PATTERN="^($TYPES)(\([^)]+\))?\s*[:/]\s*.+"
+
+          FAILED=0
+          COMMITS=$(git log --format="%H %s" "$BASE_SHA".."$HEAD_SHA")
+
+          if [[ -z "$COMMITS" ]]; then
+            echo "No commits to validate"
+            exit 0
+          fi
+
+          while IFS= read -r line; do
+            HASH=$(echo "$line" | cut -d' ' -f1)
+            MSG=$(echo "$line" | cut -d' ' -f2-)
+            SHORT_HASH=${HASH:0:7}
+
+            # Skip merge commits
+            if [[ "$MSG" =~ ^Merge ]]; then
+              echo "  [SKIP] $SHORT_HASH: $MSG (merge commit)"
+              continue
+            fi
+
+            if [[ "$MSG" =~ $PATTERN ]]; then
+              echo "  [OK] $SHORT_HASH: $MSG"
+            else
+              echo "  [FAIL] $SHORT_HASH: $MSG"
+              FAILED=1
+            fi
+          done <<< "$COMMITS"
+
+          if [[ $FAILED -eq 1 ]]; then
+            echo ""
+            echo "::error::Some commit messages do not follow the required format."
+            echo ""
+            echo "Required format: type[/: ]description"
+            echo "  or: type(scope)[/: ]description"
+            echo ""
+            echo "Allowed types: $TYPES"
+            echo ""
+            echo "Examples:"
+            echo "  fix: resolve boot splash rotation"
+            echo "  feat(pi): add DSI display support"
+            echo "  docs/ update CONTRIBUTING guide"
+            echo "  refactor(initramfs): simplify module loading"
+            echo "  hotfix: critical boot failure"
+            echo "  emergency: production outage fix"
+            exit 1
+          fi
+
+          echo ""
+          echo "All commit messages are valid."
