@@ -4,14 +4,13 @@ name: Check and format
 
 # Controls when the action will run.
 on:
-  # Triggers the workflow on push or pull request events for all branches
-  push:
-    branches-ignore:
-      - 'dependabot/**'
+  # Only run on pull requests - not on every push
+  # This prevents false positives from shellcheck not understanding
+  # initramfs runtime context (sourced files, preset variables)
   pull_request:
     types: [opened, synchronize, reopened]
 
-  # Allows you to run this workflow manually from the Actions tab
+  # Allows manual runs from Actions tab for testing
   workflow_dispatch:
 
 env:
