@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#
+# Git commit-msg hook to validate commit message format
+#
+# Installation:
+#   cp .github/hooks/commit-msg .git/hooks/commit-msg
+#   chmod +x .git/hooks/commit-msg
+#
+# Or use symlink:
+#   ln -sf ../../.github/hooks/commit-msg .git/hooks/commit-msg
+#
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Skip merge commits
+if [[ "$COMMIT_MSG" =~ ^Merge ]]; then
+    exit 0
+fi
+
+# Allowed commit types
+TYPES="fix|feat|docs|chore|refactor|test|build|ci|perf|revert|hotfix|emergency"
+
+# Pattern: type: desc OR type/ desc OR type(scope): desc
+# Allows flexible spacing around separators
+PATTERN="^($TYPES)(\([^)]+\))?\s*[:/]\s*.+"
+
+if [[ ! "$COMMIT_MSG" =~ $PATTERN ]]; then
+    echo ""
+    echo "ERROR: Commit message does not follow required format."
+    echo ""
+    echo "Your message: $COMMIT_MSG"
+    echo ""
+    echo "Required format: type[/: ]description"
+    echo "  or: type(scope)[/: ]description"
+    echo ""
+    echo "Allowed types: fix, feat, docs, chore, refactor, test, build, ci, perf, revert, hotfix, emergency"
+    echo ""
+    echo "Examples:"
+    echo "  fix: resolve boot splash rotation"
+    echo "  feat(pi): add DSI display support"
+    echo "  docs/ update README"
+    echo "  refactor(initramfs): simplify module loading"
+    echo ""
+    exit 1
+fi
+
+exit 0

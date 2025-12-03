@@ -12,6 +12,23 @@ To get started with contributing to Volumio, follow these steps:
 
 1. Prepare your development environment and ensure you have installed all the required packages listed in the README.md file.
 2. Fork this repository
+3. Create a feature branch from the appropriate base branch (see Branch Strategy below)
+
+### Branch Strategy
+
+The `master` branch is protected and represents the production-ready state.
+
+**For external contributors (fork workflow):**
+```
+your-fork/feature-branch -> PR -> volumio/common (or other feature branch)
+```
+
+**For maintainers (release workflow):**
+```
+volumio/common -> PR -> volumio/master
+```
+
+**Important:** PRs from forks cannot target `master` directly. Target a feature branch instead (common, pi, amd64, etc.).
 
 ### Pull Requests
 
@@ -24,38 +41,85 @@ The process described here has several goals:
 
 Please follow these steps to have your contribution considered by the maintainers:
 
-1. Follow all instructions in this template
-2. Before you submit your pull request, test your changes carefully with a full build to ensure everything works as expected.
-3. After you submit your pull request, verify that all status checks are passing (if any)
-
-### Git Flow
-
-We use Git Flow as our branching model. The `master` branch is the main branch where the source code of HEAD always reflects a production-ready state. The `dev` branch is the main branch where the source code of HEAD always reflects a state with the latest delivered development changes for the next release.
-
-When starting work on a new feature or bug, start by creating a new branch off of `dev`.
-
-```bash
-git checkout -b feature/your-feature-name
-```
-
-When finished with your changes, open a pull request targeting the `dev` branch.
+1. Follow all instructions in this guide
+2. Ensure your commits follow the commit message format (see below)
+3. Before you submit your pull request, test your changes carefully with a full build
+4. After you submit your pull request, verify that all status checks are passing
 
 ### Small Pull Requests
 
 In order to streamline the review process and make it easier for us to integrate your changes, we prefer small pull requests. This means that each pull request should contain changes related to a single feature or bug fix. If you have made multiple changes, please split them into separate pull requests.
 
-## Styleguides
+## Commit Message Format
 
-### Git Commit Messages
+All commits must follow semantic commit format. This is enforced by CI.
 
-- Use the present tense ("Add feature" not "Added feature")
-- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-- Limit the first line to 72 characters or less
-- Reference issues and pull requests liberally after the first line
+### Format
+
+```
+type: description
+type/ description
+type(scope): description
+```
+
+Spacing around the separator (`:` or `/`) is flexible.
+
+### Allowed Types
+
+| Type       | Description                                      |
+|------------|--------------------------------------------------|
+| fix        | Bug fixes                                        |
+| feat       | New features                                     |
+| docs       | Documentation changes                            |
+| chore      | Maintenance, dependencies, cleanup               |
+| refactor   | Code restructuring without behavior change       |
+| test       | Adding or updating tests                         |
+| build      | Build system, recipes, makefiles                 |
+| ci         | CI/CD configuration (GitHub Actions, etc.)       |
+| perf       | Performance improvements                         |
+| revert     | Reverting previous commits                       |
+| hotfix     | Critical production fixes (maintainers)          |
+| emergency  | Emergency fixes (maintainers)                    |
+
+### Examples
+
+```
+fix: resolve plymouth rotation on SPI displays
+feat(pi): add support for Waveshare 3.5" display
+docs/ update installation instructions
+refactor(initramfs): simplify module loading sequence
+build: update kernel version for pi recipe
+ci: fix shellcheck workflow for PRs
+perf: reduce SPI display detection time
+revert: undo breaking change in boot sequence
+hotfix: critical boot failure on Pi 5
+emergency: production boot loop fix
+```
+
+### Scopes (Optional)
+
+Scopes provide additional context. Common scopes:
+
+- `pi`, `amd64`, `common` - device/architecture specific
+- `initramfs`, `plymouth`, `build` - subsystem specific
+- `critical`, `emergency` - for override commits to master
+
+## Code Style
+
+### Shell Scripts
+
+Shell scripts are automatically checked by shellcheck and shfmt. Ensure your scripts pass these checks before submitting.
+
+Run locally:
+```bash
+shellcheck your-script.sh
+shfmt -l your-script.sh
+```
 
 ## Community
 
 You can chat with the core team on [our community](https://community.volumio.com/)
 
+## Questions?
 
-
+If you have questions about the contribution process, please open an issue or ask in the community forums.
