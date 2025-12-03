@@ -1,0 +1,19 @@
+# Shellcheck configuration for Volumio OS build system
+#
+# This build system includes initramfs scripts that run in a different
+# context than where shellcheck analyzes them. At boot time:
+# - /scripts/functions exists (provided by initramfs-tools)
+# - /scripts/volumio-functions exists (copied during build)
+# - Variables like rootmnt, BOOT, etc. are set by initramfs infrastructure
+
+# SC1090: Can't follow non-constant source
+# Reason: initramfs sources files dynamically
+disable=SC1090
+
+# SC1091: Not following sourced file (file not found)
+# Reason: /scripts/* paths exist at boot, not in repo
+disable=SC1091
+
+# SC2154: Variable referenced but not assigned
+# Reason: initramfs infrastructure sets rootmnt, BOOT, ROOT, etc.
+disable=SC2154
