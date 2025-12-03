@@ -1,6 +1,6 @@
 [Unit]
 Description=UPnP Renderer front-end to MPD
-After=syslog.target mpd.service
+After=syslog.target
 
 [Service]
 Type=simple
@@ -9,6 +9,7 @@ User=volumio
 Group=volumio
 Restart=always
 RestartSec=15s
+TimeoutStopSec=10
 TimeoutStartFailureMode=terminate
 TimeoutStopFailureMode=terminate
 
