@@ -2,15 +2,15 @@
 
 name: Check and format
 
-# Controls when the action will run. 
+# Controls when the action will run.
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ master ]
+  # Only run on pull requests - not on every push
+  # This prevents false positives from shellcheck not understanding
+  # initramfs runtime context (sourced files, preset variables)
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
 
-  # Allows you to run this workflow manually from the Actions tab
+  # Allows manual runs from Actions tab for testing
   workflow_dispatch:
 
 env:
@@ -18,7 +18,7 @@ env:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
+  # This workflow contains a single job called "check"
   check:
     # The type of runner that the job will run on
     runs-on: ubuntu-22.04
@@ -26,12 +26,12 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       # Run our action
-      - name: Checker and formatter 
+      - name: Checker and formatter
         uses: ./.github/actions
         with:
-         only_changed: 'true'
-         exclude: ./.github*
-
-
+          only_changed: 'true'
+          exclude: ./.github*
