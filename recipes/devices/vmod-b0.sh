@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-## Setup for Radxa Rock Pi 4B
-DEVICE_SUPPORT_TYPE="S" # First letter (Community Porting|Supported Officially|OEM)
+## Setup for Volumio VMOD-B0 Module
+DEVICE_SUPPORT_TYPE="O" # First letter (Community Porting|Supported Officially|OEM)
 DEVICE_STATUS="P"       # First letter (Planned|Test|Maintenance)
 
 # Base system
@@ -11,13 +11,16 @@ ARCH="armhf"
 BUILD="armv7"
 UINITRD_ARCH="arm64"
 
+### Build image with initramfs debug info?
+DEBUG_IMAGE="no" # yes/no or empty.
+
 ### Device information
-DEVICENAME="RockPi 4B"
+DEVICENAME="VMOD-B0"
 # This is useful for multiple devices sharing the same/similar kernel
-DEVICEFAMILY="rock4"
+DEVICEFAMILY="vmod"
 # tarball from DEVICEFAMILY repo to use
 #DEVICEBASE=${DEVICE} # Defaults to ${DEVICE} if unset
-DEVICEREPO="https://github.com/volumio/platform-${DEVICEFAMILY}.git"
+DEVICEREPO="https://github.com/Darmur/platform-${DEVICEFAMILY}.git"
 
 ### What features do we want to target
 # TODO: Not fully implement
@@ -29,8 +32,6 @@ KIOSKBROWSER=vivaldi
 
 # Plymouth theme
 PLYMOUTH_THEME="volumio-adaptive"
-# Debug image
-DEBUG_IMAGE=no
 
 ## Partition info
 BOOT_START=17
@@ -53,16 +54,11 @@ write_device_files() {
   cp -dR "${PLTDIR}/${DEVICE}/boot" "${ROOTFSMNT}"
   cp -pdR "${PLTDIR}/${DEVICE}/lib/modules" "${ROOTFSMNT}/lib"
   cp -pdR "${PLTDIR}/${DEVICE}/lib/firmware" "${ROOTFSMNT}/lib"
-
-  log "Add asound.conf for onboard DAC settings" "ext"
-  mkdir -p "${ROOTFSMNT}/var/lib/alsa"
-  cp "${PLTDIR}/${DEVICE}/var/lib/alsa/asound.state" "${ROOTFSMNT}/var/lib/alsa/asound.state"
 }
 
 write_device_bootloader() {
   log "Running write_device_bootloader" "ext"
-  dd if="${PLTDIR}/${DEVICE}/u-boot/idbloader.img" of="${LOOP_DEV}" seek=64 conv=notrunc status=none
-  dd if="${PLTDIR}/${DEVICE}/u-boot/u-boot.itb" of="${LOOP_DEV}" seek=16384 conv=notrunc status=none
+  dd if="${PLTDIR}/${DEVICE}/u-boot/u-boot-rockchip.bin" of="${LOOP_DEV}" bs=32k seek=1 conv=notrunc status=none
 }
 
 # Will be called by the image builder for any customisation
@@ -79,14 +75,12 @@ device_chroot_tweaks() {
 # Will be run in chroot - Pre initramfs
 device_chroot_tweaks_pre() {
   log "Performing device_chroot_tweaks_pre" "ext"
-
   log "Fixing armv8 deprecated instruction emulation with armv7 rootfs"
   cat <<-EOF >>/etc/sysctl.conf
 abi.cp15_barrier=2
 EOF
 
-  log "Configure kernel cmdline parameters" "cfg"
-
+  log "Creating boot parameters from template"
   sed -i "s/rootdev=UUID=/rootdev=UUID=${UUID_BOOT}/g" /boot/armbianEnv.txt
   sed -i "s/imgpart=UUID=/imgpart=UUID=${UUID_IMG}/g" /boot/armbianEnv.txt
   sed -i "s/bootpart=UUID=/bootpart=UUID=${UUID_BOOT}/g" /boot/armbianEnv.txt
@@ -116,6 +110,9 @@ EOF
   cat <<-EOF >/etc/udev/rules.d/99-gpio.rules
 	SUBSYSTEM=="gpio*", PROGRAM="/bin/sh -c 'find -L /sys/class/gpio/ -maxdepth 2 -exec chown root:gpio {} \; -exec chmod 770 {} \; || true'"
 	EOF
+
+  log "Fix for Volumio Remote updater"
+  sed -i '10i\RestartSec=5' /lib/systemd/system/volumio-remote-updater.service
 }
 
 # Will be run in chroot - Post initramfs
