@@ -17,3 +17,8 @@ disable=SC1091
 # SC2154: Variable referenced but not assigned
 # Reason: initramfs infrastructure sets rootmnt, BOOT, ROOT, etc.
 disable=SC2154
+
+# SC2295: Expansions inside ${..} need to be quoted separately
+# Reason: Build system variables (SRC, etc.) are controlled paths
+# without glob characters - pattern matching is not a concern
+disable=SC2295
