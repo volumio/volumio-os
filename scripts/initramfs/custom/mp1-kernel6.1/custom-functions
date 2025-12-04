@@ -15,7 +15,7 @@ post_kernel_update() {
     BOOTDEV=$(lsblk -ndo pkname ${BOOTPART})
     if [ "${OLDKERNEL}" != "${NEWKERNEL}" ]; then
       log_end_msg
-      log_begin_msg "Major kernel change V4 -> V6, replacing u-boot""
+      log_begin_msg "Major kernel change V4 -> V6, replacing u-boot"
       echo "[VIM3L] Kernel change, replacing u-boot" >> ${BOOTMNT}/kernelupdate.log
 
       echo "[VIM3L] Write u-boot to ${BOOTDEV}" >> ${BOOTMNT}/kernelupdate.log
