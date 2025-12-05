@@ -266,14 +266,71 @@ log "Prepare external source lists"
 log "Attempting to install Node version: ${NODE_VERSION}"
 IFS=\. read -ra NODE_SEMVER <<<"${NODE_VERSION}"
 NODE_APT=node_${NODE_SEMVER[0]}.x
-log "Adding NodeJs lists - ${NODE_APT}"
-cat <<-EOF >/etc/apt/sources.list.d/nodesource.list
-deb https://deb.nodesource.com/${NODE_APT} ${DISTRO_NAME} main
-deb-src https://deb.nodesource.com/${NODE_APT} ${DISTRO_NAME} main
-EOF
 
-apt-get update
-apt-get -y install ${packages}
+install_node_nodesource() {
+  log "Configuring NodeSource repository (nodistro format)" "info"
+  cat <<-EOF >/etc/apt/sources.list.d/nodesource.list
+deb [signed-by=/etc/apt/trusted.gpg.d/nodesource.gpg] https://deb.nodesource.com/${NODE_APT} nodistro main
+EOF
+  apt-get update
+  log "Attempting to install nodejs=${NODE_VERSION}* from NodeSource" "info"
+  if apt-get -y install "nodejs=${NODE_VERSION}*"; then
+    return 0
+  else
+    log "NodeSource does not have nodejs ${NODE_VERSION} available" "wrn"
+    return 1
+  fi
+}
+
+install_node_static() {
+  log "Attempting static package from Volumio repository" "info"
+  local pkg_url="${NODE_STATIC_REPO}/nodejs_${NODE_VERSION}-1custom_${VOLUMIO_ARCH}.deb"
+  local tmp_deb="/tmp/nodejs_static.deb"
+  log "Fetching: ${pkg_url}" "info"
+  if wget -nv -O "${tmp_deb}" "${pkg_url}"; then
+    if dpkg -i "${tmp_deb}"; then
+      rm -f "${tmp_deb}"
+      return 0
+    else
+      log "Failed to install static Node.js package" "err"
+      rm -f "${tmp_deb}"
+      return 1
+    fi
+  else
+    log "Failed to download static Node.js package" "err"
+    return 1
+  fi
+}
+
+validate_node_version() {
+  if ! command -v node &>/dev/null; then
+    log "Node.js binary not found after installation" "err"
+    return 1
+  fi
+  local installed_version
+  installed_version=$(node --version | tr -d 'v')
+  if [[ "${installed_version}" != "${NODE_VERSION}" ]]; then
+    log "Node.js version mismatch - Required: ${NODE_VERSION}, Installed: ${installed_version}" "err"
+    return 1
+  fi
+  log "Node.js version validated: ${installed_version}" "okay"
+  return 0
+}
+
+# Tiered installation: NodeSource (exact version) -> Static -> Fail
+if ! install_node_nodesource; then
+  log "NodeSource installation failed, attempting static package" "wrn"
+  if ! install_node_static; then
+    log "FATAL: All Node.js installation methods failed" "err"
+    exit 10
+  fi
+fi
+
+# Validate exact version
+if ! validate_node_version; then
+  log "FATAL: Node.js version validation failed" "err"
+  exit 11
+fi
 
 log "Node $(node --version) arm_version: $(node <<<'console.log(process.config.variables.arm_version)')" "info"
 log "nodejs installed at $(command -v node)" "info"
