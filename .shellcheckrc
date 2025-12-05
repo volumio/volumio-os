@@ -14,6 +14,31 @@ disable=SC1090
 # Reason: /scripts/* paths exist at boot, not in repo
 disable=SC1091
 
+# SC2016: Expressions don't expand in single quotes
+# Reason: Intentional literal string replacement in sed commands
+disable=SC2016
+
+# SC2034: Variable appears unused
+# Reason: Variables like 'packages' are used externally by build system
+disable=SC2034
+
+# SC2035: Use ./*glob* so names with dashes won't become options
+# Reason: Controlled directory context in build scripts
+disable=SC2035
+
 # SC2154: Variable referenced but not assigned
 # Reason: initramfs infrastructure sets rootmnt, BOOT, ROOT, etc.
 disable=SC2154
+
+# SC2164: Use 'cd ... || exit' in case cd fails
+# Reason: Build system context handles failures at higher level
+disable=SC2164
+
+# SC2231: Quote expansions in for loop glob
+# Reason: Intentional glob expansion for kernel module directories
+disable=SC2231
+
+# SC2295: Expansions inside ${..} need to be quoted separately
+# Reason: Build system variables (SRC, etc.) are controlled paths
+# without glob characters - pattern matching is not a concern
+disable=SC2295
