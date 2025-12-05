@@ -230,6 +230,19 @@ else
   rm -rf "${PATCH}" /patch
 fi
 
+# Validate Node.js version after device tweaks (pi.sh may have replaced it)
+log "Checking Node.js version after device tweaks" "info"
+if ! command -v node &>/dev/null; then
+  log "FATAL: Node.js binary not found" "err"
+  exit 10
+fi
+INSTALLED_NODE_VERSION=$(node --version | tr -d 'v')
+if [[ "${INSTALLED_NODE_VERSION}" != "${NODE_VERSION}" ]]; then
+  log "FATAL: Node.js version mismatch - Required: ${NODE_VERSION}, Found: ${INSTALLED_NODE_VERSION}" "err"
+  exit 11
+fi
+log "Node.js version validated: ${INSTALLED_NODE_VERSION}" "okay"
+
 # #mke2fsfull is used since busybox mke2fs does not include ext4 support
 cp -rp /sbin/mke2fs /sbin/mke2fsfull
 

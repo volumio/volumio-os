@@ -285,19 +285,24 @@ device_chroot_tweaks_pre() {
 
 	### Other Rpi specific stuff
 	## Lets update some packages from raspbian repos now
+	log "Blocking nodejs upgrades for ${NODE_VERSION}" "info"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/nodejs"
+		Package: nodejs
+		Pin: release *
+		Pin-Priority: -1
+	EOF
 	apt-get update && apt-get -y upgrade
 
 	# https://github.com/volumio/volumio3-os/issues/174
 	## Quick fix for dhcpcd in Raspbian vs Debian
 	log "Raspbian vs Debian dhcpcd debug "
 	apt-get remove dhcpcd -yy && apt-get autoremove
-	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
-	# wget -nv http://ftp.debian.org/debian/pool/main/d/dhcpcd5/dhcpcd_9.4.1-24~deb12u4_all.deb
+
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd_9.4.1-24~deb12u4_all.deb
 	wget -nv https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/dhcpcd/dhcpcd-base_9.4.1-24~deb12u4_armhf.deb
 	dpkg -i dhcpcd*.deb && rm -rf dhcpcd*.deb
 
-	log "Blocking dhcpcd upgrades for ${NODE_VERSION}" "info"
+	log "Blocking dhcpcd upgrades for 9.4.1" "info"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/dhcpcd"
 		Package: dhcpcd
 		Pin: release *
@@ -312,41 +317,32 @@ device_chroot_tweaks_pre() {
 	wget -nv https://github.com/WiringPi/WiringPi/releases/download/3.10/wiringpi_3.10_armhf.deb
 	dpkg -i wiringpi_3.10_armhf.deb && rm wiringpi_3.10_armhf.deb
 
-	NODE_VERSION=$(node --version)
-	log "Node version installed:" "dbg" "${NODE_VERSION}"
-	# drop the leading v
-	NODE_VERSION=${NODE_VERSION:1}
-	if [[ ${USE_NODE_ARMV6:-yes} == yes && ${NODE_VERSION%%.*} -ge 8 ]]; then
-		log "Using a compatible nodejs version for all pi images" "info"
-		# We don't know in advance what version is in the repo, so we have to hard code it.
-		# This is temporary fix - make this smarter!
+	CURRENT_NODE=$(node --version | tr -d 'v')
+	log "Node version installed:" "dbg" "${CURRENT_NODE}"
+	log "Node version required:" "dbg" "${NODE_VERSION}"
+	if [[ ${USE_NODE_ARMV6:-yes} == yes && ${CURRENT_NODE%%.*} -ge 8 ]]; then
+		log "Replacing with armv6-compatible nodejs ${NODE_VERSION}" "info"
 		declare -A NodeVersion=(
-			[14]="https://repo.volumio.org/Volumio2/nodejs_14.15.4-1unofficial_armv6l.deb"
-			[8]="https://repo.volumio.org/Volumio2/nodejs_8.17.0-1unofficial_armv6l.deb"
+			[20]="${NODE_STATIC_REPO}/nodejs_${NODE_VERSION}-1custom_arm.deb"
 		)
-		# TODO: Warn and proceed or exit the build?
-		local arch=armv6l
-		wget -nv "${NodeVersion[${NODE_VERSION%%.*}]}" -P /volumio/customNode || log "Failed fetching Nodejs for armv6!!" "wrn"
+		mkdir -p /volumio/customNode
+		wget -nv "${NodeVersion[${NODE_VERSION%%.*}]}" -P /volumio/customNode || {
+			log "Failed fetching nodejs ${NODE_VERSION} for arm" "err"
+			exit 10
+		}
 		# Proceed only if there is a deb to install
-		if compgen -G "/volumio/customNode/nodejs_*-1unofficial_${arch}.deb" >/dev/null; then
+		if compgen -G "/volumio/customNode/nodejs_*.deb" >/dev/null; then
 			# Get rid of armv7 nodejs and pick up the armv6l version
 			if dpkg -s nodejs &>/dev/null; then
 				log "Removing previous nodejs installation from $(command -v node)" "info"
 				log "Removing Node $(node --version) arm_version: $(node <<<'console.log(process.config.variables.arm_version)')" "info"
 				apt-get -y purge nodejs
 			fi
-			log "Installing Node for ${arch}" "info"
-			dpkg -i /volumio/customNode/nodejs_*-1unofficial_${arch}.deb
+			log "Installing Node ${NODE_VERSION} for arm" "info"
+			dpkg -i /volumio/customNode/nodejs_*.deb
 			log "Installed Node $(node --version) arm_version: $(node <<<'console.log(process.config.variables.arm_version)')" "info"
 			rm -rf /volumio/customNode
 		fi
-		# Block upgrade of nodejs from raspi repos
-		log "Blocking nodejs upgrades for ${NODE_VERSION}" "info"
-		cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/nodejs"
-			Package: nodejs
-			Pin: release *
-			Pin-Priority: -1
-		EOF
 	fi
 
 	log "Adding gpio & spi group and permissions" "info"
