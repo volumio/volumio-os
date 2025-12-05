@@ -3,7 +3,7 @@
 
 declare -A SecureApt=(
   [debian_12.gpg]="https://ftp-master.debian.org/keys/archive-key-12.asc"
-  [nodesource.gpg]="https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+  [nodesource.gpg]="https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key"
   [lesbonscomptes.gpg]="https://www.lesbonscomptes.com/pages/lesbonscomptes.gpg"
   #TODO Not needed for arm64 and x86
   [raspbian.gpg]="https://archive.raspbian.org/raspbian.public.key"
@@ -49,9 +49,12 @@ VOL_BE_REPO_BRANCH="master"
 # Semver is only used w.t.r modules fetched from repo,
 # actual node version installs only respects the current major versions (Major.x)
 NODE_VERSION=20.5.1
+NODE_VERSION_MAJOR="${NODE_VERSION%%.*}"
 # Used to pull the right version of modules
 # expected format node_modules_{arm/x86}-v${NODE_VERSION}.tar.gz
 NODE_MODULES_REPO="https://github.com/volumio/volumio3-os-static-assets/raw/master/node_modules"
+# Static Node.js packages (fallback if NodeSource unavailable)
+NODE_STATIC_REPO="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/nodejs"
 
 ## 
 # Array of custom ALSA plugins
@@ -63,4 +66,4 @@ declare -A ALSA_PLUGINS=(
   [volumiofifo]="https://github.com/volumio/volumio-alsa-fifo/releases/download/volumiofifo-1.0.1/"
 )
 
-export SecureApt APTSOURCE VOLBINSREPO VOLBINS VOL_BE_REPO VOL_BE_REPO_BRANCH VOL_BE_REPO_SHA NODE_VERSION NODE_MODULES_REPO CUSTOM_PKGS ALSA_PLUGINS
+export SecureApt APTSOURCE VOLBINSREPO VOLBINS VOL_BE_REPO VOL_BE_REPO_BRANCH VOL_BE_REPO_SHA NODE_VERSION NODE_VERSION_MAJOR NODE_MODULES_REPO NODE_STATIC_REPO CUSTOM_PKGS ALSA_PLUGINS
