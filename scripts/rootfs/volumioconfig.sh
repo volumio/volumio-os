@@ -199,7 +199,7 @@ volumio ALL=(ALL) NOPASSWD: /usr/local/bin/x86Installer.sh,/usr/local/bin/PiInst
 EOF
 chmod 0440 ${SUDOERS_FILE}
 
-# Fix qmeu 64 bit host issues for 32bit binaries on buster
+# Fix qmeu 64 bit host issues for 32bit binaries
 # TODO: This is just one manifestation of the underlying error,
 # probably safer to use 32bit qmeu
 log "Testing for SSL issues" "dbg"
