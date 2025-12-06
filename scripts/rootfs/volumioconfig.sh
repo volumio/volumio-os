@@ -269,8 +269,11 @@ NODE_APT=node_${NODE_SEMVER[0]}.x
 
 install_node_nodesource() {
   log "Configuring NodeSource repository (nodistro format)" "info"
+  local arch_opt=""
+  # Prevent i386 package lookup on x64 systems
+  [[ "${VOLUMIO_ARCH}" == "x86" ]] && arch_opt="arch=amd64 "
   cat <<-EOF >/etc/apt/sources.list.d/nodesource.list
-deb [signed-by=/etc/apt/trusted.gpg.d/nodesource.gpg] https://deb.nodesource.com/${NODE_APT} nodistro main
+deb [${arch_opt}signed-by=/etc/apt/trusted.gpg.d/nodesource.gpg] https://deb.nodesource.com/${NODE_APT} nodistro main
 EOF
   apt-get update
   log "Attempting to install nodejs=${NODE_VERSION}* from NodeSource" "info"
