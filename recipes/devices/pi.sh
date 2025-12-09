@@ -716,8 +716,6 @@ device_chroot_tweaks_pre() {
 	kernel_params+=("console=serial0,115200" "console=tty1")
 	# Image params
 	kernel_params+=("imgpart=UUID=${UUID_IMG} imgfile=/volumio_current.sqsh bootpart=UUID=${UUID_BOOT} datapart=UUID=${UUID_DATA} uuidconfig=cmdline.txt")
-	# A quirk of Linux on ARM that may result in suboptimal performance
-	kernel_params+=("pcie_aspm=off" "pci=pcie_bus_safe")
 	# Wait for root device
 	kernel_params+=("rootwait" "bootdelay=7")
 	# Disable linux logo during boot
@@ -725,11 +723,11 @@ device_chroot_tweaks_pre() {
 	# Disable cursor
 	kernel_params+=("vt.global_cursor_default=0")
 
-	# Buster tweaks
+	# System OS tweaks
 	DISABLE_PN="net.ifnames=0"
 	kernel_params+=("${DISABLE_PN}")
 	# ALSA tweaks
-	kernel_params+=("snd-bcm2835.enable_compat_alsa=${compat_alsa}" "snd_bcm2835.enable_hdmi=1" "snd_bcm2835.enable_headphones=1")
+	kernel_params+=("snd_bcm2835.enable_hdmi=1" "snd_bcm2835.enable_headphones=1")
 
 	# Further debug changes
 	if [[ $DEBUG_IMAGE == yes ]]; then

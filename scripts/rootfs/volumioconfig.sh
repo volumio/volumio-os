@@ -199,7 +199,7 @@ volumio ALL=(ALL) NOPASSWD: /usr/local/bin/x86Installer.sh,/usr/local/bin/PiInst
 EOF
 chmod 0440 ${SUDOERS_FILE}
 
-# Fix qmeu 64 bit host issues for 32bit binaries on buster
+# Fix qmeu 64 bit host issues for 32bit binaries
 # TODO: This is just one manifestation of the underlying error,
 # probably safer to use 32bit qmeu
 log "Testing for SSL issues" "dbg"
@@ -269,8 +269,11 @@ NODE_APT=node_${NODE_SEMVER[0]}.x
 
 install_node_nodesource() {
   log "Configuring NodeSource repository (nodistro format)" "info"
+  local arch_opt=""
+  # Prevent i386 package lookup on x64 systems
+  [[ "${VOLUMIO_ARCH}" == "x86" ]] && arch_opt="arch=amd64 "
   cat <<-EOF >/etc/apt/sources.list.d/nodesource.list
-deb [signed-by=/etc/apt/trusted.gpg.d/nodesource.gpg] https://deb.nodesource.com/${NODE_APT} nodistro main
+deb [${arch_opt}signed-by=/etc/apt/trusted.gpg.d/nodesource.gpg] https://deb.nodesource.com/${NODE_APT} nodistro main
 EOF
   apt-get update
   log "Attempting to install nodejs=${NODE_VERSION}* from NodeSource" "info"
