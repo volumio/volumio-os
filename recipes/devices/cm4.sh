@@ -506,7 +506,7 @@ device_chroot_tweaks_pre() {
 	# Disable cursor
 	kernel_params+=("vt.global_cursor_default=0")
 
-	# Buster tweaks
+	# System OS tweaks
 	DISABLE_PN="net.ifnames=0"
 	kernel_params+=("${DISABLE_PN}")
 	# ALSA tweaks

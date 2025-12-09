@@ -157,7 +157,7 @@ device_chroot_tweaks_pre() {
   dpkg -i firmware-realtek_20210818-1_all.deb
   rm firmware-realtek_20210818-1_all.deb
 
-  # Thsis needs to be MOST for buster
+  # Thsis needs to be MOST for full depmod support
   #log "Changing to 'modules=dep'"
   #sed -i "s/MODULES=most/MODULES=dep/g" /etc/initramfs-tools/initramfs.conf
 }
