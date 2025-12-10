@@ -10,59 +10,104 @@ Following these guidelines helps to communicate that you respect the time of the
 
 To get started with contributing to Volumio, follow these steps:
 
-1. Prepare your development environment and ensure you have installed all the required packages listed in the README.md file.
-2. Fork this repository
-3. Create a feature branch from the appropriate base branch (see Branch Strategy below)
+1. Prepare your development environment and ensure you have installed all the required packages listed in the README.md file
+2. Fork this repository (if you're an external contributor)
+3. Create a feature branch from `master` using the naming convention below
 
-### Branch Strategy
+### Our Workflow
 
-The `master` branch is protected and represents the production-ready state.
+We keep things simple and effective. The `master` branch is our main branch where the source code always reflects a production-ready state. All contributions follow this workflow:
 
-**For external contributors (fork workflow):**
+1. **Create a branch** from `master` using the naming convention below
+2. **Make your changes** and commit them following our commit message format
+3. **Test thoroughly** - testing is mandatory before submitting
+4. **Open a Pull Request** to `master`
+5. **Get approval** - one person with write access must review and approve your PR
+6. **Merge** once approved and all checks pass
+
+### Branch Protection
+
+The `master` branch is protected and requires **1 approval** from a team member with write access before any PR can be merged.
+
+### Branch Naming Convention
+
+When starting work on a new feature or bug fix, create a new branch from `master`:
+
+```bash
+git checkout master
+git pull origin master
+git checkout -b feature/your-feature-name
 ```
-your-fork/feature-branch -> PR -> volumio/common (or other feature branch)
-```
 
-**For maintainers (release workflow):**
-```
-volumio/common -> PR -> volumio/master
-```
+Use one of these prefixes:
 
-**Important:** PRs from forks cannot target `master` directly. Target a feature branch instead (common, pi, amd64, etc.).
+- `feature/your-feature-name` - New features
+- `fix/issue-description` - Bug fixes
+- `hotfix/critical-issue` - Urgent production fixes
+- `refactor/what-you-refactored` - Code refactoring
+- `docs/what-you-documented` - Documentation updates
+- `build/build-changes` - Build system changes
+- `perf/performance-improvement` - Performance improvements
+
+**Examples:**
+- `fix/dlna-discovery-race-condition`
+- `hotfix/boot-failure-pi5`
+- `docs/update-installation-guide`
 
 ### Pull Requests
 
-The process described here has several goals:
+#### Keep PRs Small and Focused
 
-- Maintain Volumio's quality
-- Fix problems that are important to users
-- Engage the community in working toward the best possible Volumio
-- Enable a sustainable system for Volumio's maintainers to review contributions
+In order to streamline the review process and make it easier for maintainers to integrate your changes, we strongly prefer **small, focused pull requests**. This means:
 
-Please follow these steps to have your contribution considered by the maintainers:
+- Each pull request should contain changes related to a **single feature or bug fix**
+- Keep code changes **minimal and focused** on the specific issue
+- If you have made multiple unrelated changes, please **split them into separate pull requests**
+- Avoid mixing refactoring with feature work or bug fixes
 
-1. Follow all instructions in this guide
-2. Ensure your commits follow the commit message format (see below)
-3. Before you submit your pull request, test your changes carefully with a full build
-4. After you submit your pull request, verify that all status checks are passing
+Small PRs are:
+- Easier to review
+- Less likely to introduce bugs
+- Faster to get merged
+- Easier to revert if needed
 
-### Small Pull Requests
+**This makes maintainers' lives much easier and your contributions will be appreciated even more!**
 
-In order to streamline the review process and make it easier for us to integrate your changes, we prefer small pull requests. This means that each pull request should contain changes related to a single feature or bug fix. If you have made multiple changes, please split them into separate pull requests.
+#### Include Test Reports
+
+**Test reports will get your PR merged faster!** When you submit your pull request, include details about how you tested your changes:
+
+- What hardware/configuration you tested on
+- Steps you took to verify the fix/feature works
+- Any edge cases you tested
+- Screenshots or logs if applicable
+
+Example:
+```
+Tested on:
+- Raspberry Pi 4 with HiFiBerry DAC
+- Volumio 3.5
+- Verified DLNA discovery works after network reconnect
+- Tested with both WiFi and Ethernet
+```
+
+#### Before Submitting
+
+Please ensure:
+
+1. Your commits follow the commit message format (see below)
+2. You've tested your changes thoroughly with a full build
+3. You've included a test report in your PR description
 
 ## Commit Message Format
 
-All commits must follow semantic commit format. This is enforced by CI.
+All commits must follow semantic commit format.
 
 ### Format
 
 ```
 type: description
-type/ description
-type(scope): description
 ```
-
-Spacing around the separator (`:` or `/`) is flexible.
 
 ### Allowed Types
 
@@ -75,40 +120,26 @@ Spacing around the separator (`:` or `/`) is flexible.
 | refactor   | Code restructuring without behavior change       |
 | test       | Adding or updating tests                         |
 | build      | Build system, recipes, makefiles                 |
-| ci         | CI/CD configuration (GitHub Actions, etc.)       |
+| ci         | CI/CD configuration                              |
 | perf       | Performance improvements                         |
 | revert     | Reverting previous commits                       |
-| hotfix     | Critical production fixes (maintainers)          |
-| emergency  | Emergency fixes (maintainers)                    |
+| hotfix     | Critical production fixes                        |
 
 ### Examples
 
 ```
 fix: resolve plymouth rotation on SPI displays
-feat(pi): add support for Waveshare 3.5" display
-docs/ update installation instructions
-refactor(initramfs): simplify module loading sequence
+feat: add support for Waveshare 3.5" display
+docs: update installation instructions
+refactor: simplify module loading sequence
 build: update kernel version for pi recipe
-ci: fix shellcheck workflow for PRs
 perf: reduce SPI display detection time
-revert: undo breaking change in boot sequence
 hotfix: critical boot failure on Pi 5
-emergency: production boot loop fix
 ```
-
-### Scopes (Optional)
-
-Scopes provide additional context. Common scopes:
-
-- `pi`, `amd64`, `common` - device/architecture specific
-- `initramfs`, `plymouth`, `build` - subsystem specific
-- `critical`, `emergency` - for override commits to master
-
-## Code Style
 
 ### Shell Scripts
 
-Shell scripts are automatically checked by shellcheck and shfmt. Ensure your scripts pass these checks before submitting.
+Shell scripts are automatically checked by `shellcheck` and `shfmt`. Ensure your scripts pass these checks before submitting.
 
 Run locally:
 ```bash
@@ -118,8 +149,17 @@ shfmt -l your-script.sh
 
 ## Community
 
-You can chat with the core team on [our community](https://community.volumio.com/)
+You can chat with the core team and other contributors on [our community forums](https://community.volumio.com/).
 
 ## Questions?
 
-If you have questions about the contribution process, please open an issue or ask in the community forums.
+If you have questions about the contribution process, please open an issue or ask in the community forums. We're here to help!
+
+## Intellectual Property
+
+By contributing to this project, you agree to assign all intellectual property rights of your contribution to **Volumio SRL**. This includes, but is not limited to, any code, documentation, designs, or other materials you submit via pull requests, issues, or any other means.
+This assignment allows Volumio SRL to maintain, distribute, and license the project effectively while ensuring the project can continue to grow and evolve.
+If you have any questions or concerns about this policy, please contact us before submitting your contribution.
+
+
+Thank you for contributing to Volumio!
