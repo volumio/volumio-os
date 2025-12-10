@@ -4,10 +4,10 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // Maintainer: Just a Nerd
-// Volumio Wireless Daemon - Version 4.0-rc3
+// Volumio Wireless Daemon - Version 4.0-rc4
 // Maintainer: Development Team
 // 
-// RELEASE CANDIDATE 3 - DHCP Reconnection Fix
+// RELEASE CANDIDATE 4 - Hotspot Startup Fix
 // 
 // Major Changes in v4.0:
 // - Single Network Mode (SNM) with ethernet/WiFi coordination
@@ -23,7 +23,14 @@
 // - Fixes WiFi reconnection failure causing hotspot fallback
 // - Fixed regdomain log output showing on two lines (cosmetic)
 //
-// Production release: v4.0-rc3
+// RC4 Changes (Hotspot Startup Fix):
+// - Wait for hostapd initialization before signaling service ready
+// - Prevents service restart loop killing hotspot on first boot
+// - Critical fix for Pi Zero 2W and fresh installs without ethernet
+// - Add INFO-level logging for hotspot startup (not just DEBUG)
+// - Monitor hostapd readiness signals (AP-ENABLED)
+//
+// Production release: v4.0-rc4
 //===================================================================
 
 // ===================================================================
@@ -35,6 +42,7 @@ var settleTime = 3000;
 var totalSecondsForConnection = 30;
 var pollingTime = 1;
 var hostapdExitDelay = 500; // Delay after hostapd exits before IP notification (ms)
+var HOSTAPD_STARTUP_WAIT = 5000; // Wait time for hostapd to initialize before callback (ms)
 
 // ===================================================================
 // TIMEOUT CONSTANTS - Single source of truth for all timeout values
@@ -370,6 +378,7 @@ function startHotspot(callback) {
                 if (callback) callback();
             });
         } else {
+            loggerInfo('Starting emergency hotspot for initial system access');
             launch(ifconfigHotspot, "confighotspot", true, function(err) {
                 loggerDebug("ifconfig " + err);
                 
@@ -379,21 +388,51 @@ function startHotspot(callback) {
                 if (all.length > 0) {
                     all.splice(0, 1);
                 }
-                loggerDebug("launching " + process + " args: ");
-                loggerDebug(all);
+                loggerInfo("Launching hostapd: " + process);
+                loggerDebug("hostapd args: " + all.join(' '));
                 
                 var hostapdChild = thus.spawn(process, all, {});
+                var callbackFired = false;
+                var hostapdReady = false;
+                
+                // Fire callback to ensure flow continues
+                var fireCallback = function(reason) {
+                    if (!callbackFired) {
+                        callbackFired = true;
+                        if (hostapdReady) {
+                            loggerInfo("Hotspot initialized successfully (" + reason + ")");
+                        } else {
+                            loggerInfo("Hotspot startup continuing (" + reason + ")");
+                        }
+                        updateNetworkState("hotspot");
+                        if (callback) callback();
+                    }
+                };
                 
                 hostapdChild.stdout.on('data', function(data) {
-                    loggerDebug("hotspot stdout: " + data);
+                    var output = data.toString();
+                    loggerDebug("hotspot stdout: " + output);
+                    
+                    // Check for readiness indicators
+                    if (output.includes('AP-ENABLED') || output.includes('Setup of interface done')) {
+                        hostapdReady = true;
+                        loggerInfo("Hotspot AP enabled and ready");
+                        fireCallback('AP ready signal');
+                    }
                 });
                 
                 hostapdChild.stderr.on('data', function(data) {
-                    loggerDebug("hotspot stderr: " + data);
+                    var output = data.toString();
+                    // Promote critical errors to INFO level
+                    if (output.includes('error') || output.includes('failed') || output.includes('Could not')) {
+                        loggerInfo("hotspot stderr: " + output.trim());
+                    } else {
+                        loggerDebug("hotspot stderr: " + output);
+                    }
                 });
                 
                 hostapdChild.on('close', function(code) {
-                    loggerDebug("hotspotchild process exited with code " + code);
+                    loggerInfo("hostapd process exited with code " + code);
                     
                     // Trigger ip-changed AFTER hostapd actually completes
                     setTimeout(function() {
@@ -406,9 +445,17 @@ function startHotspot(callback) {
                     }, hostapdExitDelay);
                 });
                 
-                // Continue with immediate callback for flow control
-                updateNetworkState("hotspot");
-                if (callback) callback();
+                hostapdChild.on('error', function(err) {
+                    loggerInfo("hostapd spawn error: " + err);
+                    fireCallback('spawn error');
+                });
+                
+                // FIX v4.0-rc4: Wait for hostapd to initialize before callback
+                // This prevents service restart loop on first boot when hotspot is needed
+                // Timeout ensures we don't block forever if hostapd doesn't send ready signal
+                setTimeout(function() {
+                    fireCallback('timeout');
+                }, HOSTAPD_STARTUP_WAIT);
             });
         }
     });
