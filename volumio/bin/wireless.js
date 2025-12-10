@@ -4,10 +4,10 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // Maintainer: Just a Nerd
-// Volumio Wireless Daemon - Version 4.0-rc5
+// Volumio Wireless Daemon - Version 4.0-rc4
 // Maintainer: Development Team
 // 
-// RELEASE CANDIDATE 5 - Hotspot Startup Race Fix
+// RELEASE CANDIDATE 4 - Cold Interface Hotspot Fix
 // 
 // Major Changes in v4.0:
 // - Single Network Mode (SNM) with ethernet/WiFi coordination
@@ -16,15 +16,11 @@
 // - Fixed deadlock and infinite loop issues
 // - Enhanced logging and diagnostics
 //
-// RC5 Changes (Hotspot Startup Race Fix):
-// - Wait for hostapd to initialize before checking is-active status
-// - Fixes race where status check ran before hostapd finished starting
-// - Prevents unnecessary retry loop killing working hotspot
-//
-// RC4 Changes (First Boot Hotspot Fix):
-// - Use verified hotspot start on first boot (startHotspotFallbackSafe)
-// - Fixes hotspot not appearing on fresh install without ethernet
-// - Plain startHotspot() did not verify hostapd actually started
+// RC4 Changes (Cold Interface Hotspot Fix):
+// - Split interface UP from IP assignment for cold interface compatibility
+// - Fixes hotspot not starting on fresh install (Bookworm)
+// - ifconfig wlan0 192.168.211.1 up fails silently on uninitialized interface
+// - Now: ifconfig wlan0 up, then ip addr add 192.168.211.1/24
 //
 // RC3 Changes (DHCP Reconnection Fix):
 // - Release DHCP lease before ethernet transition (prevents stale lease)
@@ -33,7 +29,7 @@
 // - Fixes WiFi reconnection failure causing hotspot fallback
 // - Fixed regdomain log output showing on two lines (cosmetic)
 //
-// Production release: v4.0-rc5
+// Production release: v4.0-rc4
 //===================================================================
 
 // ===================================================================
@@ -58,7 +54,6 @@ var RECONNECT_WAIT = 3000;          // Wait for wpa_supplicant association (3s)
 var USB_SETTLE_WAIT = 2000;         // USB WiFi adapter settle time (2s)
 var HOTSPOT_RETRY_DELAY = 3000;     // Hotspot fallback retry delay (3s)
 var STARTAP_RETRY_DELAY = 2000;     // startAP retry delay (2s)
-var HOSTAPD_STARTUP_WAIT = 1000;    // Wait for hostapd to initialize before status check (1s)
 var INTERFACE_CHECK_INTERVAL = 500; // Interface ready polling interval (500ms)
 
 // ===================================================================
@@ -127,7 +122,8 @@ var wpasuppPattern = WPA_SUPPLICANT + ".*" + wlan;  // Pattern for killing wlan0
 var restartdhcpcd = SUDO + " " + SYSTEMCTL + " restart dhcpcd.service";
 var starthostapd = SYSTEMCTL + " start hostapd.service";
 var stophostapd = SYSTEMCTL + " stop hostapd.service";
-var ifconfigHotspot = IFCONFIG + " " + wlan + " 192.168.211.1 up";
+var ifconfigHotspot = IFCONFIG + " " + wlan + " up";
+var ipAddHotspot = IP + " addr add 192.168.211.1/24 dev " + wlan;
 var ifconfigWlan = IFCONFIG + " " + wlan + " up";
 var ifconfigUp = SUDO + " " + IFCONFIG + " " + wlan + " up";
 var ifdeconfig = SUDO + " " + IP + " addr flush dev " + wlan + " && " + SUDO + " " + IFCONFIG + " " + wlan + " down";
@@ -383,43 +379,47 @@ function startHotspot(callback) {
         } else {
             launch(ifconfigHotspot, "confighotspot", true, function(err) {
                 loggerDebug("ifconfig " + err);
+                // Assign IP separately - combined command fails on cold interface
+                launch(ipAddHotspot, "confighotspotip", true, function(err) {
+                    loggerDebug("ip addr add " + err);
                 
-                // Launch hostapd with custom completion handling
-                var all = starthostapd.split(" ");
-                var process = all[0];
-                if (all.length > 0) {
-                    all.splice(0, 1);
-                }
-                loggerDebug("launching " + process + " args: ");
-                loggerDebug(all);
+                    // Launch hostapd with custom completion handling
+                    var all = starthostapd.split(" ");
+                    var process = all[0];
+                    if (all.length > 0) {
+                        all.splice(0, 1);
+                    }
+                    loggerDebug("launching " + process + " args: ");
+                    loggerDebug(all);
                 
-                var hostapdChild = thus.spawn(process, all, {});
+                    var hostapdChild = thus.spawn(process, all, {});
                 
-                hostapdChild.stdout.on('data', function(data) {
-                    loggerDebug("hotspot stdout: " + data);
-                });
+                    hostapdChild.stdout.on('data', function(data) {
+                        loggerDebug("hotspot stdout: " + data);
+                    });
                 
-                hostapdChild.stderr.on('data', function(data) {
-                    loggerDebug("hotspot stderr: " + data);
-                });
+                    hostapdChild.stderr.on('data', function(data) {
+                        loggerDebug("hotspot stderr: " + data);
+                    });
                 
-                hostapdChild.on('close', function(code) {
-                    loggerDebug("hotspotchild process exited with code " + code);
+                    hostapdChild.on('close', function(code) {
+                        loggerDebug("hotspotchild process exited with code " + code);
                     
-                    // Trigger ip-changed AFTER hostapd actually completes
-                    setTimeout(function() {
-                        try {
-                            execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
-                            loggerDebug("Triggered ip-changed@" + wlan + ".target for hotspot IP");
-                        } catch (e) {
-                            loggerDebug("Could not trigger ip-changed target: " + e);
-                        }
-                    }, hostapdExitDelay);
-                });
+                        // Trigger ip-changed AFTER hostapd actually completes
+                        setTimeout(function() {
+                            try {
+                                execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
+                                loggerDebug("Triggered ip-changed@" + wlan + ".target for hotspot IP");
+                            } catch (e) {
+                                loggerDebug("Could not trigger ip-changed target: " + e);
+                            }
+                        }, hostapdExitDelay);
+                    });
                 
-                // Continue with immediate callback for flow control
-                updateNetworkState("hotspot");
-                if (callback) callback();
+                    // Continue with immediate callback for flow control
+                    updateNetworkState("hotspot");
+                    if (callback) callback();
+                });
             });
         }
     });
@@ -430,44 +430,47 @@ function startHotspotForce(callback) {
     stopHotspot(function(err) {
         launch(ifconfigHotspot, "confighotspot", true, function(err) {
             loggerDebug("ifconfig " + err);
+            // Assign IP separately - combined command fails on cold interface
+            launch(ipAddHotspot, "confighotspotip", true, function(err) {
+                loggerDebug("ip addr add " + err);
             
-            // Launch hostapd with custom completion handling
-            var all = starthostapd.split(" ");
-            var process = all[0];
-            if (all.length > 0) {
-                all.splice(0, 1);
-            }
-            loggerDebug("launching " + process + " args: ");
-            loggerDebug(all);
+                // Launch hostapd with custom completion handling
+                var all = starthostapd.split(" ");
+                var process = all[0];
+                if (all.length > 0) {
+                    all.splice(0, 1);
+                }
+                loggerDebug("launching " + process + " args: ");
+                loggerDebug(all);
             
-            var hostapdChild = thus.spawn(process, all, {});
+                var hostapdChild = thus.spawn(process, all, {});
             
-            hostapdChild.stdout.on('data', function(data) {
-                loggerDebug("hotspot stdout: " + data);
-            });
+                hostapdChild.stdout.on('data', function(data) {
+                    loggerDebug("hotspot stdout: " + data);
+                });
             
-            hostapdChild.stderr.on('data', function(data) {
-                loggerDebug("hotspot stderr: " + data);
-            });
+                hostapdChild.stderr.on('data', function(data) {
+                    loggerDebug("hotspot stderr: " + data);
+                });
             
-            hostapdChild.on('close', function(code) {
-                loggerDebug("hotspotchild process exited with code " + code);
+                hostapdChild.on('close', function(code) {
+                    loggerDebug("hotspotchild process exited with code " + code);
                 
-                // Trigger ip-changed AFTER forced hostapd actually completes
-                setTimeout(function() {
-                    try {
-                        execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
-                        loggerDebug("Triggered ip-changed@" + wlan + ".target for forced hotspot IP");
-                    } catch (e) {
-                        loggerDebug("Could not trigger ip-changed target: " + e);
-                    }
-                }, hostapdExitDelay);
-            });
+                    // Trigger ip-changed AFTER forced hostapd actually completes
+                    setTimeout(function() {
+                        try {
+                            execSync(SYSTEMCTL + ' restart ip-changed@' + wlan + '.target', { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
+                            loggerDebug("Triggered ip-changed@" + wlan + ".target for forced hotspot IP");
+                        } catch (e) {
+                            loggerDebug("Could not trigger ip-changed target: " + e);
+                        }
+                    }, hostapdExitDelay);
+                });
             
-            // Continue with immediate callback for flow control
-            // Continue with immediate callback for flow control
-            updateNetworkState("hotspot");
-            if (callback) callback();
+                // Continue with immediate callback for flow control
+                updateNetworkState("hotspot");
+                if (callback) callback();
+            });
         });
     });
 }
@@ -497,34 +500,31 @@ function startHotspotFallbackSafe(retry = 0) {
             return;
         }
 
-        // Wait for hostapd to initialize before checking status
-        setTimeout(function() {
-            // Verify hostapd status
-            try {
-                const hostapdStatus = execSync(SYSTEMCTL + " is-active hostapd", { encoding: 'utf8' }).trim();
-                if (hostapdStatus !== "active") {
-                    loggerInfo("Hostapd did not reach active state. Retrying fallback.");
-                    if (retry + 1 < hotspotMaxRetries) {
-                        setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
-                    } else {
-                        loggerInfo("Hostapd failed after maximum retries. System remains offline.");
-                        notifyWirelessReady();
-                    }
-                } else {
-                    loggerInfo("Hotspot active and hostapd is running.");
-                    updateNetworkState("hotspot");
-                    notifyWirelessReady();
-                }
-            } catch (e) {
-                loggerInfo("Error checking hostapd status: " + e.message);
+        // Verify hostapd status
+        try {
+            const hostapdStatus = execSync(SYSTEMCTL + " is-active hostapd", { encoding: 'utf8' }).trim();
+            if (hostapdStatus !== "active") {
+                loggerInfo("Hostapd did not reach active state. Retrying fallback.");
                 if (retry + 1 < hotspotMaxRetries) {
                     setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
                 } else {
-                    loggerInfo("Could not confirm hostapd status. System remains offline.");
+                    loggerInfo("Hostapd failed after maximum retries. System remains offline.");
                     notifyWirelessReady();
                 }
+            } else {
+                loggerInfo("Hotspot active and hostapd is running.");
+                updateNetworkState("hotspot");
+                notifyWirelessReady();
             }
-        }, HOSTAPD_STARTUP_WAIT);
+        } catch (e) {
+            loggerInfo("Error checking hostapd status: " + e.message);
+            if (retry + 1 < hotspotMaxRetries) {
+                setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
+            } else {
+                loggerInfo("Could not confirm hostapd status. System remains offline.");
+                notifyWirelessReady();
+            }
+        }
     }
 
     if (!isWirelessDisabled()) {
@@ -1274,10 +1274,9 @@ function startFlow() {
             notifyWirelessReady();
         });
     } else if (directhotspot){
-        // Use verified hotspot start with retry logic for first boot
-        // Plain startHotspot() doesn't verify hostapd actually started
-        loggerInfo('First boot: Starting hotspot with verification');
-        startHotspotFallbackSafe();
+        startHotspot(function () {
+            notifyWirelessReady();
+        });
     } else {
         loggerInfo("Start wireless flow");
         waitForInterfaceReleaseAndStartAP();
