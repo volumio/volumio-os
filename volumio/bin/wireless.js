@@ -4,10 +4,10 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // Maintainer: Just a Nerd
-// Volumio Wireless Daemon - Version 4.0-rc4
+// Volumio Wireless Daemon - Version 4.0-rc5
 // Maintainer: Development Team
 // 
-// RELEASE CANDIDATE 4 - First Boot Hotspot Fix
+// RELEASE CANDIDATE 5 - Hotspot Startup Race Fix
 // 
 // Major Changes in v4.0:
 // - Single Network Mode (SNM) with ethernet/WiFi coordination
@@ -15,6 +15,11 @@
 // - Improved transition handling and state management
 // - Fixed deadlock and infinite loop issues
 // - Enhanced logging and diagnostics
+//
+// RC5 Changes (Hotspot Startup Race Fix):
+// - Wait for hostapd to initialize before checking is-active status
+// - Fixes race where status check ran before hostapd finished starting
+// - Prevents unnecessary retry loop killing working hotspot
 //
 // RC4 Changes (First Boot Hotspot Fix):
 // - Use verified hotspot start on first boot (startHotspotFallbackSafe)
@@ -28,7 +33,7 @@
 // - Fixes WiFi reconnection failure causing hotspot fallback
 // - Fixed regdomain log output showing on two lines (cosmetic)
 //
-// Production release: v4.0-rc4
+// Production release: v4.0-rc5
 //===================================================================
 
 // ===================================================================
@@ -53,6 +58,7 @@ var RECONNECT_WAIT = 3000;          // Wait for wpa_supplicant association (3s)
 var USB_SETTLE_WAIT = 2000;         // USB WiFi adapter settle time (2s)
 var HOTSPOT_RETRY_DELAY = 3000;     // Hotspot fallback retry delay (3s)
 var STARTAP_RETRY_DELAY = 2000;     // startAP retry delay (2s)
+var HOSTAPD_STARTUP_WAIT = 1000;    // Wait for hostapd to initialize before status check (1s)
 var INTERFACE_CHECK_INTERVAL = 500; // Interface ready polling interval (500ms)
 
 // ===================================================================
@@ -491,31 +497,34 @@ function startHotspotFallbackSafe(retry = 0) {
             return;
         }
 
-        // Verify hostapd status
-        try {
-            const hostapdStatus = execSync(SYSTEMCTL + " is-active hostapd", { encoding: 'utf8' }).trim();
-            if (hostapdStatus !== "active") {
-                loggerInfo("Hostapd did not reach active state. Retrying fallback.");
+        // Wait for hostapd to initialize before checking status
+        setTimeout(function() {
+            // Verify hostapd status
+            try {
+                const hostapdStatus = execSync(SYSTEMCTL + " is-active hostapd", { encoding: 'utf8' }).trim();
+                if (hostapdStatus !== "active") {
+                    loggerInfo("Hostapd did not reach active state. Retrying fallback.");
+                    if (retry + 1 < hotspotMaxRetries) {
+                        setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
+                    } else {
+                        loggerInfo("Hostapd failed after maximum retries. System remains offline.");
+                        notifyWirelessReady();
+                    }
+                } else {
+                    loggerInfo("Hotspot active and hostapd is running.");
+                    updateNetworkState("hotspot");
+                    notifyWirelessReady();
+                }
+            } catch (e) {
+                loggerInfo("Error checking hostapd status: " + e.message);
                 if (retry + 1 < hotspotMaxRetries) {
                     setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
                 } else {
-                    loggerInfo("Hostapd failed after maximum retries. System remains offline.");
+                    loggerInfo("Could not confirm hostapd status. System remains offline.");
                     notifyWirelessReady();
                 }
-            } else {
-                loggerInfo("Hotspot active and hostapd is running.");
-                updateNetworkState("hotspot");
-                notifyWirelessReady();
             }
-        } catch (e) {
-            loggerInfo("Error checking hostapd status: " + e.message);
-            if (retry + 1 < hotspotMaxRetries) {
-                setTimeout(() => startHotspotFallbackSafe(retry + 1), HOTSPOT_RETRY_DELAY);
-            } else {
-                loggerInfo("Could not confirm hostapd status. System remains offline.");
-                notifyWirelessReady();
-            }
-        }
+        }, HOSTAPD_STARTUP_WAIT);
     }
 
     if (!isWirelessDisabled()) {
