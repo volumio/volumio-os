@@ -19,7 +19,7 @@
 // RC4 Changes (First Boot Hotspot Fix):
 // - Add interface readiness check before starting hotspot on first boot
 // - Uses same waitForUdevSettle/waitForInterfaceReady as STA mode
-// - Fixes USB WiFi adapters not transmitting beacons on cold boot
+// - USB adapters get extra USB_SETTLE_WAIT for AP mode hardware init
 // - Added INTERFACE_READY_TIMEOUT constant (8s)
 //
 // RC3 Changes (DHCP Reconnection Fix):
@@ -1273,9 +1273,16 @@ function startFlow() {
                 if (err) {
                     loggerInfo("Interface not ready for hotspot: " + (validation ? validation.reason : err.message));
                 }
-                startHotspot(function () {
-                    notifyWirelessReady();
-                });
+                // USB adapters need extra settle time for AP mode hardware init
+                var settleDelay = (validation && validation.isUSB) ? USB_SETTLE_WAIT : 0;
+                if (settleDelay > 0) {
+                    loggerInfo("USB adapter detected, waiting " + settleDelay + "ms for AP mode hardware init");
+                }
+                setTimeout(function() {
+                    startHotspot(function () {
+                        notifyWirelessReady();
+                    });
+                }, settleDelay);
             });
         });
     } else {
