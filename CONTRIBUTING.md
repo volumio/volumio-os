@@ -14,20 +14,24 @@ To get started with contributing to Volumio, follow these steps:
 2. Fork this repository (if you're an external contributor)
 3. Create a feature branch from `master` using the naming convention below
 
-### Our Workflow
-
-We keep things simple and effective. The `master` branch is our main branch where the source code always reflects a production-ready state. All contributions follow this workflow:
-
-1. **Create a branch** from `master` using the naming convention below
-2. **Make your changes** and commit them following our commit message format
-3. **Test thoroughly** - testing is mandatory before submitting
-4. **Open a Pull Request** to `master`
-5. **Get approval** - one person with write access must review and approve your PR
-6. **Merge** once approved and all checks pass
-
 ### Branch Protection
 
 The `master` branch is protected and requires **1 approval** from a team member with write access before any PR can be merged.
+
+### Contribution Workflow
+
+**External contributors (via fork):**
+1. Fork this repository
+2. Create a feature branch from `master`
+3. Make your changes following the commit format below
+4. Open a PR targeting `common` branch (not `master`)
+5. After review and merge to `common`, maintainers merge to `master`
+
+**Why not directly to master?**
+PRs from forks cannot target `master` directly. This protects the production branch while still welcoming contributions. Target `common` or another feature branch (pi, amd64, etc.) instead.
+
+**Maintainers:**
+Maintainers with write access can PR directly to `master` from local branches.
 
 ### Branch Naming Convention
 
@@ -101,7 +105,7 @@ Please ensure:
 
 ## Commit Message Format
 
-All commits must follow semantic commit format.
+All commits must follow semantic commit format. This is enforced by CI.
 
 ### Format
 
@@ -124,6 +128,7 @@ type: description
 | perf       | Performance improvements                         |
 | revert     | Reverting previous commits                       |
 | hotfix     | Critical production fixes                        |
+| emergency  | Emergency fixes (maintainers only)               |
 
 ### Examples
 
