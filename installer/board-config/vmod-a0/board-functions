@@ -1,0 +1,30 @@
+
+# Board functions vmod-a0
+write_device_bootloader()
+{
+   echo "[info] Flashing u-boot"
+   dd if=${BOOT}/u-boot/idbloader.bin of=$1 seek=64 conv=notrunc status=none
+   dd if=${BOOT}/u-boot/u-boot.img of=$1 seek=16384 conv=notrunc status=none
+   dd if=${BOOT}/u-boot/trust.bin of=$1 seek=24576 conv=notrunc status=none
+}
+
+led_show_init_signal()
+{
+   echo none > /sys/class/leds/rockpis:blue:user/trigger
+   echo default-on > /sys/class/leds/rockpis:green:power/trigger
+}
+
+led_show_start_signal()
+{
+   echo none > /sys/class/leds/rockpis:blue:user/trigger
+   echo heartbeat > /sys/class/leds/rockpis:green:power/trigger
+   sleep 0.5
+   echo heartbeat > /sys/class/leds/rockpis:blue:user/trigger
+}
+
+led_show_finish_signal()
+{
+   echo default-on > /sys/class/leds/rockpis:blue:user/trigger
+   echo none > /sys/class/leds/rockpis:green:power/trigger
+}
+

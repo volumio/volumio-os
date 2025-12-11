@@ -5,7 +5,7 @@ DEVICEBASE="khadas"
 BOARDFAMILY="vims"
 PLATFORMREPO="https://github.com/volumio/platform-khadas.git"
 BUILD="armv7"
-NONSTANDARD_REPO=no	# yes requires "non_standard_repo() function in make.sh
+#NONSTANDARD_REPO=no	# yes requires "non_standard_repo() function in make.sh
 LBLBOOT="BOOT"
 LBLIMAGE="volumio"
 LBLDATA="volumio_data"
@@ -65,6 +65,10 @@ write_device_files()
 
    mkdir /mnt/volumio/rootfs/boot/dtb
    cp -R ${PLTDIR}/${BOARDFAMILY}/boot/dtb/kvim3l_linux.dtb $ROOTFSMNT/boot/dtb
+
+   # Volumio V4: add kernel config file to /boot (without the data-time part!)
+   kernelconfig="config-$(ls $ROOTFSMNT/lib/modules)"
+   cp ${PLTDIR}/${BOARDFAMILY}/boot/${kernelconfig}* $ROOTFSMNT/boot/${kernelconfig}
 }
 
 write_device_bootloader()
