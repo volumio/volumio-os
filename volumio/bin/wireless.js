@@ -98,7 +98,6 @@ var eth = "eth0";
 // ===================================================================
 var dhclient = SUDO + " " + DHCPCD + " " + wlan;
 var justdhclient = DHCPCD + ".*" + wlan;  // Pattern for killing wlan0 dhcpcd only
-var wpasupp = WPA_SUPPLICANT + " -s -B -D" + wirelessWPADriver + " -c" + WPA_SUPPLICANT_CONF + " -i" + wlan;
 var wpasuppPattern = WPA_SUPPLICANT + ".*" + wlan;  // Pattern for killing wlan0 wpa_supplicant only
 var restartdhcpcd = SUDO + " " + SYSTEMCTL + " restart dhcpcd.service";
 var starthostapd = SYSTEMCTL + " start hostapd.service";
@@ -217,7 +216,7 @@ function initializeWirelessDaemon() {
     retrieveEnvParameters();
     startWiredNetworkingMonitor();
     if (debug) {
-        var wpasupp = WPA_SUPPLICANT + " -d -s -B -D" + wirelessWPADriver + " -c" + WPA_SUPPLICANT_CONF + " -i" + wlan;
+        wpasupp = WPA_SUPPLICANT + " -d -s -B -D" + wirelessWPADriver + " -c" + WPA_SUPPLICANT_CONF + " -i" + wlan;
     }
 }
 
