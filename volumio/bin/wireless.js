@@ -227,8 +227,52 @@ function initializeWirelessFlow() {
     loggerInfo("Wireless.js initializing wireless flow");
     stop(function() {
         loggerInfo("Cleaning previous...");
-        detectAndApplyRegdomain(function() {
-            startFlow();
+        ensureInterfaceReady(function(err) {
+            if (err) {
+                loggerInfo('Interface setup failed, continuing anyway: ' + err);
+            }
+            detectAndApplyRegdomain(function() {
+                startFlow();
+            });
+        });
+    });
+}
+
+// Ensure wireless interface is UP and ready before any operations
+// Must be called before detectAndApplyRegdomain or any iw commands
+// Skips if wireless is disabled in config
+function ensureInterfaceReady(callback) {
+    if (isWirelessDisabled()) {
+        loggerDebug('ensureInterfaceReady: Wireless disabled, skipping');
+        return callback(null);
+    }
+
+    loggerDebug('ensureInterfaceReady: Bringing interface UP');
+
+    // Step 1: Bring interface UP
+    launch(ifconfigUp, "ifconfig_up", true, function(err) {
+        if (err) {
+            loggerInfo('ensureInterfaceReady: ifconfig up failed: ' + err);
+            // Continue anyway - interface may already be up
+        }
+
+        // Step 2: Wait for udev to settle
+        waitForUdevSettle(EXEC_TIMEOUT_LONG, function(udevErr) {
+            if (udevErr) {
+                loggerDebug('ensureInterfaceReady: udev settle warning: ' + udevErr);
+            }
+
+            // Step 3: Validate interface is ready
+            waitForInterfaceReady(wlan, INTERFACE_READY_TIMEOUT, function(waitErr, validation) {
+                if (waitErr || !validation || !validation.ready) {
+                    loggerInfo('ensureInterfaceReady: Interface not ready: ' + 
+                        (validation ? validation.reason : (waitErr ? waitErr.message : 'unknown')));
+                    return callback(new Error('Interface not ready'));
+                }
+
+                loggerInfo('ensureInterfaceReady: Interface ready (MAC: ' + validation.mac + ')');
+                callback(null);
+            });
         });
     });
 }
@@ -2286,18 +2330,20 @@ function retrieveEnvParameters() {
 // Detect and apply appropriate wireless regulatory domain
 // Scans for country codes in AP beacons and sets most common one
 // FIX: Always scan and apply regdomain on every startup (fixes MP1 China regdomain)
+// PRE: Interface must be UP (ensureInterfaceReady called before this)
 function detectAndApplyRegdomain(callback) {
     if (isWirelessDisabled()) {
         return callback();
     }
     try {
-        var currentRegDomain = execSync(ifconfigUp + " && " + iwRegGet + " | " + GREP + " -m 1 country | " + CUT + " -f1 -d':'", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_MEDIUM }).replace(/country /g, '').split('\n')[0].trim();
+        // Interface already UP via ensureInterfaceReady - just run iw commands
+        var currentRegDomain = execSync(iwRegGet + " | " + GREP + " -m 1 country | " + CUT + " -f1 -d':'", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_MEDIUM }).replace(/country /g, '').split('\n')[0].trim();
 
         loggerDebug('CURRENT REG DOMAIN: ' + currentRegDomain);
 
         // Always scan for appropriate regdomain on every startup
         loggerDebug('Scanning for appropriate regdomain...');
-        var countryCodesInScan = execSync(ifconfigUp + " && " + iwScan + " | " + GREP + " Country: | " + CUT + " -f 2", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_SCAN }).replace(/Country: /g, '').split('\n');
+        var countryCodesInScan = execSync(iwScan + " | " + GREP + " Country: | " + CUT + " -f 2", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_SCAN }).replace(/Country: /g, '').split('\n');
         var appropriateRegDomain = determineMostAppropriateRegdomain(countryCodesInScan);
         loggerDebug('APPROPRIATE REG DOMAIN: ' + appropriateRegDomain);
 
@@ -2313,11 +2359,13 @@ function detectAndApplyRegdomain(callback) {
 }
 
 // Apply new wireless regulatory domain
+// PRE: Interface must be UP (ensureInterfaceReady called before this)
 function applyNewRegDomain(newRegDom) {
     loggerInfo('SETTING APPROPRIATE REG DOMAIN: ' + newRegDom);
 
     try {
-        execSync(ifconfigUp + " && " + iwRegSet + " " + newRegDom, { uid: 1000, gid: 1000, encoding: 'utf8'});
+        // Interface already UP via ensureInterfaceReady
+        execSync(iwRegSet + " " + newRegDom, { uid: 1000, gid: 1000, encoding: 'utf8'});
         fs.writeFileSync(CRDA_CONFIG, "REGDOMAIN=" + newRegDom);
         loggerInfo('SUCCESSFULLY SET NEW REGDOMAIN: ' + newRegDom)
     } catch(e) {
