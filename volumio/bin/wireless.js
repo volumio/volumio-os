@@ -1306,6 +1306,7 @@ function startFlow() {
                 loggerInfo('Failed to maintain scan mode: ' + err);
                 loggerInfo('Falling back to interface DOWN');
             }
+            wirelessFlowInProgress = false;
             notifyWirelessReady();
         });
     } else if (directhotspot){
@@ -1525,6 +1526,7 @@ function reconnectWiFiAfterEthernet(callback) {
                             }
 
                             loggerInfo("reconnectWiFi: WiFi reconnection complete with USB adapter");
+                            wirelessFlowInProgress = false;
                             updateNetworkState("ap");
                             restartAvahi();
                             if (callback) callback(null);
@@ -1549,6 +1551,7 @@ function reconnectWiFiAfterEthernet(callback) {
                             }
 
                             loggerInfo("reconnectWiFi: WiFi reconnection complete, obtaining IP");
+                            wirelessFlowInProgress = false;
                             updateNetworkState("ap");
                             restartAvahi();
                             if (callback) callback(null);
