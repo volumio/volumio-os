@@ -4,32 +4,12 @@
 // Volumio Network Manager
 // Original Copyright: Michelangelo Guarise - Volumio.org
 // Maintainer: Just a Nerd
-// Volumio Wireless Daemon - Version 4.0-rc4
+// Volumio Wireless Daemon - Version 4.0-rc5
 // Maintainer: Development Team
 //
-// RELEASE CANDIDATE 4 - First Boot Hotspot Interface Readiness
+// RELEASE CANDIDATE 5 - Review Fixes
 //
-// Major Changes in v4.0:
-// - Single Network Mode (SNM) with ethernet/WiFi coordination
-// - Emergency hotspot fallback when no network available
-// - Improved transition handling and state management
-// - Fixed deadlock and infinite loop issues
-// - Enhanced logging and diagnostics
-//
-// RC4 Changes (First Boot Hotspot Fix):
-// - Add interface readiness check before starting hotspot on first boot
-// - Uses same waitForUdevSettle/waitForInterfaceReady as STA mode
-// - USB adapters get extra USB_SETTLE_WAIT for AP mode hardware init
-// - Added INTERFACE_READY_TIMEOUT constant (8s)
-//
-// RC3 Changes (DHCP Reconnection Fix):
-// - Release DHCP lease before ethernet transition (prevents stale lease)
-// - Force fresh DHCP request on WiFi reconnect (prevents rebind timeout)
-// - Eliminates 50-second DHCP timeout after ethernet unplug
-// - Fixes WiFi reconnection failure causing hotspot fallback
-// - Fixed regdomain log output showing on two lines (cosmetic)
-//
-// Production release: v4.0-rc4
+// Production release: v4.0-rc5
 //===================================================================
 
 // ===================================================================
