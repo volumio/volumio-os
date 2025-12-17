@@ -68,7 +68,7 @@ fi
 
 
 PLTDIR="${SRC}/platform-${DEVICEBASE}"
-rootfs_tarball="${SRC}/build/${BUILD}"_rootfs
+rootfs_tarball="${SRC}/build/bookworm/${BUILD}"_rootfs
 if [ -f "${rootfs_tarball}.lz4" ]; then
    log "Trying to use prior base system" "info"
    if [ -d ${SRC}/build/${BUILD} ]; then
@@ -83,7 +83,7 @@ if [ -f "${rootfs_tarball}.lz4" ]; then
      tar xp --xattrs -C ./build/${BUILD}/root
    if [ ! -d "${PLTDIR}" ]; then
       log "No platform folder ${PLTDIR} present, please build a volumio device image first" "err"
-	  exit 1
+      exit 1
    fi
 else
    log "No ${rootfs_tarball} present, please build a volumio device image first" "err"
@@ -119,22 +119,28 @@ fetch_bootpart_uuid
 
 log "[Stage 1] Preparing for the  kernel/ platform files" "info"
 if [ ! -z $NONSTANDARD_REPO ]; then
+   log "[Stage 1] Non-Standard repo platform files" "info"
    non_standard_repo
 else
+   log "[Stage 1] Standard repo platform files" "info"
    HAS_PLTDIR=no
    if [ -d ${PLTDIR} ]; then
-      pushd ${PLTDIR}
-      # it should not happen that the 
+      cd ${PLTDIR}
       if [ -d ${BOARDFAMILY} ]; then
-         HAS_PLTDIR=yes
+         log "[Stage 1] Get latest platform files" "info"
+         git pull
+         rm -r ${BOARDFAMILY}
       fi
-      popd
+      log "[Stage 1] Unpacking the platform files" "info"
+      tar xfJ ${BOARDFAMILY}.tar.xz
+      HAS_PLTDIR=yes
+      cd ..
    fi
    if [ $HAS_PLTDIR == no ]; then
       # This should normally not happen, just handle it for safety
       if [ -d ${PLTDIR} ]; then
-         rm -r ${PLTDIR}  
-	  fi
+         rm -r ${PLTDIR}
+      fi
       log "[Stage 1]  Clone platform files from repo" "info"
       git clone $PLATFORMREPO
       log "[Stage 1] Unpacking the platform files" "info"
