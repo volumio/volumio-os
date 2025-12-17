@@ -2285,31 +2285,26 @@ function retrieveEnvParameters() {
 
 // Detect and apply appropriate wireless regulatory domain
 // Scans for country codes in AP beacons and sets most common one
-// Skips scan if regdomain already configured (not 00/0099)
+// FIX: Always scan and apply regdomain on every startup (fixes MP1 China regdomain)
 function detectAndApplyRegdomain(callback) {
     if (isWirelessDisabled()) {
         return callback();
     }
-    var appropriateRegDom = '00';
     try {
-        // Use timeout to prevent blocking startup for too long
-        // FIX v4.0-rc3: Use grep -m 1 to limit to first match and split('\n')[0] to handle multi-line output
-        // Prevents "Regdomain already set to: 00\n99" appearing on two lines in logs
         var currentRegDomain = execSync(ifconfigUp + " && " + iwRegGet + " | " + GREP + " -m 1 country | " + CUT + " -f1 -d':'", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_MEDIUM }).replace(/country /g, '').split('\n')[0].trim();
 
         loggerDebug('CURRENT REG DOMAIN: ' + currentRegDomain);
 
-        // Only scan if current regdomain is default (00)
-        if (currentRegDomain === '00' || currentRegDomain === '0099' || !currentRegDomain) {
-            loggerDebug('Current regdomain is default, scanning for appropriate regdomain...');
-            var countryCodesInScan = execSync(ifconfigUp + " && " + iwScan + " | " + GREP + " Country: | " + CUT + " -f 2", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_SCAN }).replace(/Country: /g, '').split('\n');
-            var appropriateRegDomain = determineMostAppropriateRegdomain(countryCodesInScan);
-            loggerDebug('APPROPRIATE REG DOMAIN: ' + appropriateRegDomain);
-            if (isValidRegDomain(appropriateRegDomain) && appropriateRegDomain !== currentRegDomain) {
-                applyNewRegDomain(appropriateRegDomain);
-            }
-        } else {
-            loggerInfo('Regdomain already set to: ' + currentRegDomain + ', skipping scan');
+        // Always scan for appropriate regdomain on every startup
+        loggerDebug('Scanning for appropriate regdomain...');
+        var countryCodesInScan = execSync(ifconfigUp + " && " + iwScan + " | " + GREP + " Country: | " + CUT + " -f 2", { uid: 1000, gid: 1000, encoding: 'utf8', timeout: EXEC_TIMEOUT_SCAN }).replace(/Country: /g, '').split('\n');
+        var appropriateRegDomain = determineMostAppropriateRegdomain(countryCodesInScan);
+        loggerDebug('APPROPRIATE REG DOMAIN: ' + appropriateRegDomain);
+
+        if (isValidRegDomain(appropriateRegDomain) && appropriateRegDomain !== currentRegDomain) {
+            applyNewRegDomain(appropriateRegDomain);
+        } else if (appropriateRegDomain === currentRegDomain) {
+            loggerInfo('Regdomain already correct: ' + currentRegDomain);
         }
     } catch(e) {
         loggerInfo('Failed to determine most appropriate reg domain: ' + e);
