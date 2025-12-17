@@ -173,6 +173,8 @@ var actualTime = 0;
 var apstopped = 0;
 var stage2Failed = false;  // Stage 2 connection failure flag
 var transitionStartTime = 0;  // Track transition timing for diagnostics
+var watchDebounceTimer = null;  // Debounce timer for fs.watch events
+var WATCH_DEBOUNCE_MS = 1000;   // Prevent rapid re-triggering from inotify events
 
 // WPA State machine context (Stage 2)
 var wpaStateContext = {
@@ -2476,7 +2478,13 @@ function startWiredNetworkingMonitor() {
     }
     checkWiredNetworkStatus(true);
     fs.watch(ETH_STATUS_FILE, () => {
-        checkWiredNetworkStatus();
+        // Debounce: inotify fires multiple events per file change
+        // Without debounce, checkWiredNetworkStatus runs repeatedly causing CPU spike
+        if (watchDebounceTimer) return;
+        watchDebounceTimer = setTimeout(() => {
+            watchDebounceTimer = null;
+            checkWiredNetworkStatus();
+        }, WATCH_DEBOUNCE_MS);
     });
 }
 
