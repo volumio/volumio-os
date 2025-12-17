@@ -232,6 +232,9 @@ function initializeWirelessFlow() {
                 loggerInfo('Interface setup failed, continuing anyway: ' + err);
             }
             detectAndApplyRegdomain(function() {
+                // FIX: Synchronously verify ethernet state before flow decision
+                // Prevents race condition where async fs.watch hasn't fired yet
+                refreshEthernetState();
                 startFlow();
             });
         });
@@ -275,6 +278,22 @@ function ensureInterfaceReady(callback) {
             });
         });
     });
+}
+
+// Synchronously refresh ethernet state before flow decisions
+// Prevents race condition where isWiredNetworkActive is stale at startup
+function refreshEthernetState() {
+    try {
+        var carrier = fs.readFileSync('/sys/class/net/eth0/carrier', 'utf8').trim();
+        var newState = (carrier === '1');
+        if (newState !== isWiredNetworkActive) {
+            loggerInfo('refreshEthernetState: Corrected ethernet state: ' + (newState ? 'connected' : 'disconnected'));
+            isWiredNetworkActive = newState;
+        }
+    } catch (e) {
+        // eth0 doesn't exist or carrier file not readable - leave state unchanged
+        loggerDebug('refreshEthernetState: Could not read ethernet state: ' + e.message);
+    }
 }
 
 // ===================================================================
