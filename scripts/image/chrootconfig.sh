@@ -111,10 +111,8 @@ ExecStart=/usr/bin/mpd --no-daemon
 ExecStartPre=-/usr/bin/sudo /bin/chown mpd:audio /var/log/mpd.log
 StartLimitBurst=15
 
-# Enable this setting to ask systemd to watch over MPD, see
-# systemd.service(5).  This is disabled by default because it causes
-# periodic wakeups which are unnecessary if MPD is not playing.
-#WatchdogSec=120
+# Enable this setting to ask systemd to watch over MPD.
+WatchdogSec=20
 
 # allow MPD to use real-time priority 40
 LimitRTPRIO=40

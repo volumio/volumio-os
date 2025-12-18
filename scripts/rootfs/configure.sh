@@ -99,10 +99,6 @@ chmod a+x "${ROOTFS}/bin/plymouth-rotation.sh"
 cp "${SRC}/volumio/bin/volumio_cpu_tweak" "${ROOTFS}/bin/volumio_cpu_tweak"
 chmod a+x "${ROOTFS}/bin/volumio_cpu_tweak"
 
-#MPD Monitor
-cp "${SRC}/volumio/bin/mpd_monitor.sh" "${ROOTFS}/bin/mpd_monitor.sh"
-chmod a+x "${ROOTFS}/bin/mpd_monitor.sh"
-
 #Welcome
 cp "${SRC}/volumio/bin/welcome" "${ROOTFS}/bin/welcome"
 chmod a+x "${ROOTFS}/bin/welcome"
