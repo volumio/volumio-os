@@ -269,7 +269,7 @@ function ensureInterfaceReady(callback) {
             // Step 3: Validate interface is ready
             waitForInterfaceReady(wlan, INTERFACE_READY_TIMEOUT, function(waitErr, validation) {
                 if (waitErr || !validation || !validation.ready) {
-                    loggerInfo('ensureInterfaceReady: Interface not ready: ' + 
+                    loggerInfo('ensureInterfaceReady: Interface not ready: ' +
                         (validation ? validation.reason : (waitErr ? waitErr.message : 'unknown')));
                     return callback(new Error('Interface not ready'));
                 }
@@ -2213,7 +2213,7 @@ function loggerDebug(message) {
     var now = new Date();
     console.log("WIRELESS.JS - DEBUG: " + message);
     // Debug messages go ONLY to file (with timestamp), not console
-    fs.appendFileSync(WIRELESS_LOG, "[" + now.toISOString() + "] DEBUG: " + message + "\n");
+    fs.appendFile(WIRELESS_LOG, "[" + now.toISOString() + "] DEBUG: " + message + "\n", () => {});
 }
 
 // Logging helper for informational messages
@@ -2222,7 +2222,7 @@ function loggerInfo(message) {
     // Info to console: NO timestamp (journalctl adds it)
     console.log("WIRELESS.JS - INFO: " + message);
     // Info to file: WITH timestamp (for manual reading)
-    fs.appendFileSync(WIRELESS_LOG, "[" + now.toISOString() + "] INFO: " + message + "\n");
+    fs.appendFile(WIRELESS_LOG, "[" + now.toISOString() + "] INFO: " + message + "\n", () => {});
 }
 
 // ===================================================================
