@@ -70,27 +70,68 @@ device_chroot_tweaks() {
 
 # Will be run in chroot - Pre initramfs
 device_chroot_tweaks_pre() {
-  log "Performing device_chroot_tweaks_pre" "ext"
-  log "Fixing armv8 deprecated instruction emulation with armv7 rootfs"
-  cat <<-EOF >>/etc/sysctl.conf
-abi.cp15_barrier=2
-EOF
-
-  log "Creating boot parameters from template"
-  sed -i "s/rootdev=UUID=/rootdev=UUID=${UUID_BOOT}/g" /boot/armbianEnv.txt
-  sed -i "s/imgpart=UUID=/imgpart=UUID=${UUID_IMG}/g" /boot/armbianEnv.txt
-  sed -i "s/bootpart=UUID=/bootpart=UUID=${UUID_BOOT}/g" /boot/armbianEnv.txt
-  sed -i "s/datapart=UUID=/datapart=UUID=${UUID_DATA}/g" /boot/armbianEnv.txt
-
-  log "Adding gpio group and udev rules"
-  groupadd -f --system gpio
-  usermod -aG gpio volumio
-  # Works with newer kernels as well
-  cat <<-EOF >/etc/udev/rules.d/99-gpio.rules
-	SUBSYSTEM=="gpio*", PROGRAM="/bin/sh -c 'find -L /sys/class/gpio/ -maxdepth 2 -exec chown root:gpio {} \; -exec chmod 770 {} \; || true'"
+	log "Performing device_chroot_tweaks_pre" "ext"
+	log "Fixing armv8 deprecated instruction emulation with armv7 rootfs"
+	cat <<-EOF >> /etc/sysctl.conf
+		abi.cp15_barrier=2
 	EOF
-  log "Fix for Volumio Remote updater"
-  sed -i '10i\RestartSec=5' /lib/systemd/system/volumio-remote-updater.service
+
+	log "Creating boot parameters from template" "cfg"
+	sed -i "s/rootdev=UUID=/rootdev=UUID=${UUID_BOOT}/g" /boot/armbianEnv.txt
+	sed -i "s/imgpart=UUID=/imgpart=UUID=${UUID_IMG}/g" /boot/armbianEnv.txt
+	sed -i "s/bootpart=UUID=/bootpart=UUID=${UUID_BOOT}/g" /boot/armbianEnv.txt
+	sed -i "s/datapart=UUID=/datapart=UUID=${UUID_DATA}/g" /boot/armbianEnv.txt
+
+	log "Adding gpio group and udev rules" "info"
+	groupadd -f --system gpio
+	usermod -aG gpio volumio
+	# Works with newer kernels as well
+	cat <<-EOF > /etc/udev/rules.d/99-gpio.rules
+		SUBSYSTEM=="gpio*", PROGRAM="/bin/sh -c 'find -L /sys/class/gpio/ -maxdepth 2 -exec chown root:gpio {} \; -exec chmod 770 {} \; || true'"
+	EOF
+
+	log "Fix for Volumio Remote updater"
+	sed -i '10i\RestartSec=5' /lib/systemd/system/volumio-remote-updater.service
+
+	log "UDEV Rule and script to set fixed MAC addresses"
+	cat <<-EOF > /etc/udev/rules.d/05-fixMACaddress.rules
+		#If a network interface is being assigned a new, different address on each boot,
+		#or the MAC address is based on a disk image (rather than a hardware serial #),
+		#enable the corresponding line below to derive that interface's MAC address from
+		#the RK3308 SOC's unique serial number.
+		KERNEL=="wlan0", ACTION=="add" RUN+="/usr/bin/fixEtherAddr %k 0a"
+		KERNEL=="p2p0", ACTION=="add" RUN+="/usr/bin/fixEtherAddr %k 0e"
+		KERNEL=="eth0", ACTION=="add" RUN+="/usr/bin/fixEtherAddr %k 06"
+	EOF
+
+	cat <<-'EOF' > /usr/bin/fixEtherAddr
+		#!/bin/sh
+
+		#Assign specified interface a fixed, unique Ethernet MAC address constructed
+		#from given prefix byte followed by five byte RK3308 CPU serial number
+		#Ethernet prefix byte value less 2 should be exactly divisible by 4
+		#e.g. (prefix - 2) % 4 == 0
+
+		[ '$2' ] || {
+		  echo 'Specify network interface and first Ethernet address byte in hex' >&2
+		  exit 1
+		}
+
+		cpuSerialNum() {
+		#output first 5 bytes of CPU Serial number in hex with a space between each
+		#nvmem on RK3308 does not handle multiple simultaneous readers :-(
+		  nvmem=/sys/bus/nvmem/devices/rockchip-otp0/nvmem
+		  serNumOffset=20
+		  /usr/bin/flock -w2 $nvmem /usr/bin/od -An -vtx1 -j $serNumOffset -N 5 $nvmem
+		}
+
+		Id=`cpuSerialNum` && { #fail if Rockchip nvmem not available
+		  /sbin/ip link set $1 address $2:`echo $Id | tr ' ' :`
+		}
+	EOF
+
+	chmod a+x /usr/bin/fixEtherAddr
+
 }
 
 # Will be run in chroot - Post initramfs
