@@ -1,10 +1,9 @@
-
 # Board functions vmod-a0
 write_device_bootloader()
 {
    echo "[info] Flashing u-boot"
    dd if=${BOOT}/u-boot/idbloader.bin of=$1 seek=64 conv=notrunc status=none
-   dd if=${BOOT}/u-boot/u-boot.img of=$1 seek=16384 conv=notrunc status=none
+   dd if=${BOOT}/u-boot/uboot.img of=$1 seek=16384 conv=notrunc status=none
    dd if=${BOOT}/u-boot/trust.bin of=$1 seek=24576 conv=notrunc status=none
 }
 
