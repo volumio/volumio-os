@@ -215,6 +215,7 @@ if (process.argv.length < 2) {
 
 // Initialize wireless daemon by retrieving environment parameters and starting monitoring
 function initializeWirelessDaemon() {
+    loggerDebug("Initializing wireless daemon...");
     retrieveEnvParameters();
     startWiredNetworkingMonitor();
     if (debug) {
@@ -342,31 +343,11 @@ function kill(pattern, callback) {
     });
 }
 
-// Extract target process from command string - DEPRECATED
-// Process matching now uses interface-specific patterns for reliability
-// Keeping function for compatibility but it's not called
-function extractTargetProcess(commandString) {
-    var parts = commandString.split(" ");
-    var firstPart = parts[0];
-
-    // Check if command is sudo-wrapped
-    if (firstPart === SUDO || firstPart === "/usr/bin/sudo") {
-        // Return actual target command (element after sudo)
-        if (parts.length > 1) {
-            loggerDebug("extractTargetProcess(): Skipping sudo wrapper, target is: " + parts[1]);
-            return parts[1];
-        }
-    }
-
-    // Not sudo-wrapped, return first element
-    loggerDebug("extractTargetProcess(): Direct command, target is: " + firstPart);
-    return firstPart;
-}
-
 // Launch a command either synchronously or asynchronously with logging
 // sync=true: waits for process to complete before callback
 // sync=false: spawns process and calls callback immediately
 function launch(fullprocess, name, sync, callback) {
+    loggerDebug("launch(): " + name + " - " + fullprocess + " (sync=" + sync + ")");
     if (sync) {
         var child = thus.exec(fullprocess, {}, callback);
         child.stdout.on('data', function(data) {
@@ -386,8 +367,7 @@ function launch(fullprocess, name, sync, callback) {
         if (all.length > 0) {
             all.splice(0, 1);
         }
-        loggerDebug("launching " + process + " args: ");
-        loggerDebug(all);
+        loggerDebug("launching " + process + " args: " + all.join(' '));
         var child = thus.spawn(process, all, {});
         child.stdout.on('data', function(data) {
             loggerDebug(name + 'stdout: ' + data);
@@ -413,6 +393,7 @@ function launch(fullprocess, name, sync, callback) {
 // Start WiFi hotspot (Access Point) mode
 // If hotspot is disabled in config, only brings interface up without hostapd
 function startHotspot(callback) {
+    loggerDebug("Starting hotspot...");
     stopHotspot(function(err) {
         if (isHotspotDisabled()) {
             loggerInfo('Hotspot is disabled, not starting it');
@@ -430,9 +411,7 @@ function startHotspot(callback) {
                 if (all.length > 0) {
                     all.splice(0, 1);
                 }
-                loggerDebug("launching " + process + " args: ");
-                loggerDebug(all);
-
+                loggerDebug("launching " + process + " args: " + all.join(' '));
                 var hostapdChild = thus.spawn(process, all, {});
 
                 hostapdChild.stdout.on('data', function(data) {
@@ -467,6 +446,7 @@ function startHotspot(callback) {
 
 // Force start hotspot even if disabled (used for factory reset scenarios)
 function startHotspotForce(callback) {
+    loggerDebug("Force starting hotspot...");
     stopHotspot(function(err) {
         launch(ifconfigHotspot, "confighotspot", true, function(err) {
             loggerDebug("ifconfig " + err);
@@ -477,8 +457,7 @@ function startHotspotForce(callback) {
             if (all.length > 0) {
                 all.splice(0, 1);
             }
-            loggerDebug("launching " + process + " args: ");
-            loggerDebug(all);
+            loggerDebug("launching " + process + " args: " + all.join(' '));
 
             var hostapdChild = thus.spawn(process, all, {});
 
@@ -514,6 +493,7 @@ function startHotspotForce(callback) {
 
 // Stop WiFi hotspot and deconfigure interface
 function stopHotspot(callback) {
+    loggerDebug("Stopping hotspot...");
     launch(stophostapd, "stophotspot" , true, function(err) {
         launch(ifdeconfig, "ifdeconfig", true, callback);
     });
@@ -524,6 +504,7 @@ function stopHotspot(callback) {
 // Verifies hostapd service is actually active after start
 function startHotspotFallbackSafe(retry = 0) {
     const hotspotMaxRetries = 3;
+    loggerDebug(`Starting hotspot fallback attempt ${retry + 1} of ${hotspotMaxRetries}`);
 
     function handleHotspotResult(err) {
         if (err) {
@@ -589,6 +570,7 @@ function startHotspotFallbackSafe(retry = 0) {
 // Check if wlan0 is a USB WiFi adapter
 // Returns true if USB, false if onboard or check fails
 function isUsbWifiAdapter() {
+    loggerDebug("Checking if wlan0 is USB adapter...");
     try {
         var linkPath = execSync(checkInterfaceLink, { encoding: 'utf8' }).trim();
         return linkPath.includes('usb');
@@ -607,7 +589,7 @@ function queryUsbWifiCapabilities() {
         maxInterfaces: 1,
         chipset: 'unknown'
     };
-
+    loggerDebug("Querying USB WiFi capabilities...");
     try {
         var iwListOutput = execSync(iwList, { encoding: 'utf8', timeout: EXEC_TIMEOUT_LONG });
         var modesMatch = iwListOutput.match(/Supported interface modes:([\s\S]*?)(?=\n\s*Band|$)/);
@@ -718,7 +700,7 @@ function proceedWithWpaSupplicant(validation, callback) {
     // Cache interface identity for later verification
     var initialMAC = validation.mac;
     var initialIsUSB = validation.isUSB;
-
+    loggerDebug("Proceeding with WPA Supplicant: Initial MAC: " + initialMAC + ", isUSB: " + initialIsUSB);
     launch(wpasupp, "wpa supplicant", true, function (err) {
         loggerDebug("wpasupp " + err);
         wpaerr = err ? 1 : 0;
@@ -864,6 +846,7 @@ function proceedWithWpaSupplicant(validation, callback) {
 function waitForWlanRelease(attempt, onReleased) {
     const MAX_RETRIES = 10;
     const RETRY_INTERVAL = 1000;
+    loggerDebug("Waiting for " + wlan + " to be released (attempt " + attempt + ")");
 
     try {
         const output = execSync(ipLink).toString();
@@ -918,6 +901,7 @@ function stopAP(callback) {
 // Wait for interface release and start AP with retry logic
 // Prevents duplicate AP start attempts and implements exponential backoff
 function waitForInterfaceReleaseAndStartAP() {
+    loggerDebug("waitForInterfaceReleaseAndStartAP called");
     // Prevent duplicate calls
     if (apStartInProgress) {
         loggerDebug("AP start already in progress, ignoring duplicate call");
@@ -1248,6 +1232,7 @@ function afterAPStart() {
 // - Single network mode with active ethernet
 // - Normal WiFi client connection
 function startFlow() {
+    loggerDebug("startFlow called");
     // Prevent duplicate flow starts
     if (wirelessFlowInProgress) {
         loggerDebug("Wireless flow already in progress, ignoring duplicate call");
@@ -1349,6 +1334,7 @@ function stop(callback) {
 
 // Keep wlan0 UP without IP for scanning capability (SNM ethernet active)
 function keepWlanUpWithoutIP(callback) {
+    loggerDebug("keepWlanUpWithoutIP called");
     // Check if wireless is disabled in config
     if (isWirelessDisabled()) {
         loggerInfo("SNM: WiFi disabled in config, not starting scan mode");
@@ -1424,6 +1410,7 @@ function keepWlanUpWithoutIP(callback) {
 // Verify wlan0 is in scan-capable state (UP without IP)
 // Verify wlan0 is in correct scan mode state (diagnostic)
 function verifyWlanScanState() {
+    loggerDebug("Verifying wlan0 scan-capable state");
     try {
         // Check interface state
         var linkState = execSync(ipLink, { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT });
@@ -1671,6 +1658,7 @@ function isInterfaceUSB(interfaceName) {
 // Get interface operational state flags
 // Returns object with state information or null
 function getInterfaceOperState(interfaceName) {
+    loggerDebug("InterfaceValidator: Reading operstate for " + interfaceName);
     try {
         var operstate = fs.readFileSync('/sys/class/net/' + interfaceName + '/operstate', 'utf8').trim();
         var flags = fs.readFileSync('/sys/class/net/' + interfaceName + '/flags', 'utf8').trim();
@@ -1774,6 +1762,7 @@ var interfaceCache = {};
 
 // Update interface cache with current state
 function updateInterfaceCache(interfaceName) {
+    loggerDebug("InterfaceMonitor: Updating cache for " + interfaceName);
     var mac = getInterfaceMAC(interfaceName);
     if (!mac) {
         delete interfaceCache[interfaceName];
@@ -1909,6 +1898,7 @@ function startWpaStateMonitor(interfaceName, callback) {
 
 // Stop wpa_supplicant state monitoring
 function stopWpaStateMonitor() {
+    loggerDebug("WpaStateMachine: Stopping state monitor");
     if (wpaStateContext.monitorProcess) {
         clearTimeout(wpaStateContext.monitorProcess);
         wpaStateContext.monitorProcess = null;
@@ -2092,6 +2082,7 @@ function getFailureExplanation(reason) {
 
 // Check if wlan0 interface has been released (DOWN or NO-CARRIER)
 function checkInterfaceReleased() {
+    loggerDebug("Checking if wlan0 interface is released");
     try {
         const output = execSync(ipLink).toString();
         return output.includes('state DOWN') || output.includes('NO-CARRIER');
@@ -2103,6 +2094,7 @@ function checkInterfaceReleased() {
 // Check if configured SSID is visible in scan results
 // Used to determine if hotspot fallback should be enabled
 function isConfiguredSSIDVisible() {
+    loggerDebug("Checking if configured SSID is visible in scan results");
     try {
         const config = getWirelessConfiguration();
         const ssid = config.wlanssid?.value;
@@ -2148,6 +2140,7 @@ function restartAvahi() {
 // Notify systemd that wireless service is ready
 // Required for Type=notify systemd service
 function notifyWirelessReady() {
+    loggerDebug('Notifying systemd that wireless is ready');
     exec('systemd-notify --ready', { stdio: 'inherit', shell: '/bin/bash', uid: process.getuid(), gid: process.getgid(), encoding: 'utf8'}, function(error) {
         if (error) {
             loggerInfo('Could not notify systemd about wireless ready: ' + error);
