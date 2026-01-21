@@ -417,9 +417,6 @@ ln -s /lib/systemd/system/iptables.service /etc/systemd/system/multi-user.target
 log "Adding headless_wireless Service"
 ln -s /lib/systemd/system/headless_wireless.service /etc/systemd/system/multi-user.target.wants/headless_wireless.service
 
-log "Adding Manage nl80211 modules blocking state Service"
-ln -s /lib/systemd/system/volumio_rfkill_unblock.service /etc/systemd/system/multi-user.target.wants/volumio_rfkill_unblock.service
-
 log "Disabling SSH by default"
 systemctl disable ssh.service
 
@@ -512,7 +509,6 @@ log "Setting up wireless hostspot config" "info"
 log "Adding Volumio bits to dnsmasq and hostapd services"
 sed -i '/^After=network.target/a # For Volumio hotspot functionality\nAfter=hostapd.service\nPartOf=hostapd.service' /lib/systemd/system/dnsmasq.service
 sed -i '/^After=network.target/a # For Volumio hotspot functionality\nWants=dnsmasq.service' /lib/systemd/system/hostapd.service
-sed -i '/^After=network.target/a # Ensure rfkill unblocking before hostapd starts\nAfter=volumio_rfkill_unblock.service\nWants=volumio_rfkill_unblock.service' /lib/systemd/system/hostapd.service
 
 log "Configuring dnsmasq"
 # TODO listen on wlan* or only wlan0?
