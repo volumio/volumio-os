@@ -25,9 +25,6 @@ check_dependency() {
   fi
 }
 
-# Packages to install that are not in multistrap for some reason.
-packages=nodejs
-
 log "Preparing to run Debconf in chroot" "info"
 # Not required, we have mounted /proc, systemd will be smart enough
 # log "Prevent services starting during install, running under chroot"
@@ -267,24 +264,6 @@ log "Attempting to install Node version: ${NODE_VERSION}"
 IFS=\. read -ra NODE_SEMVER <<<"${NODE_VERSION}"
 NODE_APT=node_${NODE_SEMVER[0]}.x
 
-install_node_nodesource() {
-  log "Configuring NodeSource repository (nodistro format)" "info"
-  local arch_opt=""
-  # Prevent i386 package lookup on x64 systems
-  [[ "${VOLUMIO_ARCH}" == "x86" ]] && arch_opt="arch=amd64 "
-  cat <<-EOF >/etc/apt/sources.list.d/nodesource.list
-deb [${arch_opt}signed-by=/etc/apt/trusted.gpg.d/nodesource.gpg] https://deb.nodesource.com/${NODE_APT} nodistro main
-EOF
-  apt-get update
-  log "Attempting to install nodejs=${NODE_VERSION}* from NodeSource" "info"
-  if apt-get -y install "nodejs=${NODE_VERSION}*"; then
-    return 0
-  else
-    log "NodeSource does not have nodejs ${NODE_VERSION} available" "wrn"
-    return 1
-  fi
-}
-
 install_node_static() {
   log "Attempting static package from Volumio repository" "info"
   local pkg_url="${NODE_STATIC_REPO}/nodejs_${NODE_VERSION}-1custom_${VOLUMIO_ARCH}.deb"
@@ -320,13 +299,9 @@ validate_node_version() {
   return 0
 }
 
-# Tiered installation: NodeSource (exact version) -> Static -> Fail
-if ! install_node_nodesource; then
-  log "NodeSource installation failed, attempting static package" "wrn"
-  if ! install_node_static; then
-    log "FATAL: All Node.js installation methods failed" "err"
+if ! install_node_static; then
+    log "FATAL: Node.js failed" "err"
     exit 10
-  fi
 fi
 
 # Validate exact version

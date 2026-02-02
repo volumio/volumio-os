@@ -317,34 +317,6 @@ device_chroot_tweaks_pre() {
 	wget -nv https://github.com/WiringPi/WiringPi/releases/download/3.10/wiringpi_3.10_armhf.deb
 	dpkg -i wiringpi_3.10_armhf.deb && rm wiringpi_3.10_armhf.deb
 
-	CURRENT_NODE=$(node --version | tr -d 'v')
-	log "Node version installed:" "dbg" "${CURRENT_NODE}"
-	log "Node version required:" "dbg" "${NODE_VERSION}"
-	if [[ ${USE_NODE_ARMV6:-yes} == yes && ${CURRENT_NODE%%.*} -ge 8 ]]; then
-		log "Replacing with armv6-compatible nodejs ${NODE_VERSION}" "info"
-		declare -A NodeVersion=(
-			[20]="${NODE_STATIC_REPO}/nodejs_${NODE_VERSION}-1custom_arm.deb"
-		)
-		mkdir -p /volumio/customNode
-		wget -nv "${NodeVersion[${NODE_VERSION%%.*}]}" -P /volumio/customNode || {
-			log "Failed fetching nodejs ${NODE_VERSION} for arm" "err"
-			exit 10
-		}
-		# Proceed only if there is a deb to install
-		if compgen -G "/volumio/customNode/nodejs_*.deb" >/dev/null; then
-			# Get rid of armv7 nodejs and pick up the armv6l version
-			if dpkg -s nodejs &>/dev/null; then
-				log "Removing previous nodejs installation from $(command -v node)" "info"
-				log "Removing Node $(node --version) arm_version: $(node <<<'console.log(process.config.variables.arm_version)')" "info"
-				apt-get -y purge nodejs
-			fi
-			log "Installing Node ${NODE_VERSION} for arm" "info"
-			dpkg -i /volumio/customNode/nodejs_*.deb
-			log "Installed Node $(node --version) arm_version: $(node <<<'console.log(process.config.variables.arm_version)')" "info"
-			rm -rf /volumio/customNode
-		fi
-	fi
-
 	log "Adding gpio & spi group and permissions" "info"
 	groupadd -f --system gpio
 	groupadd -f --system spi

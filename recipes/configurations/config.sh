@@ -3,7 +3,6 @@
 
 declare -A SecureApt=(
   [debian_12.gpg]="https://ftp-master.debian.org/keys/archive-key-12.asc"
-  [nodesource.gpg]="https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key"
   [lesbonscomptes.gpg]="https://www.lesbonscomptes.com/pages/lesbonscomptes.gpg"
   #TODO Not needed for arm64 and x86
   [raspbian.gpg]="https://archive.raspbian.org/raspbian.public.key"
@@ -53,7 +52,6 @@ NODE_VERSION_MAJOR="${NODE_VERSION%%.*}"
 # Used to pull the right version of modules
 # expected format node_modules_{arm/x86}-v${NODE_VERSION}.tar.gz
 NODE_MODULES_REPO="https://github.com/volumio/volumio3-os-static-assets/raw/master/node_modules"
-# Static Node.js packages (fallback if NodeSource unavailable)
 NODE_STATIC_REPO="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/nodejs"
 
 ## 
