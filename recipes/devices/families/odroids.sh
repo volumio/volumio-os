@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-## Setup for Odroid C4 device  (Community Portings)
+## Setup for Odroid C4/N2 device  (Community Portings)
 
 # Base system
 BASE="Debian"
@@ -10,9 +10,10 @@ BUILD="armv7"
 UINITRD_ARCH="arm64"
 
 ### Device information
-DEVICEFAMILY="odroid"
+DEVICEFAMILY="odroidv4"
 # This is useful for multiple devices sharing the same/similar kernel
-DEVICEREPO="https://github.com/volumio/platform-odroid.git"
+DEVICEREPO="https://github.com/gkkpch/platform-odroidv4.git"
+DEVICEREPO_BRANCH="master"
 
 ### What features do we want to target
 # TODO: Not fully implement
@@ -23,7 +24,7 @@ KIOSKMODE=no
 
 ## Partition info
 BOOT_START=1
-BOOT_END=64
+BOOT_END=128
 BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=yes        # Add UUID to fstab
 INIT_TYPE="initv3"
@@ -41,14 +42,18 @@ write_device_files() {
 
   cp ${PLTDIR}/${DEVICEBASE}/boot/*.ini "${ROOTFSMNT}/boot"
   cp -dR "${PLTDIR}/${DEVICEBASE}/boot/amlogic" "${ROOTFSMNT}/boot"
-  cp "${PLTDIR}/${DEVICEBASE}/boot/Image.gz" "${ROOTFSMNT}/boot"
+  cp "${PLTDIR}/${DEVICEBASE}/boot/Image" "${ROOTFSMNT}/boot"
   cp ${PLTDIR}/${DEVICEBASE}/boot/config-* "${ROOTFSMNT}/boot"
   cp -pdR "${PLTDIR}/${DEVICEBASE}/lib/modules" "${ROOTFSMNT}/lib"
   cp -pdR "${PLTDIR}/${DEVICEBASE}/lib/firmware" "${ROOTFSMNT}/lib"
 
-  log "Add additional firmware (mainly wifi)"
-  cp -dR "${PLTDIR}/${DEVICEBASE}/firmware" "${ROOTFSMNT}/lib"
-
+  #log "Add additional firmware (mainly wifi)"
+  #cp -dR "${PLTDIR}/${DEVICEBASE}/firmware" "${ROOTFSMNT}/lib"
+  
+  log "Copying sound settings"
+  cp "${PLTDIR}/${DEVICEBASE}/soundsettings/cards.json" "${ROOTFSMNT}/volumio/app/plugins/audio_interface/alsa_controller"
+  cp "${PLTDIR}/${DEVICEBASE}/soundsettings/${DEVICE}/asound.state" "${ROOTFSMNT}/var/lib/alsa"
+  
   log "Copying rc.local for ${DEVICENAME} performance tweaks"
   cp "${PLTDIR}/${DEVICEBASE}/etc/rc.local" "${ROOTFSMNT}/etc"
 
@@ -75,18 +80,18 @@ device_chroot_tweaks_pre() {
   log "Performing device_chroot_tweaks_pre" "ext"
 
   log "Creating UUIDs in boot.ini" "cfg"
-  sed -i "s/%%VOLUMIO-PARAMS%%/imgpart=UUID=${UUID_IMG} bootpart=UUID=${UUID_BOOT} datapart=UUID=${UUID_DATA}/" /boot/boot.ini
+  sed -i "s/%%VOLUMIO-UUIDPARAMS%%/imgpart=UUID=${UUID_IMG} bootpart=UUID=${UUID_BOOT} datapart=UUID=${UUID_DATA}/" /boot/config.ini
 
   # Configure kernel parameters, overrule $verbosity in order to keep the template (platform files) untouched
   if [ "${DEBUG_IMAGE}" == "yes" ]; then
     log "Configuring DEBUG kernel parameters" "cfg"
-    sed -i "s/loglevel=\$verbosity/loglevel=8 nosplash break= use_kmsg=yes/" /boot/boot.ini
+    sed -i "s/%%VERBOSITY%%/verbosity=loglevel=8 nosplash break= use_kmsg=yes/" /boot/config.ini
   else
     log "Configuring default kernel parameters" "cfg"
-    sed -i "s/loglevel=\$verbosity/quiet loglevel=0/" /boot/boot.ini
+    sed -i "s/%%VERBOSITY%%/verbosity=quiet nosplash loglevel=0/" /boot/boot.ini
     if [[ -n "${PLYMOUTH_THEME}" ]]; then
       log "Adding splash kernel parameters" "cfg"      
-      sed -i "s/loglevel=0/loglevel=0 splash plymouth.ignore-serial-consoles initramfs.clear/" /boot/boot.ini
+      sed -i "s/%%VERBOSITY%%/verbosity=loglevel=0 splash plymouth.ignore-serial-consoles initramfs.clear/" /boot/config.ini
     fi  
   fi
 
