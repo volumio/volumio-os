@@ -5,14 +5,12 @@
 DEVICE_SUPPORT_TYPE="C" # First letter (Community Porting|Supported Officially|OEM)
 DEVICE_STATUS="P"       # First letter (Planned|Test|Maintenance)
 
-# shellcheck source=./recipes/devices/families/odroids-newgen.sh
+# shellcheck source=./recipes/devices/families/odroids.sh
 source "${SRC}"/recipes/devices/families/odroids.sh
 
 ### Device information
 DEVICENAME="Odroid-N2"
 DEVICE="odroidn2"
 
-# Plymouth theme?
 PLYMOUTH_THEME="volumio-adaptive"
-# Debug image?
-DEBUG_IMAGE="no"
+DEBUG_IMAGE="yes"

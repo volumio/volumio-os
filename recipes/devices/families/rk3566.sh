@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-## Setup for Radxa Zero 3W
+## Setup for Radxa Zero 3W/ Odroid M1S
 DEVICE_SUPPORT_TYPE="S" # First letter (Community Porting|Supported Officially|OEM)
 DEVICE_STATUS="P"       # First letter (Planned|Test|Maintenance)
 
