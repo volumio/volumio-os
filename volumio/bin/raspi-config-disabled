@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Volumio OS: raspi-config is not supported. It overwrites boot/config and can break the system.
+cat <<'EOF'
+--------------------------------------------------------------------------------
+raspi-config is not supported on Volumio OS.
+
+It is designed for Raspberry Pi OS and will overwrite Volumio's boot config,
+locale, and system settings. This can break or permanently damage your
+Volumio installation (e.g. boot failure, lost customisations).
+
+For locale, region, network, and system updates please use the Volumio web UI
+or the supported update process (Settings / System Update in the UI).
+--------------------------------------------------------------------------------
+EOF
+exit 1
