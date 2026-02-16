@@ -4,7 +4,7 @@ After=systemd-rfkill.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/volumio_rfkill_unblock.sh
+ExecStart=/usr/sbin/rfkill unblock all
 StandardOutput=journal
 StandardError=journal
 LogLevelMax=info
