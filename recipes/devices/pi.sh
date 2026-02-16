@@ -240,6 +240,10 @@ device_image_tweaks() {
 	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" "https://raw.githubusercontent.com/${RpiUpdateRepo}/${RpiUpdateBranch}/rpi-update" &&
 		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
 
+	log "Installing raspi-config blocker (Volumio OS does not support raspi-config)" "info"
+	cp "${SRC}/volumio/bin/raspi-config-disabled" "${ROOTFSMNT}/usr/bin/raspi-config"
+	chmod +x "${ROOTFSMNT}/usr/bin/raspi-config"
+
 	# ============================================================================
 	# RPI-UPDATE BUG FIX
 	# ============================================================================
@@ -792,4 +796,11 @@ device_image_tweaks_post() {
 		log "Updating plymouth systemd services" "info"
 		cp -dR "${SRC}"/volumio/framebuffer/systemd/* "${ROOTFSMNT}"/lib/systemd
 	fi
+
+	log "Blocking raspi-config package (Volumio OS does not support raspi-config)" "info"
+	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/raspi-config"
+		Package: raspi-config
+		Pin: release *
+		Pin-Priority: -1
+	EOF
 }
