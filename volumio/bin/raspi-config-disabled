@@ -1,5 +1,66 @@
 #!/usr/bin/env bash
-# Volumio OS: raspi-config is not supported. It overwrites boot/config and can break the system.
+# Volumio OS: raspi-config wrapper. Permit nonint checks only (read-only); block interactive and any changes.
+#
+# Supported raspi-config nonint <check> (read-only; no config changes):
+#   is_pi, is_pione, is_pitwo, is_pithree, is_pifour, is_pifive, is_pizero, is_pi02
+#   gpu_has_mmu, get_pi_type
+# Pi 5 family (Pi 5, Pi 500, CM5) matched via device-tree model. Unknown nonint: blocked.
+
+if [ "${1:-}" = "nonint" ] && [ -n "${2:-}" ]; then
+	rev_file="/proc/cpuinfo"
+	model="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)"
+	case "$2" in
+		gpu_has_mmu)
+			# Pi 4 and Pi 5 family (Pi 5, Pi 500, CM5) have GPU with MMU (vc4)
+			case "$model" in *"Raspberry Pi 4"*|*"Raspberry Pi 5"*|*"Compute Module 5"*) exit 0 ;; *) exit 1 ;; esac
+			;;
+		is_pifive)
+			# Pi 5, Pi 500, CM5 (BCM2712; "Raspberry Pi 5" matches Pi 5 and Pi 500)
+			case "$model" in *"Raspberry Pi 5"*|*"Compute Module 6"*) exit 0 ;; *) exit 1 ;; esac
+			;;
+		is_pi02)
+			# Pi Zero 2 W
+			case "$model" in *"Zero 2"*) exit 0 ;; *) exit 1 ;; esac
+			;;
+		get_pi_type)
+			# Output: 0=Zero, 1=One, 2=Two, 3=Three, 4=Four, 5=Five/500/CM5, -1=unknown
+			case "$model" in *"Raspberry Pi 5"*|*"Compute Module 5"*) echo 5; exit 0 ;; esac
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F]3[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]$" "$rev_file" 2>/dev/null && { echo 4; exit 0; }
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F]2[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]$" "$rev_file" 2>/dev/null && { echo 3; exit 0; }
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]04[0-9a-fA-F]$" "$rev_file" 2>/dev/null && { echo 2; exit 0; }
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]0[9cC][0-9a-fA-F]$" "$rev_file" 2>/dev/null && { echo 0; exit 0; }
+			grep -q "^Revision[[:space:]]*:[[:space:]]*00[0-9a-fA-F][0-9a-fA-F]$" "$rev_file" 2>/dev/null && { echo 1; exit 0; }
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]0[0-36][0-9a-fA-F]$" "$rev_file" 2>/dev/null && { echo 1; exit 0; }
+			echo -1; exit 0
+			;;
+		is_pifour)
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F]3[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]$" "$rev_file" 2>/dev/null && exit 0 || exit 1
+			;;
+		is_pithree)
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F]2[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]$" "$rev_file" 2>/dev/null && exit 0 || exit 1
+			;;
+		is_pitwo)
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]04[0-9a-fA-F]$" "$rev_file" 2>/dev/null && exit 0 || exit 1
+			;;
+		is_pione)
+			grep -q "^Revision[[:space:]]*:[[:space:]]*00[0-9a-fA-F][0-9a-fA-F]$" "$rev_file" 2>/dev/null && exit 0
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]0[0-36][0-9a-fA-F]$" "$rev_file" 2>/dev/null && exit 0
+			exit 1
+			;;
+		is_pizero)
+			grep -q "^Revision[[:space:]]*:[[:space:]]*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]0[9cC][0-9a-fA-F]$" "$rev_file" 2>/dev/null && exit 0 || exit 1
+			;;
+		is_pi)
+			arch="$(dpkg --print-architecture 2>/dev/null)"
+			case "$arch" in armhf|arm64) exit 0 ;; *) exit 1 ;; esac
+			;;
+		*)
+			# Unknown nonint: likely a do_* (changes config) or unsupported check – block
+			;;
+	esac
+fi
+
+# Interactive or unsupported (including nonint do_*): show warning and exit 1
 cat <<'EOF'
 --------------------------------------------------------------------------------
 raspi-config is not supported on Volumio OS.
