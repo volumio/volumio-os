@@ -16,7 +16,7 @@ if [ "${1:-}" = "nonint" ] && [ -n "${2:-}" ]; then
 			;;
 		is_pifive)
 			# Pi 5, Pi 500, CM5 (BCM2712; "Raspberry Pi 5" matches Pi 5 and Pi 500)
-			case "$model" in *"Raspberry Pi 5"*|*"Compute Module 6"*) exit 0 ;; *) exit 1 ;; esac
+			case "$model" in *"Raspberry Pi 5"*|*"Compute Module 5"*) exit 0 ;; *) exit 1 ;; esac
 			;;
 		is_pi02)
 			# Pi Zero 2 W
