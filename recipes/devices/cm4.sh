@@ -87,23 +87,12 @@ RpiUpdateBranch="master"
 
 declare -A PI_KERNELS=(
 	#[KERNEL_VERSION]="SHA|Branch|Rev"
-	[6.1.57]="12833d1bee03c4ac58dc4addf411944a189f1dfd|master|1688" # Support for Pi5
-	[6.1.58]="7b859959a6642aff44acdfd957d6d66f6756021e|master|1690"
-	[6.1.61]="d1ba55dafdbd33cfb938bca7ec325aafc1190596|master|1696"
-	[6.1.64]="01145f0eb166cbc68dd2fe63740fac04d682133e|master|1702"
-	[6.1.69]="ec8e8136d773de83e313aaf983e664079cce2815|master|1710"
-	[6.1.70]="fc9319fda550a86dc6c23c12adda54a0f8163f22|master|1712"
-	[6.1.77]="5fc4f643d2e9c5aa972828705a902d184527ae3f|master|1730"
-	[6.6.30]="3b768c3f4d2b9a275fafdb53978f126d7ad72a1a|master|1763"
-	[6.6.47]="a0d314ac077cda7cbacee1850e84a57af9919f94|master|1792"
-	[6.6.51]="d5a7dbe77b71974b9abb133a4b5210a8070c9284|master|1796"
-	[6.6.56]="a5efb544aeb14338b481c3bdc27f709e8ee3cf8c|master|1803"
 	[6.6.62]="9a9bda382acec723c901e5ae7c7f415d9afbf635|master|1816"
-	[6.12.27]="f54e67fef6e726725d3a8f56d232194497bd247c|master|1876"
-	[6.12.34]="4f435f9e89a133baab3e2c9624b460af335bbe91|master|1889"
+	[6.12.47]="6d1da66a7b1358c9cd324286239f37203b7ce25c|master|1904"
+	[6.12.74]="7a35bddc777d8992bdfe42f8e3d043582df2f5f8|master|1948"
 )
 # Version we want
-KERNEL_VERSION="6.12.34"
+KERNEL_VERSION="6.12.74"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -246,8 +235,8 @@ device_chroot_tweaks_pre() {
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
 		[vfirmware]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/bookworm/firmware-volumio.tar.gz"
-		[PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
-		[MotivoCustom]="https://github.com/volumio/motivo-drivers/raw/main/output/modules-rpi-${KERNEL_VERSION}-motivo.tar.gz"
+		[PiCustom]="https://raw.githubusercontent.com/volumio/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
+		[MotivoCustom]="https://github.com/Darmur/motivo-drivers-evo/raw/main/output/modules-rpi-${KERNEL_VERSION}-motivo.tar.gz"
 		[RPiUserlandTools]="https://github.com/volumio/volumio3-os-static-assets/raw/master/tools/rpi-softfp-vc.tar.gz"
 	)
 
