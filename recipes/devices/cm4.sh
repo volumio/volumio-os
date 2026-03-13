@@ -242,10 +242,29 @@ device_chroot_tweaks_pre() {
 
 	# Define the kernel version (already parsed earlier)
 
+	# Remove RPi0/RPi1 kernel
+	if [ -d "/lib/modules/${KERNEL_VERSION}+" ]; then
+		log "Removing ${KERNEL_VERSION}+ Kernel and modules" "info"
+		rm -rf /boot/kernel.img
+		rm -rf "/lib/modules/${KERNEL_VERSION}+"
+	fi
+
+	# Remove RPi2 kernel
+	if [ -d "/lib/modules/${KERNEL_VERSION}-v7+" ]; then
+		log "Removing ${KERNEL_VERSION}-v7+ Kernel and modules" "info"
+		rm -rf /boot/kernel7.img
+		rm -rf "/lib/modules/${KERNEL_VERSION}-v7+"
+	fi
+
 	# Remove Pi5 16K kernel
-	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]]; then
+	if [ -d "/lib/modules/${KERNEL_VERSION}-v8_16k+" ]; then
+		log "Removing ${KERNEL_VERSION}-v8_16k+ Kernel and modules" "info"
+		rm -rf /boot/kernel_2712.img
+		rm -rf "/lib/modules/${KERNEL_VERSION}-v8_16k+"
+	fi
+	if [ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]; then
 		log "Removing v8-16k+ (Pi5 16k) Kernel and modules" "info"
-		rm -f /boot/kernel_2712.img
+		rm -rf /boot/kernel_2712.img
 		rm -rf "/lib/modules/${KERNEL_VERSION}-v8-16k+"
 	fi
 
@@ -265,7 +284,7 @@ device_chroot_tweaks_pre() {
 		fi
 	done
 
-	# Optional: remove any empty module folders
+	# Remove any empty module folders
 	for kdir in /lib/modules/${KERNEL_VERSION}*; do
 		if [[ -d "$kdir" && ! -f "$kdir/modules.builtin" ]]; then
 			kbase=$(basename "$kdir")
