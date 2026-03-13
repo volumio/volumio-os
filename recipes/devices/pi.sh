@@ -148,9 +148,10 @@ declare -A PI_KERNELS=(
 	[6.12.34]="4f435f9e89a133baab3e2c9624b460af335bbe91|master|1889"
 	[6.12.47]="6d1da66a7b1358c9cd324286239f37203b7ce25c|master|1904"
 	[6.12.50]="a22bb2f110bc8953523714ac58251f47ae4e2d2b|master|1909"
+	[6.12.74]="7a35bddc777d8992bdfe42f8e3d043582df2f5f8|master|1948"
 )
 # Version we want
-KERNEL_VERSION="6.12.47"
+KERNEL_VERSION="6.12.74"
 
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
@@ -370,11 +371,10 @@ device_chroot_tweaks_pre() {
 	declare -A CustomFirmware=(
 		[AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
 		[TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
-		[Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
 		[wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
 		[brcmfmac43430b0]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/brcmfmac43430b0/brcmfmac43430b0.tar.gz"
 		[vfirmware]="https://raw.githubusercontent.com/volumio/volumio3-os-static-assets/master/firmwares/bookworm/firmware-volumio.tar.gz"
-		[PiCustom]="https://raw.githubusercontent.com/Darmur/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
+		[PiCustom]="https://raw.githubusercontent.com/volumio/volumio-rpi-custom/main/output/modules-rpi-${KERNEL_VERSION}-custom.tar.gz"
 	)
 
 	# Define the kernel version (already parsed earlier)
