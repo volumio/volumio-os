@@ -108,8 +108,6 @@ MODULES=(
   # Waveshare DSI displays
   "panel-waveshare-dsi"
   "panel-waveshare-dsi-v2"
-  # Motivo DSI displays
-  "panel-dsi-mt"
   # SPI/FBTFT displays - legacy framebuffer support
   "fbtft"
   "fb_ili9340" 
@@ -283,23 +281,22 @@ device_image_tweaks() {
 	# ============================================================================
 	# RPI-UPDATE FLAGS CONFIGURATION
 	# ============================================================================
-	# TARGET: CM5 needs ONLY these two kernel variants:
-	#   1. kernel7l.img with -v7l+ modules  (CM5 32-bit, BCM2712 in armv7 mode)
-	#   2. kernel8.img  with -v8+ modules   (CM5 64-bit, standard 4KB pages)
+	# TARGET: CM5 needs ONLY one kernel variant:
+	#   1. kernel8.img with -v8+ modules (64-bit, standard 4KB pages)
 	#
-	# LIMITATION: rpi-update has no granular 32-bit kernel selection.
-	# WANT_32BIT=1 is required for v7l+ but also installs:
-	#   - kernel.img   with + modules   (ARMv6 Pi 1/Zero - not needed for CM5)
-	#   - kernel7.img  with -v7+ modules (Pi 2/3 - not needed for CM5)
-	# These unwanted kernels are removed in device_chroot_tweaks_pre() cleanup.
+	# BACKGROUND: CM5 uses the same BCM2712 SoC as Pi 5. The 32-bit kernel
+	# (v7l+) does NOT work on BCM2712. On the standard pi image, when used
+	# on CM5, the v8+ kernel is selected. We are not using the 16KB page
+	# kernel (v8-16k+ / kernel_2712.img) at this time - sticking with the
+	# proven v8+ configuration.
 	#
 	# FLAG DECISIONS:
-	#   WANT_32BIT=1      - Required for v7l+ (also installs unwanted + and v7+)
+	#   WANT_32BIT=0      - 32-bit kernel does not work on BCM2712
 	#   WANT_64BIT=1      - Required for v8+ modules (standard 64-bit)
 	#   WANT_64BIT_RT=0   - Exclude realtime kernels (not needed)
-	#   WANT_16K=0        - Exclude Pi 5 16KB page kernels (not needed)
+	#   WANT_16K=0        - Exclude 16KB page kernel (not using large pages yet)
 	#   WANT_PI2=0        - Exclude Pi 2 firmware (not CM5 hardware)
-	#   WANT_PI4=1        - Enable Pi 4 support (required by rpi-update for v7l+)
+	#   WANT_PI4=0        - Exclude Pi 4 firmware (not CM5 hardware)
 	#   WANT_PI5=1        - Enable Pi 5/CM5 firmware, device trees, and DTBs
 	# ============================================================================
 	RpiUpdate_args=(
@@ -309,12 +306,12 @@ device_image_tweaks() {
 		"SKIP_WARNING=1"
 		"SKIP_BACKUP=1"
 		"SKIP_CHECK_PARTITION=1"
-		"WANT_32BIT=1"      # Install 32-bit kernels (v7+, v7l+)
+		"WANT_32BIT=0"      # EXCLUDE 32-bit (does not work on BCM2712)
 		"WANT_64BIT=1"      # Install standard 64-bit kernel (v8+)
 		"WANT_64BIT_RT=0"   # EXCLUDE realtime kernel (v8-rt+)
-		"WANT_16K=0"        # EXCLUDE Pi 5 16K kernel (v8-16k+)
+		"WANT_16K=0"        # EXCLUDE 16KB page kernel (not using large pages yet)
 		"WANT_PI2=0"        # EXCLUDE Pi 2 support
-		"WANT_PI4=1"        # Enable Pi 4 support (needed for v7l+ installation)
+		"WANT_PI4=0"        # EXCLUDE Pi 4 support
 		"WANT_PI5=1"        # Enable Pi 5/CM5 firmware and device trees
 	)
 	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
@@ -375,20 +372,21 @@ device_chroot_tweaks_pre() {
 	# ----------------------------------------------------------------------------
 	# STEP 1: Remove unwanted kernel module directories (WHITELIST approach)
 	# ----------------------------------------------------------------------------
-	# DECISION: For CM5, use a whitelist - keep ONLY the two kernel variants
+	# DECISION: For CM5, use a whitelist - keep ONLY the single kernel variant
 	# that CM5 hardware actually uses and remove everything else.
-	# WHY: rpi-update installs extra 32-bit kernels (+ and -v7+) that we
-	# cannot prevent via flags, plus 16K page kernels (-v8-16k+) that we
-	# do not need. Whitelist is more robust and future-proof.
+	# WHY: CM5 uses BCM2712 (same SoC as Pi 5). The 32-bit kernel does not
+	# work on BCM2712. The proven working configuration is the standard v8+
+	# kernel (64-bit, 4KB pages). We are not using the 16KB page kernel
+	# (v8-16k+) at this time.
 	#
 	# KEEP:
-	#   *-v7l+  --> CM5 32-bit (BCM2712 in armv7 mode via arm_64bit=0)
-	#   *-v8+   --> CM5 64-bit (standard 4KB pages)
+	#   *-v8+   --> CM5 64-bit (standard 4KB pages, proven working)
 	#
 	# REMOVE (everything else):
 	#   *+      --> ARMv6 base kernel (Pi 1/Zero/CM1 - not CM5 hardware)
-	#   *-v7+   --> ARMv7 kernel (Pi 2/3/Zero2W - not needed for CM5)
-	#   *-16k+  --> Pi 5 16KB page kernel (not needed - CM5 uses v8+ 4KB)
+	#   *-v7+   --> ARMv7 kernel (Pi 2/3/Zero2W - not CM5 hardware)
+	#   *-v7l+  --> 32-bit kernel (does not work on BCM2712)
+	#   *-v8-16k+ --> 16KB page kernel (not using large pages yet)
 	#   *-rt+   --> Realtime kernels (not needed for Volumio)
 	#   *+rpt-rpi-* --> Raspberry Pi OS package-managed kernels
 	# ----------------------------------------------------------------------------
@@ -396,11 +394,10 @@ device_chroot_tweaks_pre() {
 		[[ ! -d "$kdir" ]] && continue
 		kbase=$(basename "$kdir")
 
-		# Whitelist: keep only CM5-relevant kernel suffixes
+		# Whitelist: keep only CM5 64-bit kernel
 		# Pattern anchored to end of string for precise matching
-		# -v7l+ does NOT match -v7+ (the "l" distinguishes Pi 4/5 32-bit from Pi 2/3)
 		# -v8+ does NOT match -v8-16k+ or -v8-rt+ (no extra suffix after v8)
-		if [[ "$kbase" == *-v7l+ ]] || [[ "$kbase" == *-v8+ ]]; then
+		if [[ "$kbase" == *-v8+ ]]; then
 			log "Keeping CM5 kernel modules: $kbase" "info"
 			continue
 		fi
@@ -426,26 +423,30 @@ device_chroot_tweaks_pre() {
 	# ----------------------------------------------------------------------------
 	# STEP 3: Remove unwanted kernel images from /boot (WHITELIST approach)
 	# ----------------------------------------------------------------------------
-	# DECISION: Keep only CM5-relevant kernel images, remove all others.
-	# CM5 (BCM2712) boots with kernel7l.img (32-bit) or kernel8.img (64-bit).
-	# With arm_64bit=1 (default), firmware selects kernel_2712.img then kernel8.img.
-	# We remove kernel_2712.img so firmware falls back to kernel8.img (4KB pages).
-	# All other kernel images are for hardware CM5 does not use.
+	# DECISION: Keep only kernel8.img, remove all others.
+	# CM5 (BCM2712) uses the standard 64-bit kernel (v8+, 4KB pages).
+	# 32-bit kernels do not work on BCM2712. The 16KB page kernel
+	# (kernel_2712.img) is not being used at this time.
 	# ----------------------------------------------------------------------------
 
-	# Remove ARMv6 base kernel image
-	# WHY: kernel.img is for Pi 1/Zero/CM1 (ARMv6) - CM5 is BCM2712
 	log "Removing non-CM5 kernel images" "info"
+	# Remove ARMv6 base kernel image
+	# WHY: kernel.img is for Pi 1/Zero/CM1 (ARMv6) - does not work on BCM2712
 	rm -f /boot/kernel.img          # ARMv6 Pi 1/Zero kernel
 
 	# Remove Pi 2/3 kernel image
-	# WHY: kernel7.img is for Pi 2/3 (ARMv7 v7+) - CM5 uses kernel7l.img
+	# WHY: kernel7.img is for Pi 2/3 (ARMv7 v7+) - does not work on BCM2712
 	rm -f /boot/kernel7.img         # ARMv7 Pi 2/3 kernel
 
+	# Remove 32-bit kernel image
+	# WHY: kernel7l.img is 32-bit (v7l+) - does not work on BCM2712
+	rm -f /boot/kernel7l.img        # 32-bit kernel (not functional on CM5)
+
 	# Remove Pi 5 16KB page kernel image
-	# WHY: kernel_2712.img uses 16KB pages - we want standard 4KB v8+ kernel
-	# SAFE: Without kernel_2712.img, CM5 firmware falls back to kernel8.img
-	rm -f /boot/kernel_2712.img     # Pi 5 16KB kernel
+	# WHY: kernel_2712.img uses 16KB pages - not using large pages yet
+	# NOTE: When large page support is needed, re-enable WANT_16K=1 and
+	# update this whitelist to keep kernel_2712.img and -v8-16k+ modules
+	rm -f /boot/kernel_2712.img     # Pi 5 16KB kernel (not using yet)
 	rm -f /boot/kernel2712.img      # Alternate naming
 
 	# Remove realtime kernel images if they exist
@@ -460,17 +461,16 @@ device_chroot_tweaks_pre() {
 	# VERIFICATION CHECKPOINT - CM5 ONLY
 	# ============================================================================
 	# At this point, /lib/modules should contain ONLY:
-	#   - {version}-v7l+ (CM5 32-bit, BCM2712 in armv7 mode)
-	#   - {version}-v8+  (CM5 64-bit, standard 4KB pages)
+	#   - {version}-v8+ (CM5 64-bit, standard 4KB pages)
 	#
-	# And /boot should contain ONLY these kernel images:
-	#   - kernel7l.img  (CM5 32-bit)
-	#   - kernel8.img   (CM5 64-bit)
+	# And /boot should contain ONLY this kernel image:
+	#   - kernel8.img  (CM5 64-bit)
 	#
 	# NOT present (removed by whitelist cleanup):
 	#   - Any + suffix directories or kernel.img (ARMv6)
 	#   - Any -v7+ suffix directories or kernel7.img (Pi 2/3)
-	#   - Any -v8-16k+ directories or kernel_2712.img (16KB pages)
+	#   - Any -v7l+ suffix directories or kernel7l.img (32-bit, not functional on BCM2712)
+	#   - Any -v8-16k+ directories or kernel_2712.img (16KB pages, not using yet)
 	#   - Any -v8-rt+ directories or kernel*_rt.img (realtime)
 	#   - Any +rpt-rpi- directories (package-managed kernels)
 	# ============================================================================
@@ -723,10 +723,11 @@ device_chroot_tweaks_pre() {
 	# WHY: CustomFirmware tarballs or apt-get upgrade may have introduced
 	# additional kernel module directories after STEP 1 cleanup.
 	# Re-apply the same whitelist to catch any late arrivals.
+	# CM5 uses ONLY v8+ (64-bit, 4KB pages).
 	for kdir in /lib/modules/*; do
 		[[ ! -d "$kdir" ]] && continue
 		kbase=$(basename "$kdir")
-		if [[ "$kbase" == *-v7l+ ]] || [[ "$kbase" == *-v8+ ]]; then
+		if [[ "$kbase" == *-v8+ ]]; then
 			continue
 		fi
 		log "Removing final-stage non-CM5 kernel modules: $kbase" "info"
@@ -736,11 +737,11 @@ device_chroot_tweaks_pre() {
 
 	log "Finalise all kernels with depmod and other tricks" "info"
 	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
-	# + 	--> Pi 1,Zero,ZeroW, and CM 1
-	# -v7+  --> Pi 2,3,3+,Zero 2W, CM3, and CM3+
-	# -v7l+ --> Pi 4,400, CM 4, CM 5 (32bit)
-	# -v8+  --> Pi 3,3+,4,400,5, Zero 2W, CM 3,3+,4,5 (64bit)
-	# -v8-16k+ --> Pi 5, CM 5 (64bit, 16KB pages - excluded from this build)
+	# +         --> Pi 1,Zero,ZeroW, and CM 1 -- EXCLUDED (not BCM2712)
+	# -v7+      --> Pi 2,3,3+,Zero 2W, CM3, and CM3+ -- EXCLUDED (not BCM2712)
+	# -v7l+     --> Pi 4,400, CM 4 (32bit) -- EXCLUDED (32-bit does not work on BCM2712)
+	# -v8+      --> Pi 3,3+,4,400,5, Zero 2W, CM 3,3+,4,5 (64bit) -- KEPT for CM5
+	# -v8-16k+  --> Pi 5, CM 5 (64bit, 16KB pages) -- EXCLUDED (not using large pages yet)
 
 	## Reconfirm our final kernel lists - we may have deleted a few!
 	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
@@ -780,4 +781,3 @@ device_image_tweaks_post() {
 		Pin-Priority: -1
 	EOF
 }
-                   
