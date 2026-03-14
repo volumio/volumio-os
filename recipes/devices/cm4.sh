@@ -64,7 +64,59 @@ else
 fi
 
 # Modules that will be added to initramfs
-MODULES=("drm" "fuse" "nls_cp437" "nls_iso8859_1" "nvme" "nvme_core" "overlay" "panel-dsi-mt" "panel-waveshare-dsi" "squashfs" "uas")
+MODULES=(
+  # Core filesystem and storage modules
+  "fuse" 
+  "nls_iso8859_1" 
+  "nvme" 
+  "nvme_core" 
+  "overlay" 
+  "squashfs" 
+  "uas"  
+  # ALSA sound subsystem - required for vc4/HDMI audio during boot
+  # Base ALSA module - must load before any other sound modules
+  "snd"
+  # ALSA timer and PCM support
+  "snd-timer"
+  "snd-pcm"
+  "snd-pcm-dmaengine"
+  "snd-compress"
+  # ASoC core - required by vc4 for HDMI audio
+  "snd-soc-core"
+  # Audio codecs - Pi hardware audio support
+  # Built-in audio jack - Pi 0-4
+  "snd-bcm2835"
+  # I2S audio interface - all Pi models
+  "snd-soc-bcm2835-i2s"
+  # I2C and SPI controllers - required for display panel communication
+  # I2C controller for Pi 0-4
+  "i2c-bcm2835"
+  # Display infrastructure - required for Plymouth splash
+  # Backlight control for display panels
+  "backlight"
+  # Panel orientation detection
+  "drm_panel_orientation_quirks"
+  # DRM/KMS foundation - required for Plymouth graphical boot
+  "drm" 
+  "drm_kms_helper"
+  # Display helper for vc4
+  "drm_display_helper"
+  # DMA helper for vc4
+  "drm_dma_helper"
+  # HDMI CEC support
+  "cec"
+  # VideoCore IV GPU driver - Pi 0-4
+  "vc4"
+  # DSI display panels - touchscreen support during boot
+  # Motivo DSI displays
+  "panel-dsi-mt"
+  # SPI/FBTFT displays - legacy framebuffer support
+  "fbtft"
+  # Touch controller drivers
+  "goodix"
+  "ads7846"
+)
+
 # Packages that will be installed
 PACKAGES=( # Bluetooth packages
 	"bluez" "bluez-firmware" "pi-bluetooth"
@@ -80,7 +132,7 @@ PACKAGES=( # Bluetooth packages
 #Pi Specific
 RpiRepo="https://github.com/raspberrypi/rpi-firmware"
 RpiUpdateRepo="raspberrypi/rpi-update"
-## We ended with 10 versions od 6.12.34 kernels from master branch.
+## We ended with 10 versions of 6.12.34 kernels from master branch.
 ## Using older branch to avoid boot failures
 RpiUpdateBranch="master"
 # RpiUpdateBranch="1dd909e2c8c2bae7adb3eff3aed73c3a6062e8c8"
@@ -168,6 +220,31 @@ device_image_tweaks() {
 	cp "${SRC}/volumio/bin/raspi-config-disabled" "${ROOTFSMNT}/usr/bin/raspi-config"
 	chmod +x "${ROOTFSMNT}/usr/bin/raspi-config"
 
+	# ============================================================================
+	# RPI-UPDATE BUG FIX
+	# ============================================================================
+	# PROBLEM: rpi-update has a bug in its module filtering logic.
+	# The script uses: VERSION=$(echo $BASEDIR | cut -sd "-" -f2)
+	# This extracts ONLY field 2 when splitting by "-":
+	#   6.12.47-v8+      -> VERSION="v8+"     (correct)
+	#   6.12.47-v8-16k+  -> VERSION="v8"      (WRONG! should be "v8-16k")
+	#   6.12.47-v8-rt+   -> VERSION="v8"      (WRONG! should be "v8-rt")
+	#
+	# RESULT: WANT_16K=0 and WANT_64BIT_RT=0 flags are ignored because the
+	# filter never sees "v8-16k+" or "v8-rt+", only "v8".
+	#
+	# DECISION: Patch rpi-update before execution to fix the extraction logic.
+	# This ensures filtering works correctly at the source, reducing unnecessary
+	# downloads and filesystem operations.
+	# ============================================================================
+	log "Patching rpi-update to fix module filtering bug" "info"
+	sed -i 's/VERSION=$(echo $BASEDIR | cut -sd "-" -f2)/VERSION=$(echo $BASEDIR | cut -sd "+" -f1 | cut -sd "-" -f2-)/' "${ROOTFSMNT}/usr/bin/rpi-update"
+	# NEW LOGIC: Extract everything between first "-" and the "+"
+	#   6.12.47-v8+      -> VERSION="v8"
+	#   6.12.47-v8-16k+  -> VERSION="v8-16k"
+	#   6.12.47-v8-rt+   -> VERSION="v8-rt"
+	# Now the filtering logic will correctly identify and skip unwanted variants.
+
 	# For bleeding edge, check what is the latest on offer
 	# Things *might* break, so you are warned!
 	if [[ ${RPI_USE_LATEST_KERNEL:-no} == yes ]]; then
@@ -196,11 +273,43 @@ device_image_tweaks() {
 	# using rpi-update to fetch and install kernel and firmware
 	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}" "info"
-	RpiUpdate_args=("UPDATE_SELF=0" "ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
-		"SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
-		"WANT_32BIT=1" "WANT_64BIT=1" "WANT_PI2=1" "WANT_PI4=1"
-		"WANT_PI5=1" "WANT_16K=0" "WANT_64BIT_RT=0"
-		# "BRANCH=${KERNEL_BRANCH}"
+
+	# ============================================================================
+	# RPI-UPDATE FLAGS CONFIGURATION
+	# ============================================================================
+	# TARGET: CM4 needs ONLY these two kernel variants:
+	#   1. kernel7l.img with -v7l+ modules  (CM4 32-bit, BCM2711)
+	#   2. kernel8.img  with -v8+ modules   (CM4 64-bit, standard 4KB pages)
+	#
+	# LIMITATION: rpi-update has no granular 32-bit kernel selection.
+	# WANT_32BIT=1 is required for v7l+ but also installs:
+	#   - kernel.img   with + modules   (ARMv6 Pi 1/Zero - not needed for CM4)
+	#   - kernel7.img  with -v7+ modules (Pi 2/3 - not needed for CM4)
+	# These unwanted kernels are removed in device_chroot_tweaks_pre() cleanup.
+	#
+	# FLAG DECISIONS:
+	#   WANT_32BIT=1      - Required for v7l+ (also installs unwanted + and v7+)
+	#   WANT_64BIT=1      - Required for v8+ modules (standard 64-bit)
+	#   WANT_64BIT_RT=0   - Exclude realtime kernels (not needed)
+	#   WANT_16K=0        - Exclude Pi 5 16KB page kernels (not needed)
+	#   WANT_PI2=0        - Exclude Pi 2 firmware (not CM4 hardware)
+	#   WANT_PI4=1        - Enable Pi 4/CM4 support (v7l+)
+	#   WANT_PI5=0        - Exclude Pi 5 firmware (not CM4 hardware)
+	# ============================================================================
+	RpiUpdate_args=(
+		"UPDATE_SELF=0"
+		"ROOT_PATH=${ROOTFSMNT}"
+		"BOOT_PATH=${ROOTFSMNT}/boot"
+		"SKIP_WARNING=1"
+		"SKIP_BACKUP=1"
+		"SKIP_CHECK_PARTITION=1"
+		"WANT_32BIT=1"      # Install 32-bit kernels (v7+, v7l+)
+		"WANT_64BIT=1"      # Install standard 64-bit kernel (v8+)
+		"WANT_64BIT_RT=0"   # EXCLUDE realtime kernel (v8-rt+)
+		"WANT_16K=0"        # EXCLUDE Pi 5 16K kernel (v8-16k+)
+		"WANT_PI2=0"        # EXCLUDE Pi 2 support
+		"WANT_PI4=1"        # Enable Pi 4/CM4 support
+		"WANT_PI5=0"        # EXCLUDE Pi 5 firmware (not 16K kernel)
 	)
 	env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
 }
@@ -242,57 +351,121 @@ device_chroot_tweaks_pre() {
 
 	# Define the kernel version (already parsed earlier)
 
-	# Remove RPi0/RPi1 kernel
-	if [ -d "/lib/modules/${KERNEL_VERSION}+" ]; then
-		log "Removing ${KERNEL_VERSION}+ Kernel and modules" "info"
-		rm -rf /boot/kernel.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}+"
-	fi
+	# ============================================================================
+	# POST-INSTALLATION CLEANUP - DEFENSE IN DEPTH
+	# ============================================================================
+	# RATIONALE: Even with the rpi-update patch above, we implement aggressive
+	# cleanup as a safety net. This ensures that if:
+	#   1. The patch fails to apply
+	#   2. Future rpi-update versions change the filtering logic
+	#   3. Modules are installed through other mechanisms
+	# ...we still end up with ONLY the kernel variants we want.
+	#
+	# DECISION: Remove unwanted variants by pattern matching rather than
+	# relying solely on rpi-update flags. This is more robust.
+	# ============================================================================
 
-	# Remove RPi2 kernel
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v7+" ]; then
-		log "Removing ${KERNEL_VERSION}-v7+ Kernel and modules" "info"
-		rm -rf /boot/kernel7.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}-v7+"
-	fi
+	log "Post-installation cleanup: Removing unwanted kernel variants" "info"
 
-	# Remove Pi5 16K kernel
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v8_16k+" ]; then
-		log "Removing ${KERNEL_VERSION}-v8_16k+ Kernel and modules" "info"
-		rm -rf /boot/kernel_2712.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}-v8_16k+"
-	fi
-	if [ -d "/lib/modules/${KERNEL_VERSION}-v8-16k+" ]; then
-		log "Removing v8-16k+ (Pi5 16k) Kernel and modules" "info"
-		rm -rf /boot/kernel_2712.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}-v8-16k+"
-	fi
-
-	# Remove 64-bit realtime kernel
-	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8-rt+" ]]; then
-		log "Removing v8-rt+ (64bit RT) Kernel and modules" "info"
-		rm -f /boot/kernel_2712_rt.img
-		rm -rf "/lib/modules/${KERNEL_VERSION}-v8-rt+"
-	fi
-
-	# Remove all unintended +rpt-rpi-* variants
+	# ----------------------------------------------------------------------------
+	# STEP 1: Remove unwanted kernel module directories (WHITELIST approach)
+	# ----------------------------------------------------------------------------
+	# DECISION: For CM4, use a whitelist - keep ONLY the two kernel variants
+	# that CM4 hardware actually uses and remove everything else.
+	# WHY: rpi-update installs extra 32-bit kernels (+ and -v7+) that we
+	# cannot prevent via flags, plus the pattern-based exclusion approach
+	# missed these variants. Whitelist is more robust and future-proof.
+	#
+	# KEEP:
+	#   *-v7l+  --> CM4 32-bit (Pi 4/400/CM4, BCM2711)
+	#   *-v8+   --> CM4 64-bit (standard 4KB pages)
+	#
+	# REMOVE (everything else):
+	#   *+      --> ARMv6 base kernel (Pi 1/Zero/CM1 - not CM4 hardware)
+	#   *-v7+   --> ARMv7 kernel (Pi 2/3/Zero2W - not needed for CM4)
+	#   *-16k+  --> Pi 5 16KB page kernel (BCM2712 - not CM4)
+	#   *-rt+   --> Realtime kernels (not needed for Volumio)
+	#   *+rpt-rpi-* --> Raspberry Pi OS package-managed kernels
+	# ----------------------------------------------------------------------------
 	for kdir in /lib/modules/*; do
+		[[ ! -d "$kdir" ]] && continue
 		kbase=$(basename "$kdir")
-		if [[ "$kbase" == *+rpt-rpi-* ]]; then
-			log "Removing stray kernel module folder: $kbase" "info"
-			rm -rf "/lib/modules/$kbase"
+
+		# Whitelist: keep only CM4-relevant kernel suffixes
+		# Pattern anchored to end of string for precise matching
+		# -v7l+ does NOT match -v7+ (the "l" distinguishes Pi 4 from Pi 2/3)
+		# -v8+ does NOT match -v8-16k+ or -v8-rt+ (no extra suffix after v8)
+		if [[ "$kbase" == *-v7l+ ]] || [[ "$kbase" == *-v8+ ]]; then
+			log "Keeping CM4 kernel modules: $kbase" "info"
+			continue
 		fi
+
+		log "Removing non-CM4 kernel modules: $kbase" "info"
+		rm -rf "$kdir"
 	done
 
-	# Remove any empty module folders
+	# ----------------------------------------------------------------------------
+	# STEP 2: Remove empty or incomplete module directories
+	# ----------------------------------------------------------------------------
+	# DECISION: A valid kernel module directory must contain modules.builtin file
+	# WHY: Prevents boot failures from incomplete kernel installations
+	# ----------------------------------------------------------------------------
 	for kdir in /lib/modules/${KERNEL_VERSION}*; do
 		if [[ -d "$kdir" && ! -f "$kdir/modules.builtin" ]]; then
 			kbase=$(basename "$kdir")
-			log "Removing empty kernel module folder: $kbase" "info"
+			log "Removing incomplete kernel module directory: $kbase" "info"
 			rm -rf "$kdir"
 		fi
 	done
 
+	# ----------------------------------------------------------------------------
+	# STEP 3: Remove unwanted kernel images from /boot (WHITELIST approach)
+	# ----------------------------------------------------------------------------
+	# DECISION: Keep only CM4-relevant kernel images, remove all others.
+	# CM4 (BCM2711) boots with kernel7l.img (32-bit) or kernel8.img (64-bit).
+	# All other kernel images are for hardware CM4 does not use.
+	# ----------------------------------------------------------------------------
+
+	# Remove ARMv6 base kernel image
+	# WHY: kernel.img is for Pi 1/Zero/CM1 (ARMv6) - CM4 is BCM2711
+	log "Removing non-CM4 kernel images" "info"
+	rm -f /boot/kernel.img          # ARMv6 Pi 1/Zero kernel
+
+	# Remove Pi 2/3 kernel image
+	# WHY: kernel7.img is for Pi 2/3 (ARMv7 v7+) - CM4 uses kernel7l.img
+	rm -f /boot/kernel7.img         # ARMv7 Pi 2/3 kernel
+
+	# Remove Pi 5 specific kernel images
+	# WHY: kernel_2712.img is ONLY for Pi 5 with 16KB pages (BCM2712)
+	rm -f /boot/kernel_2712.img     # Pi 5 16KB kernel
+	rm -f /boot/kernel2712.img      # Alternate naming
+
+	# Remove realtime kernel images if they exist
+	# WHY: Corresponding to -v8-rt+ modules we don't want
+	rm -f /boot/kernel8_rt.img      # 64-bit RT kernel
+	rm -f /boot/kernel_rt.img       # Generic RT kernel naming
+	rm -f /boot/kernel*-rt*.img     # Catch any RT variants
+
+	log "Kernel cleanup completed" "okay"
+
+	# ============================================================================
+	# VERIFICATION CHECKPOINT - CM4 ONLY
+	# ============================================================================
+	# At this point, /lib/modules should contain ONLY:
+	#   - {version}-v7l+ (CM4 32-bit, BCM2711)
+	#   - {version}-v8+  (CM4 64-bit, standard 4KB pages)
+	#
+	# And /boot should contain ONLY these kernel images:
+	#   - kernel7l.img  (CM4 32-bit)
+	#   - kernel8.img   (CM4 64-bit)
+	#
+	# NOT present (removed by whitelist cleanup):
+	#   - Any + suffix directories or kernel.img (ARMv6)
+	#   - Any -v7+ suffix directories or kernel7.img (Pi 2/3)
+	#   - Any -v8-16k+ directories or kernel_2712.img (Pi 5)
+	#   - Any -v8-rt+ directories or kernel*_rt.img (realtime)
+	#   - Any +rpt-rpi- directories (package-managed kernels)
+	# ============================================================================
 	log "Finished Kernel installation" "okay"
 
 	### Other Rpi specific stuff
@@ -519,13 +692,18 @@ device_chroot_tweaks_pre() {
 		${kernel_params[@]}
 	EOF
 
-	log "Final cleanup: remove unintended +rpt-rpi-* kernel module folders" "info"
-	for kdir in /lib/modules/*+rpt-rpi-*; do
-		if [[ -d "$kdir" ]]; then
-			kbase=$(basename "$kdir")
-			log "Removing final-stage rpt-rpi kernel module folder:" "$kbase" "info"
-			rm -rf "$kdir"
+	log "Final cleanup: enforce CM4 kernel whitelist" "info"
+	# WHY: CustomFirmware tarballs or apt-get upgrade may have introduced
+	# additional kernel module directories after STEP 1 cleanup.
+	# Re-apply the same whitelist to catch any late arrivals.
+	for kdir in /lib/modules/*; do
+		[[ ! -d "$kdir" ]] && continue
+		kbase=$(basename "$kdir")
+		if [[ "$kbase" == *-v7l+ ]] || [[ "$kbase" == *-v8+ ]]; then
+			continue
 		fi
+		log "Removing final-stage non-CM4 kernel modules: $kbase" "info"
+		rm -rf "$kdir"
 	done
 	log "Raspi Kernel and Modules cleanup completed" "okay"
 
