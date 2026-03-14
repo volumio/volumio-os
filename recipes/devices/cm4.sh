@@ -84,6 +84,8 @@ MODULES=(
   # ASoC core - required by vc4 for HDMI audio
   "snd-soc-core"
   # Audio codecs - Pi hardware audio support
+  # HDMI audio codec - all Pi models with HDMI
+  "snd-soc-hdmi-codec"
   # Built-in audio jack - Pi 0-4
   "snd-bcm2835"
   # I2S audio interface - all Pi models
@@ -108,10 +110,23 @@ MODULES=(
   # VideoCore IV GPU driver - Pi 0-4
   "vc4"
   # DSI display panels - touchscreen support during boot
+  # Official Pi 7" touchscreen
+  "panel-raspberrypi-touchscreen"
+  # Official Pi Touch Display 2
+  "panel-ilitek-ili9881c"
+  # Waveshare DSI displays
+  "panel-waveshare-dsi"
+  "panel-waveshare-dsi-v2"
   # Motivo DSI displays
   "panel-dsi-mt"
   # SPI/FBTFT displays - legacy framebuffer support
   "fbtft"
+  "fb_ili9340" 
+  "fb_ili9341"
+  "fb_ili9488"
+  "fb_st7735r" 
+  "fb_st7789v"
+  "fb_hx8357d"
   # Touch controller drivers
   "goodix"
   "ads7846"
