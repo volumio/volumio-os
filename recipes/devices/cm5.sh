@@ -108,6 +108,8 @@ MODULES=(
   # Waveshare DSI displays
   "panel-waveshare-dsi"
   "panel-waveshare-dsi-v2"
+  # Motivo DSI displays
+  "panel-dsi-mt"
   # SPI/FBTFT displays - legacy framebuffer support
   "fbtft"
   "fb_ili9340" 
