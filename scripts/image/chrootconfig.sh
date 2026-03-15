@@ -102,13 +102,14 @@ log "Copying MPD custom systemd file"
 echo "[Unit]
 Description=Music Player Daemon
 Documentation=man:mpd(1) man:mpd.conf(5)
-After=network.target sound.target
+After=network.target sound.target local-fs.target
 Wants=mpd.socket
 
 [Service]
 Type=notify
 ExecStart=/usr/bin/mpd --no-daemon
 ExecStartPre=-/usr/bin/sudo /bin/chown mpd:audio /var/log/mpd.log
+ExecStartPre=/bin/sh -c 'mkdir -p /mnt/NAS /data/INTERNAL /media'
 StartLimitBurst=15
 
 # Enable this setting to ask systemd to watch over MPD.

@@ -334,7 +334,10 @@ apt-get clean
 rm -rf tmp/*
 
 log "Setting up MPD" "info"
-# Symlinking Mount Folders to Mpd's Folder
+# MPD uses a single music_directory (/var/lib/mpd/music). We point it at one source;
+# the last symlink wins (INTERNAL). At runtime the Volumio app may switch the symlink
+# to NAS or USB. Ensure these mount points exist before MPD starts (see mpd.service
+# ExecStartPre in chrootconfig.sh: mkdir -p /mnt/NAS /data/INTERNAL /media).
 ln -s /mnt/NAS /var/lib/mpd/music
 ln -s /mnt/USB /var/lib/mpd/music
 ln -s /mnt/INTERNAL /var/lib/mpd/music
