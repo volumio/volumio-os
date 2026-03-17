@@ -62,6 +62,17 @@ switch_back_vt() {
 	/sbin/chvt "${NORMAL_VT}" 2>/dev/null || true
 }
 
+# Resolve UUID= or LABEL= to /dev/... path so -b and lsblk/dd/mount work in initramfs
+resolve_partition_to_device() {
+	_spec="$1"
+	[ -z "${_spec}" ] && return
+	case "${_spec}" in
+		/dev/*) echo "${_spec}"; return ;;
+		UUID=*|LABEL=*) _d=$(/sbin/findfs "${_spec}" 2>/dev/null); [ -n "${_d}" ] && echo "${_d}"; return ;;
+		*) echo "${_spec}"; return ;;
+	esac
+}
+
 prepare_ota_storage() {
 	P1_END=""
 	P2_END=""
@@ -71,12 +82,19 @@ prepare_ota_storage() {
 	TAIL_MB=""
 	_need_resize=""
 	DATADEV=""
+	BOOT_DEVICE=""
+	IMAGE_DEVICE=""
+	DATA_DEVICE=""
 
-	# 1) Resolve disk device
-	if [ -z "${DATA_PARTITION}" ] || [ ! -b "${DATA_PARTITION}" ]; then
-		return 0
-	fi
-	DATADEV="/dev/$(/bin/lsblk -no PKNAME "${DATA_PARTITION}" 2>/dev/null)"
+	# 1) Resolve partition specs (UUID= or LABEL=) to device paths
+	[ -z "${DATA_PARTITION}" ] && return 0
+	DATA_DEVICE=$(resolve_partition_to_device "${DATA_PARTITION}")
+	[ -z "${DATA_DEVICE}" ] || [ ! -b "${DATA_DEVICE}" ] && return 0
+	BOOT_DEVICE=$(resolve_partition_to_device "${BOOT_PARTITION}")
+	IMAGE_DEVICE=$(resolve_partition_to_device "${IMAGE_PARTITION}")
+	[ -z "${BOOT_DEVICE}" ] || [ ! -b "${BOOT_DEVICE}" ] || [ -z "${IMAGE_DEVICE}" ] || [ ! -b "${IMAGE_DEVICE}" ] && return 0
+
+	DATADEV="/dev/$(/bin/lsblk -no PKNAME "${DATA_DEVICE}" 2>/dev/null)"
 	[ -n "${DATADEV}" ] && [ -b "${DATADEV}" ] || return 0
 
 	# 2) Parse current layout (parted unit MiB print)
@@ -96,15 +114,15 @@ prepare_ota_storage() {
 			/sbin/umount "${BOOTMNT}" 2>/dev/null || true
 			/sbin/umount "${IMAGEMNT}" 2>/dev/null || true
 			RECOVERY_IMG_MB=$((TARGET_IMAGE_END - TARGET_BOOT_END))
-			if /sbin/dd if="${DATA_PARTITION}" of="${BOOT_PARTITION}" bs=1M skip=0 count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null && \
-			   /sbin/dd if="${DATA_PARTITION}" of="${IMAGE_PARTITION}" bs=1M skip="${BOOT_BACKUP_MB}" count="${RECOVERY_IMG_MB}" conv=fsync 2>/dev/null; then
+			if /sbin/dd if="${DATA_DEVICE}" of="${BOOT_DEVICE}" bs=1M skip=0 count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null && \
+			   /sbin/dd if="${DATA_DEVICE}" of="${IMAGE_DEVICE}" bs=1M skip="${BOOT_BACKUP_MB}" count="${RECOVERY_IMG_MB}" conv=fsync 2>/dev/null; then
 				/sbin/sync
-				/sbin/mke2fsfull -t ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null || true
+				/sbin/mke2fsfull -t ext4 -F -L volumio_data "${DATA_DEVICE}" 2>/dev/null || true
 				/sbin/sync
 			fi
 			write_stage 0 "${DATADEV}" 2>/dev/null || true
-			/sbin/mount -t vfat "${BOOT_PARTITION}" "${BOOTMNT}" 2>/dev/null || true
-			/sbin/mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}" 2>/dev/null || true
+			/sbin/mount -t vfat "${BOOT_DEVICE}" "${BOOTMNT}" 2>/dev/null || true
+			/sbin/mount -t ext4 "${IMAGE_DEVICE}" "${IMAGEMNT}" 2>/dev/null || true
 			switch_back_vt
 		fi
 		write_stage 0 "${DATADEV}" 2>/dev/null || true
@@ -134,9 +152,9 @@ prepare_ota_storage() {
 
 	# 6) Mount data partition for backup
 	mkdir -p "${OTA_MOUNT}"
-	if ! /sbin/mount -t ext4 -o ro "${DATA_PARTITION}" "${OTA_MOUNT}" 2>/dev/null; then
+	if ! /sbin/mount -t ext4 -o ro "${DATA_DEVICE}" "${OTA_MOUNT}" 2>/dev/null; then
 		# Try without ro in case fs is dirty
-		if ! /sbin/mount -t ext4 "${DATA_PARTITION}" "${OTA_MOUNT}" 2>/dev/null; then
+		if ! /sbin/mount -t ext4 "${DATA_DEVICE}" "${OTA_MOUNT}" 2>/dev/null; then
 			switch_back_vt
 			return 1
 		fi
@@ -148,12 +166,12 @@ prepare_ota_storage() {
 	[ "${SEEK_MB}" -ge 0 ] || { /sbin/umount "${OTA_MOUNT}" 2>/dev/null; switch_back_vt; return 1; }
 
 	# 7) Backup boot and image partition to tail of p3 (raw dd into partition at SEEK_MB)
-	if ! /sbin/dd if="${BOOT_PARTITION}" of="${DATA_PARTITION}" bs=1M seek="${SEEK_MB}" count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null; then
+	if ! /sbin/dd if="${BOOT_DEVICE}" of="${DATA_DEVICE}" bs=1M seek="${SEEK_MB}" count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null; then
 		/sbin/umount "${OTA_MOUNT}" 2>/dev/null
 		switch_back_vt
 		return 1
 	fi
-	if ! /sbin/dd if="${IMAGE_PARTITION}" of="${DATA_PARTITION}" bs=1M seek=$((SEEK_MB + BOOT_BACKUP_MB)) count="${IMG_SIZE_MB}" conv=fsync 2>/dev/null; then
+	if ! /sbin/dd if="${IMAGE_DEVICE}" of="${DATA_DEVICE}" bs=1M seek=$((SEEK_MB + BOOT_BACKUP_MB)) count="${IMG_SIZE_MB}" conv=fsync 2>/dev/null; then
 		/sbin/umount "${OTA_MOUNT}" 2>/dev/null
 		switch_back_vt
 		return 1
