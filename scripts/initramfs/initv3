@@ -403,6 +403,18 @@ maybe_volumio_break progress "init: $LINENO"
 mount -t vfat "${BOOT_PARTITION}" "${BOOTMNT}"
 mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}"
 
+# Prepare OTA storage: resize to Pi layout if needed (script may be absent or on boot)
+PREPARE_OTA_SCRIPT=""
+if [ -f /scripts/prepare-ota-storage ]; then
+	PREPARE_OTA_SCRIPT="/scripts/prepare-ota-storage"
+elif [ -f "${BOOTMNT}/prepare-ota-storage" ]; then
+	PREPARE_OTA_SCRIPT="${BOOTMNT}/prepare-ota-storage"
+fi
+if [ -n "${PREPARE_OTA_SCRIPT}" ]; then
+	. "${PREPARE_OTA_SCRIPT}"
+	prepare_ota_storage || true
+fi
+
 # In case of a gpt boot partition: move the backup table when not done yet
 # This function is also safe for non-gpt boot partitions (it will not trigger a mismatch).
 #

@@ -1,0 +1,240 @@
+#!/bin/sh
+# prepare-ota-storage: one-time resize of boot and image partitions to Pi layout
+# for OTA headroom. Runs in initramfs (BusyBox ash). POSIX sh only.
+
+TARGET_BOOT_END=385
+TARGET_IMAGE_END=4673
+RESERVED_VT=2
+NORMAL_VT=1
+STAGE_SIZE_SECTORS=128
+BOOT_BACKUP_MB=385
+OTA_MOUNT=/mnt/ota_data
+
+# Write stage magic and value to last 64K of disk (for recovery)
+# Usage: write_stage 0|1|2  (ASCII digit written after "VOLRESIZE")
+write_stage() {
+	_stage_val="$1"
+	_dev="$2"
+	_size_sect=""
+	if [ -z "${_dev}" ]; then return 1; fi
+	_block="${_dev#/dev/}"
+	[ -f "/sys/block/${_block}/size" ] || return 1
+	_size_sect=$(cat "/sys/block/${_block}/size" 2>/dev/null)
+	[ -n "${_size_sect}" ] || return 1
+	_seek_sect=$((_size_sect - STAGE_SIZE_SECTORS))
+	_payload=$(printf "VOLRESIZE%s" "${_stage_val}")
+	printf "%s" "${_payload}" | /sbin/dd of="${_dev}" bs=512 seek="${_seek_sect}" conv=fsync 2>/dev/null
+	return $?
+}
+
+read_stage() {
+	_dev="$1"
+	_size_sect=""
+	_seek_sect=""
+	if [ -z "${_dev}" ]; then echo "0"; return; fi
+	_block="${_dev#/dev/}"
+	[ -f "/sys/block/${_block}/size" ] || { echo "0"; return; }
+	_size_sect=$(cat "/sys/block/${_block}/size" 2>/dev/null)
+	[ -n "${_size_sect}" ] || { echo "0"; return; }
+	_seek_sect=$((_size_sect - STAGE_SIZE_SECTORS))
+	_magic=$(/sbin/dd if="${_dev}" bs=512 skip="${_seek_sect}" count=1 2>/dev/null | head -c 16)
+	case "${_magic}" in
+		VOLRESIZE1) echo "1"; return ;;
+		VOLRESIZE2) echo "2"; return ;;
+		*) echo "0"; return ;;
+	esac
+}
+
+# Show maintenance message on reserved VT (large text); only call when resize will run
+show_maintenance_vt() {
+	/sbin/chvt "${RESERVED_VT}" 2>/dev/null || true
+	# Clear and home
+	printf '\033[2J\033[H' > "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+	echo "" > "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+	echo "========================================" > "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+	echo "  MAINTENANCE - Do not disconnect power" > "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+	echo "  This may take several minutes." > "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+	echo "========================================" > "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+	echo "" > "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+}
+
+switch_back_vt() {
+	/sbin/chvt "${NORMAL_VT}" 2>/dev/null || true
+}
+
+prepare_ota_storage() {
+	P1_END=""
+	P2_END=""
+	IMG_SIZE_MB=""
+	SEEK_MB=""
+	DEV_SIZE_MB=""
+	TAIL_MB=""
+	_need_resize=""
+	DATADEV=""
+
+	# 1) Resolve disk device
+	if [ -z "${DATA_PARTITION}" ] || [ ! -b "${DATA_PARTITION}" ]; then
+		return 0
+	fi
+	DATADEV="/dev/$(/bin/lsblk -no PKNAME "${DATA_PARTITION}" 2>/dev/null)"
+	[ -n "${DATADEV}" ] && [ -b "${DATADEV}" ] || return 0
+
+	# 2) Parse current layout (parted unit MiB print)
+	_part_out=$(/sbin/parted -s "${DATADEV}" unit MiB print 2>/dev/null)
+	[ -n "${_part_out}" ] || return 0
+
+	P1_END=$(echo "${_part_out}" | awk '/^[[:space:]]*1[[:space:]]/ { gsub(/MiB/,"",$3); v=int($3+0); if(v>0) print v; exit }')
+	P2_END=$(echo "${_part_out}" | awk '/^[[:space:]]*2[[:space:]]/ { gsub(/MiB/,"",$3); v=int($3+0); if(v>0) print v; exit }')
+	[ -n "${P1_END}" ] && [ -n "${P2_END}" ] || return 0
+
+	# 3) Check if resize needed (already at Pi layout)
+	if [ "${P1_END}" -ge "${TARGET_BOOT_END}" ] && [ "${P2_END}" -ge "${TARGET_IMAGE_END}" ]; then
+		_stage=$(read_stage "${DATADEV}")
+		# Recovery: layout is Pi but stage says we were interrupted; restore from tail only
+		if [ "${_stage}" = "1" ] || [ "${_stage}" = "2" ]; then
+			show_maintenance_vt
+			/sbin/umount "${BOOTMNT}" 2>/dev/null || true
+			/sbin/umount "${IMAGEMNT}" 2>/dev/null || true
+			RECOVERY_IMG_MB=$((TARGET_IMAGE_END - TARGET_BOOT_END))
+			if /sbin/dd if="${DATA_PARTITION}" of="${BOOT_PARTITION}" bs=1M skip=0 count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null && \
+			   /sbin/dd if="${DATA_PARTITION}" of="${IMAGE_PARTITION}" bs=1M skip="${BOOT_BACKUP_MB}" count="${RECOVERY_IMG_MB}" conv=fsync 2>/dev/null; then
+				/sbin/sync
+				/sbin/mke2fsfull -t ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null || true
+				/sbin/sync
+			fi
+			write_stage 0 "${DATADEV}" 2>/dev/null || true
+			/sbin/mount -t vfat "${BOOT_PARTITION}" "${BOOTMNT}" 2>/dev/null || true
+			/sbin/mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}" 2>/dev/null || true
+			switch_back_vt
+		fi
+		write_stage 0 "${DATADEV}" 2>/dev/null || true
+		return 0
+	fi
+
+	# 4) Compute image partition size (p2 size in MiB)
+	IMG_SIZE_MB=$((P2_END - P1_END))
+	[ "${IMG_SIZE_MB}" -gt 0 ] || return 0
+
+	# Device size (from last partition or free)
+	DEV_SIZE_MB=$(echo "${_part_out}" | awk '/^Disk \// { gsub(/MiB/,"",$2); print $2+0; exit }')
+	[ -n "${DEV_SIZE_MB}" ] && [ "${DEV_SIZE_MB}" -gt 0 ] || return 0
+
+	# Tail size (from 4673 to end) must fit backup: BOOT_BACKUP_MB + IMG_SIZE_MB
+	TAIL_MB=$((DEV_SIZE_MB - TARGET_IMAGE_END))
+	if [ "${TAIL_MB}" -lt "${BOOT_BACKUP_MB}" ] || [ "${TAIL_MB}" -lt "${IMG_SIZE_MB}" ]; then
+		return 0
+	fi
+	_need_resize=1
+
+	# 5) Show maintenance message (VT) and unmount boot + imgpart
+	show_maintenance_vt
+
+	/sbin/umount "${BOOTMNT}" 2>/dev/null || true
+	/sbin/umount "${IMAGEMNT}" 2>/dev/null || true
+
+	# 6) Mount data partition for backup
+	mkdir -p "${OTA_MOUNT}"
+	if ! /sbin/mount -t ext4 -o ro "${DATA_PARTITION}" "${OTA_MOUNT}" 2>/dev/null; then
+		# Try without ro in case fs is dirty
+		if ! /sbin/mount -t ext4 "${DATA_PARTITION}" "${OTA_MOUNT}" 2>/dev/null; then
+			switch_back_vt
+			return 1
+		fi
+	fi
+
+	# P3 start in MiB = end of p2 (offset inside p3 that corresponds to disk 4673 MiB)
+	P3_START_MB="${P2_END}"
+	SEEK_MB=$((TARGET_IMAGE_END - P3_START_MB))
+	[ "${SEEK_MB}" -ge 0 ] || { /sbin/umount "${OTA_MOUNT}" 2>/dev/null; switch_back_vt; return 1; }
+
+	# 7) Backup boot and image partition to tail of p3 (raw dd into partition at SEEK_MB)
+	if ! /sbin/dd if="${BOOT_PARTITION}" of="${DATA_PARTITION}" bs=1M seek="${SEEK_MB}" count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null; then
+		/sbin/umount "${OTA_MOUNT}" 2>/dev/null
+		switch_back_vt
+		return 1
+	fi
+	if ! /sbin/dd if="${IMAGE_PARTITION}" of="${DATA_PARTITION}" bs=1M seek=$((SEEK_MB + BOOT_BACKUP_MB)) count="${IMG_SIZE_MB}" conv=fsync 2>/dev/null; then
+		/sbin/umount "${OTA_MOUNT}" 2>/dev/null
+		switch_back_vt
+		return 1
+	fi
+	/sbin/sync
+	/sbin/umount "${OTA_MOUNT}" 2>/dev/null || true
+
+	write_stage 1 "${DATADEV}" 2>/dev/null || true
+
+	# 8) Recreate partition table
+	if ! /sbin/parted -s "${DATADEV}" mklabel msdos 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	if ! /sbin/parted -s "${DATADEV}" unit MiB mkpart primary fat32 1 "${TARGET_BOOT_END}" 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	if ! /sbin/parted -s "${DATADEV}" unit MiB mkpart primary ext4 "${TARGET_BOOT_END}" "${TARGET_IMAGE_END}" 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	if ! /sbin/parted -s "${DATADEV}" unit MiB mkpart primary ext4 "${TARGET_IMAGE_END}" 100% 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	if ! /sbin/parted -s "${DATADEV}" set 1 boot on 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	/sbin/partprobe "${DATADEV}" 2>/dev/null || true
+	/sbin/mdev -s 2>/dev/null || true
+	sleep 1
+
+	# Re-read partition devices (UUIDs may change; we use same device names p1/p2/p3)
+	BOOT_PARTITION="${DATADEV}p1"
+	IMAGE_PARTITION="${DATADEV}p2"
+	DATA_PARTITION="${DATADEV}p3"
+	[ -b "${BOOT_PARTITION}" ] && [ -b "${IMAGE_PARTITION}" ] && [ -b "${DATA_PARTITION}" ] || {
+		switch_back_vt
+		return 1
+	}
+
+	# 9) mkfs boot and image only
+	if ! /sbin/mkfs.vfat -n BOOT "${BOOT_PARTITION}" 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	if ! /sbin/mke2fsfull -t ext4 -F -L volumio "${IMAGE_PARTITION}" 2>/dev/null; then
+		if ! /sbin/mke2fs -t ext4 -F -L volumio "${IMAGE_PARTITION}" 2>/dev/null; then
+			/sbin/mkfs.ext4 -F -L volumio "${IMAGE_PARTITION}" 2>/dev/null || {
+				switch_back_vt
+				return 1
+			}
+		fi
+	fi
+
+	# 10) Restore from tail (first 385 MiB of p3 = boot, next IMG_SIZE_MB = img)
+	if ! /sbin/dd if="${DATA_PARTITION}" of="${BOOT_PARTITION}" bs=1M skip=0 count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	if ! /sbin/dd if="${DATA_PARTITION}" of="${IMAGE_PARTITION}" bs=1M skip="${BOOT_BACKUP_MB}" count="${IMG_SIZE_MB}" conv=fsync 2>/dev/null; then
+		switch_back_vt
+		return 1
+	fi
+	/sbin/sync
+
+	# 11) mkfs data partition (fresh)
+	if ! /sbin/mke2fsfull -t ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null; then
+		if ! /sbin/mke2fs -t ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null; then
+			/sbin/mkfs.ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null || true
+		fi
+	fi
+	/sbin/sync
+
+	write_stage 0 "${DATADEV}" 2>/dev/null || true
+
+	# 12) Remount boot and image so init can continue
+	/sbin/mount -t vfat "${BOOT_PARTITION}" "${BOOTMNT}" 2>/dev/null || true
+	/sbin/mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}" 2>/dev/null || true
+	switch_back_vt
+	return 0
+}
