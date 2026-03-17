@@ -157,6 +157,32 @@ expand_image_ext4() {
 	return 0
 }
 
+# Check whether a mounted filesystem is undersized relative to its partition.
+# Compares filesystem total (from df) against partition size (from lsblk).
+# Returns 0 if undersized (needs expansion), 1 if OK or unknown.
+# Args: $1 = partition device (must be currently mounted)
+check_fs_undersized() {
+	_cdev="$1"
+	[ -b "${_cdev}" ] || return 1
+
+	# Filesystem total in 1K blocks (from df, filtered by device)
+	_fs_total_k=$(df -k 2>/dev/null | awk -v dev="${_cdev}" '$1==dev {print $2; exit}')
+	[ -n "${_fs_total_k}" ] || return 1
+
+	# Partition size in 1K blocks (from lsblk in bytes, divided)
+	_part_bytes=$(lsblk -bno SIZE "${_cdev}" 2>/dev/null)
+	[ -n "${_part_bytes}" ] || return 1
+	_part_k=$((_part_bytes / 1024))
+
+	# If filesystem total is less than 90% of partition size, it needs expansion.
+	# 90% threshold accounts for normal filesystem overhead (journal, reserved blocks)
+	# while still catching genuinely undersized filesystems (e.g. 241 MiB on 384 MiB,
+	# or 2.7G on 4.2G).
+	_threshold=$((_part_k * 9 / 10))
+	[ "${_fs_total_k}" -lt "${_threshold}" ] && return 0
+	return 1
+}
+
 prepare_ota_storage() {
 	P1_END=""
 	P2_END=""
@@ -223,6 +249,46 @@ prepare_ota_storage() {
 			mount -t ext4 "${IMAGE_DEVICE}" "${IMAGEMNT}" 2>/dev/null || true
 			switch_back_vt
 		fi
+
+		# Repair: partition layout is correct and stage is clean, but filesystems
+		# may be undersized. This catches devices where dd restore completed but
+		# expansion was missed (e.g. earlier script version without expand step).
+		# Boot and image are mounted at this point (by init or by recovery above),
+		# so df can compare filesystem size against partition size.
+		_boot_expand=""
+		_img_expand=""
+		if check_fs_undersized "${BOOT_DEVICE}"; then
+			_boot_expand=1
+		fi
+		if check_fs_undersized "${IMAGE_DEVICE}"; then
+			_img_expand=1
+		fi
+		if [ -n "${_boot_expand}" ] || [ -n "${_img_expand}" ]; then
+			show_maintenance_vt
+			umount "${BOOTMNT}" 2>/dev/null || true
+			umount "${IMAGEMNT}" 2>/dev/null || true
+
+			progress_msg 1 3 "Expanding boot filesystem"
+			if [ -n "${_boot_expand}" ]; then
+				mkdir -p "${BOOTMNT}"
+				if ! expand_boot_vfat "${BOOT_DEVICE}" "${BOOTMNT}"; then
+					[ -c /dev/kmsg ] && echo "prepare_ota_storage: boot vfat expansion failed" >/dev/kmsg
+				fi
+			fi
+
+			progress_msg 2 3 "Expanding image filesystem"
+			if [ -n "${_img_expand}" ]; then
+				if ! expand_image_ext4 "${IMAGE_DEVICE}"; then
+					[ -c /dev/kmsg ] && echo "prepare_ota_storage: image ext4 expansion failed" >/dev/kmsg
+				fi
+			fi
+
+			progress_msg 3 3 "Remounting partitions"
+			mount -t vfat "${BOOT_DEVICE}" "${BOOTMNT}" 2>/dev/null || true
+			mount -t ext4 "${IMAGE_DEVICE}" "${IMAGEMNT}" 2>/dev/null || true
+			switch_back_vt
+		fi
+
 		write_stage 0 "${DATADEV}" 2>/dev/null || true
 		return 0
 	fi
