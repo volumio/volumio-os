@@ -90,6 +90,8 @@ MODULES=(
   "rp1-mailbox"
   # RP1 PIO support
   "rp1-pio"
+  # PWM controller - required for DSI panel backlight
+  "pwm-bcm2835"
   # Display infrastructure - required for Plymouth splash
   # Backlight control for display panels
   "backlight"

@@ -93,6 +93,8 @@ MODULES=(
   # I2C and SPI controllers - required for display panel communication
   # I2C controller for Pi 0-4
   "i2c-bcm2835"
+  # PWM controller - required for DSI panel backlight
+  "pwm-bcm2835"
   # Display infrastructure - required for Plymouth splash
   # Backlight control for display panels
   "backlight"
