@@ -41,27 +41,12 @@ INIT_TYPE="initv3"
 INIT_UUID_TYPE="pi" # Use block device GPEN if dynamic UUIDs are not handled.
 
 ## Plymouth theme management
-PLYMOUTH_THEME="volumio-adaptive"	# Choices are: {volumio-player, volumio-text, volumio-adaptive}
+PLYMOUTH_THEME="volumio-adaptive" # Choices are: {volumio-player, volumio-text, volumio-adaptive}
+INIT_PLYMOUTH_DISABLE="no"      # yes/no or empty. Removes plymouth initialization in init if "yes" is selected
 
-log "VARIANT is ${VARIANT}." "info"
-## INIT_PLYMOUTH_DISABLE removes plymouth initialization in init if "yes" is selected
-if [[ "${VARIANT}" == motivo ]]; then
-	log "Building ${VARIANT}: Removing plymouth from init." "info"
-	INIT_PLYMOUTH_DISABLE="yes"
-else
-	log "Using default plymouth initialization in init." "info"
-	INIT_PLYMOUTH_DISABLE="no"
-fi
-
-## For any KMS DRM panel mudule, which does not create frambuffer bridge, set this variable to yes, otherwise no
-## UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM replaces default plymouth systemd services if "yes" is selected
-if [[ "${VARIANT}" == motivo ]]; then
-	log "Building ${VARIANT}: Replacing default plymouth systemd services" "info"
-	UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="yes"
-else
-	log "Using packager default plymouth systemd services" "info"
-	UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="no"
-fi
+## TODO: for any KMS DRM panel mudule, which does not create frambuffer bridge, set this variable to yes, otherwise no
+## Implement an if/else statement to handle this properly
+UPDATE_PLYMOUTH_SERVICES_FOR_KMS_DRM="yes" # yes/no or empty. Replaces default plymouth systemd services if "yes" is selected
 
 # Modules that will be added to initramfs
 MODULES=(
