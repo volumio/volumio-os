@@ -70,6 +70,15 @@ switch_back_vt() {
 	chvt "${NORMAL_VT}" 2>/dev/null || true
 }
 
+# Update step progress on the reserved VT.
+# Cursor positioned at row 8 (below the banner), clearing the line each time
+# so each step overwrites the previous one. The banner stays on screen.
+# Args: $1 = current step, $2 = total steps, $3 = description
+progress_msg() {
+	printf '\033[8;1H  Step %s of %s: %-40s' "$1" "$2" "$3" \
+		> "/dev/tty${RESERVED_VT}" 2>/dev/null || true
+}
+
 # Resolve UUID= or LABEL= to /dev/... path so -b and lsblk/dd/mount work in initramfs
 resolve_partition_to_device() {
 	_spec="$1"
@@ -79,6 +88,73 @@ resolve_partition_to_device() {
 		UUID=*|LABEL=*) _d=$(findfs "${_spec}" 2>/dev/null); [ -n "${_d}" ] && echo "${_d}"; return ;;
 		*) echo "${_spec}"; return ;;
 	esac
+}
+
+# Expand a restored vfat boot partition to fill its device.
+# dd restore writes the original (smaller) vfat image block-for-block.
+# The BPB still describes the old size (e.g. 244 MiB on a now-384 MiB partition).
+# No in-place fatresize exists in BusyBox, so: mount old vfat, copy files to
+# tmpfs staging, unmount, mkfs.vfat at full partition size, mount, copy back.
+# Args: $1 = partition device, $2 = mount point (temporary)
+expand_boot_vfat() {
+	_edev="$1"
+	_emnt="$2"
+	_staging=""
+
+	[ -b "${_edev}" ] || return 1
+
+	_staging=$(mktemp -d /run/boot_staging.XXXXXX 2>/dev/null) || return 1
+
+	# Mount the restored (old-size) vfat
+	if ! mount -t vfat -o ro "${_edev}" "${_emnt}" 2>/dev/null; then
+		rm -rf "${_staging}"
+		return 1
+	fi
+
+	# Copy all files preserving timestamps
+	if ! cp -a "${_emnt}/." "${_staging}/" 2>/dev/null; then
+		umount "${_emnt}" 2>/dev/null || true
+		rm -rf "${_staging}"
+		return 1
+	fi
+	umount "${_emnt}" 2>/dev/null || true
+
+	# Create full-size vfat
+	if ! mkfs.vfat -n BOOT "${_edev}" 2>/dev/null; then
+		rm -rf "${_staging}"
+		return 1
+	fi
+
+	# Mount new full-size vfat and copy files back
+	if ! mount -t vfat "${_edev}" "${_emnt}" 2>/dev/null; then
+		rm -rf "${_staging}"
+		return 1
+	fi
+	cp -a "${_staging}/." "${_emnt}/" 2>/dev/null
+	sync
+	umount "${_emnt}" 2>/dev/null || true
+
+	rm -rf "${_staging}"
+	return 0
+}
+
+# Expand a restored ext4 image partition to fill its device.
+# dd restore writes the original (smaller) ext4 image block-for-block.
+# The superblock still describes the old size. resize2fs expands in-place.
+# Args: $1 = partition device
+expand_image_ext4() {
+	_edev="$1"
+
+	[ -b "${_edev}" ] || return 1
+
+	# e2fsck required before resize2fs (resize2fs may refuse a dirty fs)
+	e2fsck -fy "${_edev}" >/dev/null 2>&1 || true
+
+	# resize2fs with no size argument expands to fill the partition
+	if ! resize2fs "${_edev}" >/dev/null 2>&1; then
+		return 1
+	fi
+	return 0
 }
 
 prepare_ota_storage() {
@@ -125,11 +201,22 @@ prepare_ota_storage() {
 			# count=BOOT_PART_SIZE (384), not BOOT_BACKUP_MB (385):
 			# new P1 is 384 MiB (start=1, end=385); writing 385 blocks
 			# overflows the device and dd returns non-zero.
-			if dd if="${DATA_DEVICE}" of="${BOOT_DEVICE}" bs=1M skip=0 count="${BOOT_PART_SIZE}" conv=fsync 2>/dev/null && \
-			   dd if="${DATA_DEVICE}" of="${IMAGE_DEVICE}" bs=1M skip="${BOOT_BACKUP_MB}" count="${RECOVERY_IMG_MB}" conv=fsync 2>/dev/null; then
-				sync
-				/sbin/mke2fsfull -t ext4 -F -L volumio_data "${DATA_DEVICE}" 2>/dev/null || true
-				sync
+			progress_msg 1 5 "Restoring boot partition"
+			if dd if="${DATA_DEVICE}" of="${BOOT_DEVICE}" bs=1M skip=0 count="${BOOT_PART_SIZE}" conv=fsync 2>/dev/null; then
+				progress_msg 2 5 "Restoring image partition"
+				if dd if="${DATA_DEVICE}" of="${IMAGE_DEVICE}" bs=1M skip="${BOOT_BACKUP_MB}" count="${RECOVERY_IMG_MB}" conv=fsync 2>/dev/null; then
+					sync
+					# Expand restored filesystems to fill their new partitions
+					progress_msg 3 5 "Expanding boot filesystem"
+					mkdir -p "${BOOTMNT}"
+					expand_boot_vfat "${BOOT_DEVICE}" "${BOOTMNT}"
+					progress_msg 4 5 "Expanding image filesystem"
+					expand_image_ext4 "${IMAGE_DEVICE}"
+					# mkfs data partition (fresh)
+					progress_msg 5 5 "Preparing data partition"
+					/sbin/mke2fsfull -t ext4 -F -L volumio_data "${DATA_DEVICE}" 2>/dev/null || true
+					sync
+				fi
 			fi
 			write_stage 0 "${DATADEV}" 2>/dev/null || true
 			mount -t vfat "${BOOT_DEVICE}" "${BOOTMNT}" 2>/dev/null || true
@@ -196,12 +283,14 @@ prepare_ota_storage() {
 	[ "${SEEK_MB}" -ge 0 ] || { switch_back_vt; return 1; }
 
 	# 6) Backup boot and image partition to tail of p3 (raw dd; data partition must be unmounted)
-	# count=BOOT_BACKUP_MB (385) is safe here: the original boot partition is smaller
-	# (e.g. 244 MiB), so dd short-reads at EOF and exits 0.
+	# count=BOOT_BACKUP_MB (385) is safe here: dd reads from the original boot partition
+	# which is smaller (e.g. 244 MiB), so dd short-reads at EOF and exits 0.
+	progress_msg 1 9 "Backing up boot partition"
 	if ! dd if="${BOOT_DEVICE}" of="${DATA_DEVICE}" bs=1M seek="${SEEK_MB}" count="${BOOT_BACKUP_MB}" conv=fsync 2>/dev/null; then
 		switch_back_vt
 		return 1
 	fi
+	progress_msg 2 9 "Backing up image partition"
 	if ! dd if="${IMAGE_DEVICE}" of="${DATA_DEVICE}" bs=1M seek=$((SEEK_MB + BOOT_BACKUP_MB)) count="${IMG_SIZE_MB}" conv=fsync 2>/dev/null; then
 		switch_back_vt
 		return 1
@@ -211,6 +300,7 @@ prepare_ota_storage() {
 	write_stage 1 "${DATADEV}" 2>/dev/null || true
 
 	# 8) Recreate partition table
+	progress_msg 3 9 "Recreating partition table"
 	if ! parted -s "${DATADEV}" mklabel msdos 2>/dev/null; then
 		switch_back_vt
 		return 1
@@ -244,39 +334,52 @@ prepare_ota_storage() {
 		return 1
 	}
 
-	# 9) mkfs boot and image only (mke2fsfull like volumio-functions: busybox mke2fs lacks ext4)
-	if ! mkfs.vfat -n BOOT "${BOOT_PARTITION}" 2>/dev/null; then
-		switch_back_vt
-		return 1
-	fi
-	if ! /sbin/mke2fsfull -t ext4 -F -L volumio "${IMAGE_PARTITION}" 2>/dev/null; then
-		if ! mke2fs -t ext4 -F -L volumio "${IMAGE_PARTITION}" 2>/dev/null; then
-			mkfs.ext4 -F -L volumio "${IMAGE_PARTITION}" 2>/dev/null || {
-				switch_back_vt
-				return 1
-			}
-		fi
-	fi
+	# 9) Restore boot and image from tail of new P3, then expand filesystems.
+	#
+	# dd writes the original (smaller) filesystem images block-for-block onto the
+	# new (larger) partitions. The filesystem metadata still describes the old size.
+	# After dd, each filesystem must be expanded to fill its new partition:
+	# - vfat (P1): no in-place resize tool; copy files via tmpfs, mkfs at full size, copy back
+	# - ext4 (P2): resize2fs expands in-place after e2fsck
 
-	# 10) Restore from tail of new P3.
-	# Boot backup occupies the first BOOT_BACKUP_MB (385 MiB) of the backup area.
-	# The new boot partition is BOOT_PART_SIZE (384 MiB): parted mkpart 1..385.
-	# count MUST be BOOT_PART_SIZE, not BOOT_BACKUP_MB. Writing 385 blocks to a
-	# 384 MiB device overflows the block device boundary and dd returns non-zero,
-	# which aborts the function before image restore, P3 mkfs, or stage clear.
+	# 9a) Restore boot partition
+	# count=BOOT_PART_SIZE (384), not BOOT_BACKUP_MB (385):
+	# new P1 is 384 MiB (parted mkpart 1..385); writing 385 blocks overflows the
+	# block device boundary and dd returns non-zero.
+	progress_msg 4 9 "Restoring boot partition"
 	if ! dd if="${DATA_PARTITION}" of="${BOOT_PARTITION}" bs=1M skip=0 count="${BOOT_PART_SIZE}" conv=fsync 2>/dev/null; then
 		switch_back_vt
 		return 1
 	fi
-	# Image backup starts at offset BOOT_BACKUP_MB (385) in the backup area.
+
+	# 9b) Expand boot vfat to fill 384 MiB partition
+	progress_msg 5 9 "Expanding boot filesystem"
+	mkdir -p "${BOOTMNT}"
+	if ! expand_boot_vfat "${BOOT_PARTITION}" "${BOOTMNT}"; then
+		[ -c /dev/kmsg ] && echo "prepare_ota_storage: boot vfat expansion failed" >/dev/kmsg
+		# Non-fatal: boot content is intact at old size, just not using full partition.
+		# Init and the running system will work; only the extra space is lost.
+	fi
+
+	# 9c) Restore image partition
 	# skip=BOOT_BACKUP_MB is correct: it matches the seek offset used during backup.
+	progress_msg 6 9 "Restoring image partition"
 	if ! dd if="${DATA_PARTITION}" of="${IMAGE_PARTITION}" bs=1M skip="${BOOT_BACKUP_MB}" count="${IMG_SIZE_MB}" conv=fsync 2>/dev/null; then
 		switch_back_vt
 		return 1
 	fi
+
+	# 9d) Expand image ext4 to fill 4288 MiB partition
+	progress_msg 7 9 "Expanding image filesystem"
+	if ! expand_image_ext4 "${IMAGE_PARTITION}"; then
+		[ -c /dev/kmsg ] && echo "prepare_ota_storage: image ext4 expansion failed" >/dev/kmsg
+		# Non-fatal: image content is intact at old size, future OTA may still fail
+		# on space but the device will boot.
+	fi
 	sync
 
-	# 11) mkfs data partition (fresh)
+	# 10) mkfs data partition (fresh)
+	progress_msg 8 9 "Preparing data partition"
 	if ! /sbin/mke2fsfull -t ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null; then
 		if ! mke2fs -t ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null; then
 			mkfs.ext4 -F -L volumio_data "${DATA_PARTITION}" 2>/dev/null || true
@@ -286,7 +389,8 @@ prepare_ota_storage() {
 
 	write_stage 0 "${DATADEV}" 2>/dev/null || true
 
-	# 12) Remount boot and image so init can continue
+	# 11) Remount boot and image so init can continue
+	progress_msg 9 9 "Remounting partitions"
 	mount -t vfat "${BOOT_PARTITION}" "${BOOTMNT}" 2>/dev/null || true
 	mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}" 2>/dev/null || true
 	switch_back_vt
