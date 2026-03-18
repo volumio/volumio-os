@@ -8,7 +8,6 @@ RESERVED_VT=2
 NORMAL_VT=1
 STAGE_SIZE_SECTORS=128
 BOOT_BACKUP_MB=385
-OTA_MOUNT=/mnt/ota_data
 
 # BOOT_BACKUP_MB is the backup SLOT size (used for seek/skip offsets to position
 # the image backup after the boot backup in the tail area).
@@ -311,33 +310,13 @@ prepare_ota_storage() {
 	fi
 	_need_resize=1
 
-	# 5) Show maintenance message (VT). Mount data before unmounting boot so /sbin (and mount) stay available.
+	# 5) Show maintenance message (VT) and unmount boot and imgpart before raw dd.
+	# The data partition does NOT need a filesystem for the backup step - dd writes
+	# raw blocks to the block device at calculated offsets. On first boot after flash
+	# P3 may have no ext4 yet (resize_datapartition has not run), so any mount
+	# attempt would fail and abort the script unnecessarily.
 	show_maintenance_vt
 
-	mkdir -p "${OTA_MOUNT}"
-	_mounted=""
-	for _try in 1 2; do
-		if mount -t ext4 -o ro "${DATA_DEVICE}" "${OTA_MOUNT}" 2>/dev/null; then
-			_mounted=1
-			break
-		fi
-		[ "${_try}" -eq 1 ] && sleep 2
-	done
-	if [ -z "${_mounted}" ]; then
-		if mount -t ext4 "${DATA_DEVICE}" "${OTA_MOUNT}" 2>/dev/null; then
-			_mounted=1
-		fi
-	fi
-	if [ -z "${_mounted}" ]; then
-		_err=$(mount -t ext4 "${DATA_DEVICE}" "${OTA_MOUNT}" 2>&1)
-		[ -c /dev/kmsg ] && echo "prepare_ota_storage: mount ${DATA_DEVICE} failed: ${_err}" >/dev/kmsg
-		umount "${OTA_MOUNT}" 2>/dev/null || true
-		switch_back_vt
-		return 1
-	fi
-
-	# Unmount data before raw dd; then unmount boot and imgpart.
-	umount "${OTA_MOUNT}" 2>/dev/null || true
 	umount "${BOOTMNT}" 2>/dev/null || true
 	umount "${IMAGEMNT}" 2>/dev/null || true
 	sleep 2
