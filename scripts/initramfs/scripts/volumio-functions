@@ -425,22 +425,185 @@ process_kernel_update() {
 }
 
 resize_datapartition() {
+# ============================================================================
+# Resize the data partition (partition 3) to fill available disk space.
+#
+# CHANGES FROM PREVIOUS VERSION:
+#   - Replaced fragile human-readable 'parted print free' parsing with
+#     machine-readable 'parted -ms unit B print' (colon-delimited, exact bytes,
+#     locale-independent). Fixes intermittent resize failures caused by
+#     ambiguous Free Space line position in parted human-readable output.
+#   - Added MBR 2 TiB limit detection. MBR (msdos) partition tables use
+#     32-bit LBA addressing: max = 2^32 * sector_size bytes.
+#     On disks exceeding this limit, resize is capped at the MBR maximum.
+#     Previously this failed silently.
+#   - Added validation guards on all parsed values.
+#   - Added return code checking and logging for parted, e2fsck, resize2fs.
+#   - Added single retry with device settle for transient resizepart failures.
+#   - All large-number arithmetic uses awk (IEEE 754 double, 53-bit mantissa)
+#     to avoid potential 32-bit overflow in shell arithmetic on older busybox.
+#
+# TOOLS REQUIRED (verified present in initrd):
+#   parted (standalone GNU parted 3.x, supports -ms and resizepart)
+#   blockdev (busybox applet, supports --getsize64)
+#   e2fsck (standalone)
+#   resize2fs (standalone)
+#   awk (busybox applet)
+#   mdev (busybox applet)
+#
+# PARTED MACHINE-READABLE OUTPUT FORMAT (parted -ms unit B print):
+#   BYT;
+#   /dev/sda:500107862016B:scsi:512:512:msdos:ATA TOSHIBA:;
+#   1:1048576B:399507455B:398458880B:fat32::boot,lba;
+#   2:399507456B:4693721087B:4294213632B:ext4::;
+#   3:4693721088B:4798578687B:104857600B:ext4::;
+#
+#   Disk line fields:
+#     1:path 2:size 3:transport 4:logical_sector 5:physical_sector
+#     6:table_type 7:model
+#   Partition line fields:
+#     1:number 2:start 3:end 4:size 5:fs_type 6:name 7:flags
+# ============================================================================
+
   log_begin_msg "Checking free space on the data partition"
   DATADEV=/dev/$(lsblk -no PKNAME "${DATA_PARTITION}")
-  # Re-sizing is not necessary when we already reached maximum (shows with decimals less than 1MB).
-  FREESIZE="$(parted -s "${DATADEV}" unit MB print free | tail -n 2 | grep Free | awk '{print $3}' | awk -F 'MB' '{print $1}')"
-  if [ "$(awk 'BEGIN {print ("'$FREESIZE'" >= "'1'")}')" -eq "1" ]; then
-    log_end_msg
-    msg="Expanding internal storage space to maximum, this can take a minute"
-    plymouth_msg $msg
-    log_begin_msg $msg
 
-    END="$(parted -s "${DATADEV}" unit MB print free | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]\+')"
-    parted -s "${DATADEV}" resizepart 3 "${END}" >/dev/null 2>&1
-    e2fsck -f "${DATA_PARTITION}" -y >/dev/null 2>&1
-    resize2fs -p "${DATA_PARTITION}" >/dev/null 2>&1
-    parted -s "${DATADEV}" unit MB print >/dev/null 2>&1
+  # Validate parent device resolved to an actual block device
+  if [ ! -b "${DATADEV}" ]; then
+    log_failure_msg "resize: parent device not found for ${DATA_PARTITION}"
+    log_end_msg
+    return
   fi
+
+  # ---------------------------------------------------------------------------
+  # Gather disk geometry using machine-readable parted output
+  # ---------------------------------------------------------------------------
+  PARTED_OUT="$(parted -ms "${DATADEV}" unit B print 2>/dev/null)"
+  if [ -z "${PARTED_OUT}" ]; then
+    log_failure_msg "resize: parted returned no output for ${DATADEV}"
+    log_end_msg
+    return
+  fi
+
+  # Disk total size in bytes - blockdev is the most reliable source
+  DISK_BYTES="$(blockdev --getsize64 "${DATADEV}" 2>/dev/null)"
+  if [ -z "${DISK_BYTES}" ]; then
+    log_failure_msg "resize: blockdev --getsize64 failed for ${DATADEV}"
+    log_end_msg
+    return
+  fi
+
+  # Partition table type from parted disk line, field 6
+  PTTYPE="$(echo "${PARTED_OUT}" | grep "^${DATADEV}" | cut -d ':' -f 6)"
+
+  # Logical sector size from parted disk line, field 4, strip trailing 'B'
+  SECTOR_SIZE="$(echo "${PARTED_OUT}" | grep "^${DATADEV}" | cut -d ':' -f 4 | sed 's/B$//')"
+  # Fallback to 512 if extraction failed (safe default for all current devices)
+  if [ -z "${SECTOR_SIZE}" ]; then
+    SECTOR_SIZE=512
+  fi
+
+  # Partition 3 end position in bytes, field 3 of partition 3 line, strip 'B'
+  PART3_END="$(echo "${PARTED_OUT}" | grep "^3:" | cut -d ':' -f 3 | sed 's/B$//')"
+  if [ -z "${PART3_END}" ]; then
+    log_failure_msg "resize: could not determine partition 3 end position"
+    log_end_msg
+    return
+  fi
+
+  # ---------------------------------------------------------------------------
+  # Determine if resize is needed
+  # Threshold: 1 MiB (1048576 bytes) matches original function intent.
+  # Calculation uses awk for safe large-number arithmetic.
+  # ---------------------------------------------------------------------------
+  FREE_MIB="$(awk "BEGIN { printf \"%d\", (${DISK_BYTES} - ${PART3_END}) / 1048576 }")"
+  if [ "${FREE_MIB}" -lt 1 ]; then
+    log_begin_msg "Data partition already at maximum size" && log_end_msg
+    log_end_msg
+    return
+  fi
+
+  log_end_msg
+  log_begin_msg "Expanding data partition (free space: ${FREE_MIB} MiB)"
+  plymouth_msg "Expanding internal storage space to maximum, this can take a minute"
+
+  # ---------------------------------------------------------------------------
+  # Compute resize target, respecting MBR 2 TiB addressing limit.
+  #
+  # MBR (msdos) partition tables use 32-bit LBA fields.
+  # Maximum addressable byte offset = 2^32 * logical_sector_size.
+  #   512-byte sectors:  2,199,023,255,552 bytes  (~2.0 TiB)
+  #   4096-byte sectors: 17,592,186,044,416 bytes (~16.0 TiB)
+  #
+  # GPT has no practical size limit (2^64 sectors).
+  #
+  # For GPT and MBR-within-limit: 'resizepart 3 100%' lets parted handle
+  # alignment and (on GPT) backup header placement.
+  # For MBR-over-limit: explicit byte cap with 1 MiB alignment margin.
+  # ---------------------------------------------------------------------------
+  RESIZE_END="100%"
+  if [ "${PTTYPE}" = "msdos" ]; then
+    MBR_EXCEEDED="$(awk "BEGIN { print (${DISK_BYTES} > 4294967296 * ${SECTOR_SIZE}) }")"
+    if [ "${MBR_EXCEEDED}" = "1" ]; then
+      # Cap at MBR maximum minus 1 MiB for sector alignment safety
+      RESIZE_END="$(awk "BEGIN { printf \"%.0f\", 4294967296 * ${SECTOR_SIZE} - 1048576 }")B"
+      MBR_MAX_GIB="$(awk "BEGIN { printf \"%d\", 4294967296 * ${SECTOR_SIZE} / 1073741824 }")"
+      DISK_GIB="$(awk "BEGIN { printf \"%d\", ${DISK_BYTES} / 1073741824 }")"
+      log_end_msg
+      log_begin_msg "MBR limit: disk is ${DISK_GIB} GiB but msdos table addresses ${MBR_MAX_GIB} GiB max"
+      log_end_msg
+      log_begin_msg "Capping data partition at MBR maximum (space beyond limit requires GPT)"
+    fi
+  fi
+
+  # ---------------------------------------------------------------------------
+  # Resize partition, with one retry on transient failure.
+  # Transient failures can occur when the kernel has not finished rescanning
+  # the partition table or the device is not fully settled after boot.
+  # ---------------------------------------------------------------------------
+  resize_ok=0
+  for attempt in 1 2; do
+    parted -s "${DATADEV}" resizepart 3 "${RESIZE_END}" 2>/dev/null
+    if [ $? -eq 0 ]; then
+      resize_ok=1
+      break
+    fi
+    if [ ${attempt} -eq 1 ]; then
+      log_end_msg
+      log_begin_msg "resize: resizepart attempt 1 failed, retrying after device settle"
+      sleep 1
+      mdev -s
+    fi
+  done
+
+  if [ ${resize_ok} -eq 0 ]; then
+    log_failure_msg "resize: resizepart failed after 2 attempts on ${DATADEV}"
+    log_end_msg
+    return
+  fi
+
+  # ---------------------------------------------------------------------------
+  # Check and expand the ext4 filesystem to fill the resized partition.
+  # e2fsck exit codes: 0 = clean, 1 = errors corrected (both acceptable).
+  # Exit codes > 1 indicate uncorrected errors.
+  # ---------------------------------------------------------------------------
+  e2fsck -f "${DATA_PARTITION}" -y >/dev/null 2>&1
+  RET=$?
+  if [ ${RET} -gt 1 ]; then
+    log_failure_msg "resize: e2fsck failed on ${DATA_PARTITION} (exit ${RET})"
+    log_end_msg
+    return
+  fi
+
+  resize2fs "${DATA_PARTITION}" >/dev/null 2>&1
+  RET=$?
+  if [ ${RET} -ne 0 ]; then
+    log_failure_msg "resize: resize2fs failed on ${DATA_PARTITION} (exit ${RET})"
+    log_end_msg
+    return
+  fi
+
+  log_success_msg "Data partition resized successfully"
   log_end_msg
 }
 
