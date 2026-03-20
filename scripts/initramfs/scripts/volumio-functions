@@ -444,255 +444,120 @@ resize_datapartition() {
   log_end_msg
 }
 
-_imgpart_write_stage() {
-#
-# Write a raw-sector stage marker to the last 64 KiB of the disk.
-# Lives outside any filesystem so it survives filesystem corruption.
-# Format: "VOLRESIZE<stage>:<img_mib_05d>"  (fits easily in 512 bytes)
-#
-# Args: $1=stage("0"|"1")  $2=whole-disk-device  $3=img_size_mib
-#
-  _iws_blk="${2#/dev/}"
-  _iws_sz=$(cat "/sys/block/${_iws_blk}/size" 2>/dev/null)
-  [ -n "${_iws_sz}" ] || return 1
-  _iws_seek=$((_iws_sz - 128))   # last 128 * 512 = 64 KiB
-  printf 'VOLRESIZE%s:%05d' "$1" "${3:-0}" \
-    | dd of="$2" bs=512 seek="${_iws_seek}" conv=fsync 2>/dev/null
-  return $?
-}
-
-_imgpart_read_stage() {
-#
-# Read the stage marker written by _imgpart_write_stage.
-# Echoes "STAGE IMG_SIZE_MIB" e.g. "1 1907", or "0 0" if no marker.
-#
-# Args: $1=whole-disk-device
-#
-  _irs_blk="${1#/dev/}"
-  _irs_sz=$(cat "/sys/block/${_irs_blk}/size" 2>/dev/null)
-  [ -n "${_irs_sz}" ] || { printf '0 0\n'; return; }
-  _irs_seek=$((_irs_sz - 128))
-  _irs_raw=$(dd if="$1" bs=512 skip="${_irs_seek}" count=1 2>/dev/null | head -c 16)
-  case "${_irs_raw}" in
-    VOLRESIZE1:*)
-      _irs_mib=$(printf '%d' "${_irs_raw#VOLRESIZE1:}" 2>/dev/null) || _irs_mib=0
-      printf '1 %d\n' "${_irs_mib}" ;;
-    *) printf '0 0\n' ;;
-  esac
-}
-
-_imgpart_mkp3() {
-# Helper: recreate data partition (p3) using all remaining free space.
-# Shared by the normal path, idempotency check and recovery path.
-  _mp3_s="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $1}' | grep -o '[0-9]*')"
-  _mp3_e="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]*')"
-  [ -n "${_mp3_s}" ] && [ -n "${_mp3_e}" ] || return 1
-  parted -s "${BOOT_DEVICE}" mkpart primary ext4 "${_mp3_s}MB" "${_mp3_e}MB" >/dev/null 2>&1 || true
-  sync
-  wait_for_udev 10
-}
-
 resize_imgpartition() {
 #
 # When /boot/resize_imgpart AND /boot/user_data are both present:
-#   1. Back up the image partition (p2) to the tail of the raw disk via dd.
-#   2. Write a raw-sector stage marker (survives filesystem corruption).
-#   3. Delete p3, grow p2 to 4500MB, e2fsck + resize2fs, recreate p3.
-#   4. Clear the stage marker and remove /boot/resize_imgpart.
+#   - delete partition 3 (data partition)
+#   - enlarge partition 2 (imgpart) to 4.5GB
+#   - check and expand its ext4 filesystem
+#   - recreate partition 3 using remaining disk space
+#   - remove /boot/resize_imgpart
 #
-# If stage=1 is found at boot (power was cut during a previous run):
-#   Restore p2 from the tail backup, redo the partition-table changes,
-#   then clear the stage.  The image partition content is always recoverable.
-#
-# Backup position: (disk_size_MiB - img_size_MiB - 1) MiB from disk start.
-# Stage marker:    last 64 KiB of the raw disk (128 x 512-byte sectors).
-#
-# Sizes are derived from /sys/block in sectors (avoids 32-bit overflow
-# that byte values would cause for >2 GiB partitions on 32-bit platforms).
-#
-# Data partition formatting and final expansion are left to the existing
-# search_for_factory_reset() and resize_datapartition() functions.
+# The data partition formatting and final expansion are handled by the
+# existing search_for_factory_reset() and resize_datapartition() functions
+# that run later in the init flow.
 #
   if [ ! -e "${BOOTMNT}/resize_imgpart" ] || [ ! -e "${BOOTMNT}/user_data" ]; then
     return 0
   fi
 
-  log_begin_msg "Image partition resize requested: reading disk state"
+  log_begin_msg "Image partition resize requested: checking prerequisites"
   plymouth_msg "Resizing image partition to 4.5GB, please wait..."
 
   if [ ! -b "${BOOT_DEVICE}" ]; then
-    log_failure_msg "Boot device ${BOOT_DEVICE} not available, skipping"
+    log_failure_msg "Boot device ${BOOT_DEVICE} not available, skipping imgpart resize"
     log_end_msg
     return 0
   fi
 
-  # Disk size in MiB from kernel (sectors / 2048; safe on 32-bit sh for disks < 4 TiB)
-  _rip_blk="${BOOT_DEVICE#/dev/}"
-  _rip_disk_sect=$(cat "/sys/block/${_rip_blk}/size" 2>/dev/null)
-  if [ -z "${_rip_disk_sect}" ]; then
-    log_failure_msg "Cannot read disk size, skipping"
-    log_end_msg
-    return 0
-  fi
-  _rip_disk_mib=$((_rip_disk_sect / 2048))
-
-  # ------------------------------------------------------------------ #
-  # RECOVERY PATH: stage=1 means power was lost during a previous run.  #
-  # Restore the image partition from the tail-of-disk backup, then redo  #
-  # all partition-table and filesystem steps (they are all idempotent).  #
-  # ------------------------------------------------------------------ #
-  _rip_stage_info=$(_imgpart_read_stage "${BOOT_DEVICE}")
-  _rip_stage=$(echo "${_rip_stage_info}"    | awk '{print $1}')
-  _rip_bkup_mib=$(echo "${_rip_stage_info}" | awk '{print $2}')
-
-  if [ "${_rip_stage}" = "1" ] && [ "${_rip_bkup_mib:-0}" -gt 0 ] 2>/dev/null; then
-    log_end_msg
-    log_begin_msg "Interrupted resize detected (stage=1) — restoring from backup"
-    plymouth_msg "Recovering image partition from backup, please wait..."
-
-    _rip_bkup_seek=$((_rip_disk_mib - _rip_bkup_mib - 1))
-
-    # Ensure p2 reaches the target size in the partition table (idempotent)
-    parted -s "${BOOT_DEVICE}" resizepart 2 4500MB >/dev/null 2>&1 || true
-    sync
-    wait_for_udev 5
-
-    # Restore image partition content from the raw-disk backup
-    if [ -b "${IMAGE_PARTITION}" ] && [ "${_rip_bkup_seek}" -gt 0 ]; then
-      log_begin_msg "Restoring image partition (${_rip_bkup_mib} MiB)"
-      dd if="${BOOT_DEVICE}" of="${IMAGE_PARTITION}" \
-        bs=1M skip="${_rip_bkup_seek}" count="${_rip_bkup_mib}" conv=fsync 2>/dev/null || true
+  # If partition 2 already ends at or beyond 4.4GB the resize has already run.
+  # However p3 may be missing if power was lost between step 2 and step 4 on a
+  # previous boot.  Recreate it before removing the marker so the rest of the
+  # init flow (wait_for_partitions_ready, search_for_factory_reset, …) can
+  # proceed normally.
+  CURRENT_P2_END="$(parted -s "${BOOT_DEVICE}" unit MB print 2>/dev/null | awk '/^ 2 /{print $3}' | grep -o '[0-9]*')"
+  if [ -n "${CURRENT_P2_END}" ] && [ "${CURRENT_P2_END}" -ge 4400 ]; then
+    if [ ! -b "${DATA_PARTITION}" ]; then
+      log_begin_msg "Partition 2 already resized but partition 3 missing - recreating data partition"
+      PART3_START_RCV="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $1}' | grep -o '[0-9]*')"
+      DISK_END_RCV="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]*')"
+      parted -s "${BOOT_DEVICE}" mkpart primary ext4 "${PART3_START_RCV}MB" "${DISK_END_RCV}MB" >/dev/null 2>&1 || true
       sync
+      wait_for_udev 10
       log_end_msg
     fi
-
-    # Repair and expand the restored filesystem
-    log_begin_msg "Checking restored filesystem (e2fsck)"
-    e2fsck -f -y "${IMAGE_PARTITION}" >/dev/null 2>&1 || true
-    sync
-    log_end_msg
-
-    log_begin_msg "Expanding restored filesystem (resize2fs)"
-    resize2fs "${IMAGE_PARTITION}" >/dev/null 2>&1 || true
-    sync
-    log_end_msg
-
-    # Recreate p3 if it was lost
-    if [ ! -b "${DATA_PARTITION}" ]; then
-      log_begin_msg "Recreating data partition (partition 3)"
-      _imgpart_mkp3 || true
-      log_end_msg
-    fi
-
-    _imgpart_write_stage 0 "${BOOT_DEVICE}" 0 || true
+    log_begin_msg "Partition 2 already ${CURRENT_P2_END}MB (>= 4.4GB), removing marker"
     rm -f "${BOOTMNT}/resize_imgpart"
     sync
-    plymouth_msg "Image partition recovered. Continuing startup..."
-    log_begin_msg "Recovery complete"
+    log_end_msg
+    return 0
+  fi
+
+  # Confirm disk is large enough (need > 5.5GB)
+  DISK_SIZE_MB="$(parted -s "${BOOT_DEVICE}" unit MB print 2>/dev/null | grep "^Disk ${BOOT_DEVICE}" | awk '{print $3}' | grep -o '[0-9]*')"
+  if [ -z "${DISK_SIZE_MB}" ] || [ "${DISK_SIZE_MB}" -lt 5500 ]; then
+    log_failure_msg "Disk only ${DISK_SIZE_MB}MB - too small for 4.5GB imgpart resize, skipping"
+    rm -f "${BOOTMNT}/resize_imgpart"
+    sync
     log_end_msg
     return 0
   fi
 
   log_end_msg
 
-  # ---- Idempotency: p2 is already at the target size ----------------
-  # This covers the case where the full sequence completed but the marker
-  # removal was interrupted (stage=0 already cleared).
-  _rip_p2_end="$(parted -s "${BOOT_DEVICE}" unit MB print 2>/dev/null | awk '/^ 2 /{print $3}' | grep -o '[0-9]*')"
-  if [ -n "${_rip_p2_end}" ] && [ "${_rip_p2_end}" -ge 4400 ]; then
-    if [ ! -b "${DATA_PARTITION}" ]; then
-      log_begin_msg "p2 already resized but p3 missing — recreating"
-      _imgpart_mkp3 || true
-      log_end_msg
-    fi
-    log_begin_msg "Partition 2 already ${_rip_p2_end}MB — removing marker"
-    rm -f "${BOOTMNT}/resize_imgpart"
-    sync
-    log_end_msg
-    return 0
-  fi
-
-  # ---- Pre-flight checks --------------------------------------------
-  # Image partition size in MiB from kernel (sectors; safe on 32-bit sh)
-  _rip_img_kname=$(lsblk -no KNAME "${IMAGE_PARTITION}" 2>/dev/null)
-  _rip_img_sect=$(cat "/sys/class/block/${_rip_img_kname}/size" 2>/dev/null)
-  if [ -z "${_rip_img_sect}" ] || [ "${_rip_img_sect}" -eq 0 ] 2>/dev/null; then
-    log_failure_msg "Cannot read image partition size, skipping"
-    rm -f "${BOOTMNT}/resize_imgpart"
-    sync
-    return 0
-  fi
-  _rip_img_mib=$((_rip_img_sect / 2048))
-
-  # Backup lives at: (disk_end - img_size - 1 MiB gap) to keep it clear of
-  # the 64 KiB stage sector and leave a small alignment buffer.
-  _rip_bkup_seek=$((_rip_disk_mib - _rip_img_mib - 1))
-
-  # The backup seek must be safely past the new p2 end (~4293 MiB for 4500MB).
-  # If not, the disk is too small to hold both the resized p2 and the backup.
-  if [ "${_rip_bkup_seek}" -le 4300 ]; then
-    log_failure_msg "Disk too small for safe backup (seek ${_rip_bkup_seek} MiB <= 4300), skipping"
-    rm -f "${BOOTMNT}/resize_imgpart"
-    sync
-    return 0
-  fi
-
-  # ---- Step 1: back up image partition to tail of disk ---------------
-  log_begin_msg "Backing up image partition (${_rip_img_mib} MiB) to disk tail (seek=${_rip_bkup_seek} MiB)"
-  if ! dd if="${IMAGE_PARTITION}" of="${BOOT_DEVICE}" \
-       bs=1M seek="${_rip_bkup_seek}" count="${_rip_img_mib}" conv=fsync 2>/dev/null; then
-    log_failure_msg "Backup failed — aborting resize (no changes made)"
-    log_end_msg
-    return 0
-  fi
-  sync
-  log_end_msg
-
-  # ---- Step 2: commit stage=1 to raw disk ---------------------------
-  # From this point on, any power loss will be caught by the recovery path
-  # on the next boot using the backup written above.
-  _imgpart_write_stage 1 "${BOOT_DEVICE}" "${_rip_img_mib}" || true
-
-  # ---- Step 3: delete data partition (partition 3) ------------------
+  # ---- Step 1: delete data partition (partition 3) ----
   log_begin_msg "Deleting data partition (partition 3)"
   parted -s "${BOOT_DEVICE}" rm 3 >/dev/null 2>&1 || true
   sync
   log_end_msg
 
-  # ---- Step 4: resize image partition (partition 2) to 4500MB -------
+  # ---- Step 2: resize image partition (partition 2) to 4500MB ----
   log_begin_msg "Resizing image partition (partition 2) to 4500MB"
   if ! parted -s "${BOOT_DEVICE}" resizepart 2 4500MB >/dev/null 2>&1; then
-    log_failure_msg "Failed to resize p2 — stage=1 kept; next boot will restore from backup"
+    log_failure_msg "Failed to resize partition 2 - attempting to restore data partition"
+    PART3_START_ERR="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $1}' | grep -o '[0-9]*')"
+    DISK_END_ERR="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]*')"
+    parted -s "${BOOT_DEVICE}" mkpart primary ext4 "${PART3_START_ERR}MB" "${DISK_END_ERR}MB" >/dev/null 2>&1 || true
+    sync
     log_end_msg
     return 1
   fi
   sync
   log_end_msg
 
-  # ---- Step 5: check and expand the ext4 filesystem -----------------
+  # ---- Step 3: check and expand the ext4 filesystem on the image partition ----
   log_begin_msg "Running e2fsck on image partition"
   e2fsck -f -y "${IMAGE_PARTITION}" >/dev/null 2>&1 || true
   sync
   log_end_msg
 
-  log_begin_msg "Expanding image partition filesystem (resize2fs)"
+  log_begin_msg "Expanding image partition filesystem"
   resize2fs "${IMAGE_PARTITION}" >/dev/null 2>&1 || true
   sync
   log_end_msg
 
-  # ---- Step 6: recreate data partition (partition 3) ----------------
+  # ---- Step 4: recreate data partition (partition 3) with remaining space ----
   log_begin_msg "Recreating data partition (partition 3)"
-  if ! _imgpart_mkp3; then
-    log_failure_msg "Cannot determine free space — stage=1 kept; next boot will recover"
+  PART3_START="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $1}' | grep -o '[0-9]*')"
+  DISK_END="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]*')"
+  if [ -z "${PART3_START}" ] || [ -z "${DISK_END}" ]; then
+    log_failure_msg "Cannot determine free space for data partition"
     log_end_msg
     return 1
   fi
+  parted -s "${BOOT_DEVICE}" mkpart primary ext4 "${PART3_START}MB" "${DISK_END}MB" >/dev/null 2>&1
+  sync
   log_end_msg
 
-  # ---- Step 7: clear stage marker and remove resize trigger ---------
-  # user_data is left in place: search_for_factory_reset() formats p3,
-  # and resize_datapartition() expands it to fill the disk.
-  _imgpart_write_stage 0 "${BOOT_DEVICE}" 0 || true
+  # Wait for kernel to expose the new partition node
+  log_begin_msg "Waiting for new partition to become available"
+  wait_for_udev 10
+  log_end_msg
+
+  # ---- Step 5: remove the resize marker ----
+  # user_data is intentionally left in place so that search_for_factory_reset()
+  # will format the freshly recreated data partition, and resize_datapartition()
+  # will then expand it to its full size.
   log_begin_msg "Removing resize_imgpart marker"
   rm -f "${BOOTMNT}/resize_imgpart"
   sync
