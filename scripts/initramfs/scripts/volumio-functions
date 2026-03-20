@@ -446,7 +446,7 @@ resize_datapartition() {
 
 resize_imgpartition() {
 #
-# When /boot/resize_imgpart AND /boot/user_data are both present:
+# When /boot/resize_imgpart is present:
 #   - delete partition 3 (data partition)
 #   - enlarge partition 2 (imgpart) to 4.5GB
 #   - check and expand its ext4 filesystem
@@ -457,7 +457,7 @@ resize_imgpartition() {
 # existing search_for_factory_reset() and resize_datapartition() functions
 # that run later in the init flow.
 #
-  if [ ! -e "${BOOTMNT}/resize_imgpart" ] || [ ! -e "${BOOTMNT}/user_data" ]; then
+  if [ ! -e "${BOOTMNT}/resize_imgpart" ]; then
     return 0
   fi
 
