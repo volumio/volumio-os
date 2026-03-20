@@ -401,6 +401,14 @@ maybe_volumio_break progress "init: $LINENO"
 
 # Mount partition with the squash file
 mount -t vfat "${BOOT_PARTITION}" "${BOOTMNT}"
+
+# Resize imgpart to 4.5GB when /boot/resize_imgpart + /boot/user_data are present.
+# Must run before the image partition is mounted so parted/resize2fs can work freely.
+#
+maybe_volumio_break resize-imgpart "init: $LINENO"
+
+resize_imgpartition
+
 mount -t ext4 "${IMAGE_PARTITION}" "${IMAGEMNT}"
 
 # In case of a gpt boot partition: move the backup table when not done yet
