@@ -462,7 +462,7 @@ resize_imgpartition() {
   fi
 
   log_begin_msg "Image partition resize requested: checking prerequisites"
-  plymouth_msg "Resizing image partition to 4.5GB, please wait..."
+  plymouth_msg "Preparing system... DO NOT POWER OFF"
 
   if [ ! -b "${BOOT_DEVICE}" ]; then
     log_failure_msg "Boot device ${BOOT_DEVICE} not available, skipping imgpart resize"
@@ -563,7 +563,7 @@ resize_imgpartition() {
   sync
   log_end_msg
 
-  plymouth_msg "Image partition resized. Formatting data partition..."
+  plymouth_msg "System setup complete. Continuing..."
   log_begin_msg "Image partition resize complete"
   log_end_msg
 }
