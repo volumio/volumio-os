@@ -12,7 +12,7 @@ maybe_volumio_break() {
 # Valid breakpoints are:
 #       top, modules, premount, mount, cust-init-part, init-part-pars, progress, dev_partiton,
 #       krnl-archive, search-for-firmw, search-fact-reset, search-fact-reset, krnl-rollbck,
-#       krnl-upd, resize-data, mnt-overlayfs, cust-upd-uuid, updfstab, bottom and init
+#       krnl-upd, resize-imgpart, resize-data, mnt-overlayfs, cust-upd-uuid, updfstab, bottom and init
 # Globals
 #   none
 #
@@ -441,6 +441,140 @@ resize_datapartition() {
     resize2fs -p "${DATA_PARTITION}" >/dev/null 2>&1
     parted -s "${DATADEV}" unit MB print >/dev/null 2>&1
   fi
+  log_end_msg
+}
+
+resize_imgpartition() {
+#
+# When /boot/resize_imgpart is present:
+#   - delete partition 3 (data partition)
+#   - enlarge partition 2 (imgpart) to 4.5GB
+#   - check and expand its ext4 filesystem
+#   - recreate partition 3 using remaining disk space
+#   - remove /boot/resize_imgpart
+#
+# The data partition formatting and final expansion are handled by the
+# existing search_for_factory_reset() and resize_datapartition() functions
+# that run later in the init flow.
+#
+  if [ ! -e "${BOOTMNT}/resize_imgpart" ]; then
+    return 0
+  fi
+
+  log_begin_msg "Image partition resize requested: checking prerequisites"
+  plymouth_msg "Preparing system... DO NOT POWER OFF"
+
+  if [ ! -b "${BOOT_DEVICE}" ]; then
+    log_failure_msg "Boot device ${BOOT_DEVICE} not available, skipping imgpart resize"
+    log_end_msg
+    return 0
+  fi
+
+  # If partition 2 already ends at or beyond 4.4GB the resize has already run.
+  # However p3 may be missing if power was lost between step 2 and step 4 on a
+  # previous boot.  Recreate it before removing the marker so the rest of the
+  # init flow (wait_for_partitions_ready, search_for_factory_reset, …) can
+  # proceed normally.
+  CURRENT_P2_END="$(parted -s "${BOOT_DEVICE}" unit MB print 2>/dev/null | awk '/^ 2 /{print $3}' | grep -o '[0-9]*')"
+  if [ -n "${CURRENT_P2_END}" ] && [ "${CURRENT_P2_END}" -ge 4400 ]; then
+    if [ ! -b "${DATA_PARTITION}" ]; then
+      log_begin_msg "Partition 2 already resized but partition 3 missing - recreating data partition"
+      PART3_START_RCV="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $1}' | grep -o '[0-9]*')"
+      DISK_END_RCV="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]*')"
+      parted -s "${BOOT_DEVICE}" mkpart primary ext4 "${PART3_START_RCV}MB" "${DISK_END_RCV}MB" >/dev/null 2>&1 || true
+      sync
+      wait_for_udev 10
+      log_end_msg
+      log_begin_msg "Creating user_data marker so the recovered data partition gets formatted"
+      echo " " > "${BOOTMNT}/user_data"
+      sync
+      log_end_msg
+    fi
+    log_begin_msg "Partition 2 already ${CURRENT_P2_END}MB (>= 4.4GB), removing marker"
+    rm -f "${BOOTMNT}/resize_imgpart"
+    sync
+    log_end_msg
+    return 0
+  fi
+
+  # Confirm disk is large enough (need > 5.5GB)
+  DISK_SIZE_MB="$(parted -s "${BOOT_DEVICE}" unit MB print 2>/dev/null | grep "^Disk ${BOOT_DEVICE}" | awk '{print $3}' | grep -o '[0-9]*')"
+  if [ -z "${DISK_SIZE_MB}" ] || [ "${DISK_SIZE_MB}" -lt 5500 ]; then
+    log_failure_msg "Disk only ${DISK_SIZE_MB}MB - too small for 4.5GB imgpart resize, skipping"
+    rm -f "${BOOTMNT}/resize_imgpart"
+    sync
+    log_end_msg
+    return 0
+  fi
+
+  log_end_msg
+
+  # ---- Step 1: delete data partition (partition 3) ----
+  log_begin_msg "Deleting data partition (partition 3)"
+  parted -s "${BOOT_DEVICE}" rm 3 >/dev/null 2>&1 || true
+  sync
+  log_end_msg
+
+  # ---- Step 2: resize image partition (partition 2) to 4500MB ----
+  log_begin_msg "Resizing image partition (partition 2) to 4500MB"
+  if ! parted -s "${BOOT_DEVICE}" resizepart 2 4500MB >/dev/null 2>&1; then
+    log_failure_msg "Failed to resize partition 2 - attempting to restore data partition"
+    PART3_START_ERR="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $1}' | grep -o '[0-9]*')"
+    DISK_END_ERR="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]*')"
+    parted -s "${BOOT_DEVICE}" mkpart primary ext4 "${PART3_START_ERR}MB" "${DISK_END_ERR}MB" >/dev/null 2>&1 || true
+    sync
+    log_end_msg
+    return 1
+  fi
+  sync
+  log_end_msg
+
+  # ---- Step 3: check and expand the ext4 filesystem on the image partition ----
+  log_begin_msg "Running e2fsck on image partition"
+  e2fsck -f -y "${IMAGE_PARTITION}" >/dev/null 2>&1 || true
+  sync
+  log_end_msg
+
+  log_begin_msg "Expanding image partition filesystem"
+  resize2fs "${IMAGE_PARTITION}" >/dev/null 2>&1 || true
+  sync
+  log_end_msg
+
+  # ---- Step 4: recreate data partition (partition 3) with remaining space ----
+  log_begin_msg "Recreating data partition (partition 3)"
+  PART3_START="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $1}' | grep -o '[0-9]*')"
+  DISK_END="$(parted -s "${BOOT_DEVICE}" unit MB print free 2>/dev/null | grep Free | tail -1 | awk '{print $2}' | grep -o '[0-9]*')"
+  if [ -z "${PART3_START}" ] || [ -z "${DISK_END}" ]; then
+    log_failure_msg "Cannot determine free space for data partition"
+    log_end_msg
+    return 1
+  fi
+  parted -s "${BOOT_DEVICE}" mkpart primary ext4 "${PART3_START}MB" "${DISK_END}MB" >/dev/null 2>&1
+  sync
+  log_end_msg
+
+  # Wait for kernel to expose the new partition node
+  log_begin_msg "Waiting for new partition to become available"
+  wait_for_udev 10
+  log_end_msg
+
+  # ---- Step 5: create user_data so search_for_factory_reset() formats the new partition ----
+  # The freshly recreated partition 3 is a raw unformatted partition.
+  # search_for_factory_reset() checks for user_data and runs mke2fs to format it,
+  # after which resize_datapartition() expands it to full size.
+  log_begin_msg "Creating user_data marker for data partition formatting"
+  echo " " > "${BOOTMNT}/user_data"
+  sync
+  log_end_msg
+
+  # ---- Step 6: remove the resize marker ----
+  log_begin_msg "Removing resize_imgpart marker"
+  rm -f "${BOOTMNT}/resize_imgpart"
+  sync
+  log_end_msg
+
+  plymouth_msg "System setup complete. Continuing..."
+  log_begin_msg "Image partition resize complete"
   log_end_msg
 }
 
