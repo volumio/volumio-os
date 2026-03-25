@@ -13,8 +13,8 @@ LBLDATA="volumio_data"
 # Partition Info
 BOOT_TYPE=msdos			# msdos or gpt   
 BOOT_START=1
-BOOT_END=64
-IMAGE_END=3800
+BOOT_END=128
+IMAGE_END=4416
 BOOT=/mnt/boot
 BOOTDELAY=1
 BOOTDEV="mmcblk1"

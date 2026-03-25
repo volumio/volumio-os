@@ -28,7 +28,7 @@ VOLINITUPDATER=yes
 ## Partition info
 BOOT_START=1
 BOOT_END=129
-IMAGE_END=3841     # BOOT_END + 3712 MiB (/img squashfs)
+IMAGE_END=4417     # BOOT_END + 4288 MiB (/img squashfs)
 BOOT_TYPE=msdos    # msdos or gpt
 INIT_TYPE="initv3"
 INIT_UUID_TYPE="non-uuid-devices" # Use block device GPEN if dynamic UUIDs are not handled.

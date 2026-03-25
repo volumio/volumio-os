@@ -29,6 +29,7 @@ DISABLE_DISPLAY=yes
 ## Partition info
 BOOT_START=21
 BOOT_END=84
+IMAGE_END=4372         # BOOT_END + 4288 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 INIT_TYPE="initv3"
 INIT_UUID_TYPE="non-uuid-devices" # Use block device GPEN if dynamic UUIDs are not handled.

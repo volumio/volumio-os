@@ -32,7 +32,7 @@ PLYMOUTH_THEME="volumio-adaptive"
 ## Partition info
 BOOT_START=17
 BOOT_END=273
-IMAGE_END=3985           # BOOT_END + 3712 MiB (/img squashfs)
+IMAGE_END=4561           # BOOT_END + 4288 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=no         # Add UUID to fstab
 INIT_TYPE="initv3"

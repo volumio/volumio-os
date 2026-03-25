@@ -35,7 +35,7 @@ BOOT_START=16
 BOOT_END=80
 BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=yes        # Add UUID to fstab
-IMAGE_END=3800
+IMAGE_END=4368         # BOOT_END + 4288 MiB (/img squashfs)
 INIT_TYPE="initv3"
 PLYMOUTH_THEME="volumio-adaptive"
 

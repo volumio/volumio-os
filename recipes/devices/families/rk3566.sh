@@ -27,6 +27,7 @@ VOLINITUPDATER=yes
 ## Partition info
 BOOT_START=20
 BOOT_END=96
+IMAGE_END=4384         # BOOT_END + 4288 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=yes        # Add UUID to fstab
 INIT_TYPE="initv3" 

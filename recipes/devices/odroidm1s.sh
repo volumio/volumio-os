@@ -21,6 +21,7 @@ DEBUG_IMAGE="no"
 
 ## Partition info
 BOOT_END=84
+IMAGE_END=4372         # BOOT_END + 4288 MiB (/img squashfs)
 
 write_device_bootloader() {
   log "Running write_device_bootloader" "ext"

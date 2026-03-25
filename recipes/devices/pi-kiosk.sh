@@ -15,4 +15,4 @@ KIOSKBROWSER=chromium
 
 # We need a bigger image size
 BOOT_END=180
-IMAGE_END=3800
+IMAGE_END=4468         # BOOT_END + 4288 MiB (/img squashfs)
