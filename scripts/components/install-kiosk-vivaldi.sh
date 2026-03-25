@@ -12,13 +12,23 @@ export DEBIAN_FRONTEND=noninteractive
 CMP_PACKAGES=(
   # Keyboard config
   "keyboard-configuration"
-  # Display stuff
-  "openbox" "xorg" "xinit" "libexif12" "unclutter" "libu2f-udev" "libvulkan1" "xinput"
-  # Browser dependencies 
+  # X server - targeted packages instead of the "xorg" metapackage
+  # WHY: "xorg" pulls in xserver-xorg-video-all (amdgpu, ati, radeon, nouveau,
+  # vesa, fbdev), xterm, and xorg-docs - none of which are needed.
+  # Pi/CM4/CM5 use vc4 KMS with the modesetting DDX built into xserver-xorg-core.
+  # See: https://github.com/volumio/volumio-os/issues/368
+  "xserver-xorg-core"           # X server with built-in modesetting DDX for vc4
+  "xserver-xorg-input-libinput" # Touch, mouse, and keyboard input
+  "x11-xserver-utils"           # xset, xrandr - used by kiosk start script
+  "xinit"                       # startx
+  # Window manager and display utilities
+  "openbox" "libexif12" "unclutter" "libu2f-udev" "libvulkan1" "xinput"
+  # Browser dependencies
   "fonts-liberation" "libatk-bridge2.0-0" "libatk1.0-0" "libatspi2.0-0" "libgtk-3-0" "libnspr4" "libnss3" "xdg-utils"
-  # Fonts
+  # CJK and international font support for kiosk UI
+  # NOTE: These add ~30M installed. If international UI support is not needed
+  # for a specific OEM build, these can be omitted to save space.
   "fonts-arphic-ukai" "fonts-arphic-gbsn00lp" "fonts-unfonts-core"
-  # Fonts for Japanese and Thai languages
   "fonts-ipafont" "fonts-vlgothic" "fonts-thai-tlwg-ttf"
 )
 
