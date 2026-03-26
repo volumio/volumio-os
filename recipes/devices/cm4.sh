@@ -600,8 +600,7 @@ device_chroot_tweaks_pre() {
 	# user-attached USB WiFi/BT dongles.
 	#
 	# ALSO: Remove Pi 5 EEPROM bootloader images (BCM2712) - CM4 is BCM2711.
-	# Remove cypress directory - Pi uses brcmfmac from /lib/firmware/brcm/,
-	# not the Cypress FMAC alternate path.
+	# NOTE: /lib/firmware/cypress/ is kept - brcm/ has symlinks into it.
 	# ============================================================================
 
 	log "Firmware cleanup: removing unused firmware from /lib/firmware" "info"
@@ -633,13 +632,11 @@ device_chroot_tweaks_pre() {
 		rm -rf "/lib/firmware/raspberrypi/bootloader-2712"
 	fi
 
-	# Remove Cypress FMAC alternate firmware directory
-	# Pi/CM4 brcmfmac driver loads from /lib/firmware/brcm/, not /lib/firmware/cypress/
-	# All files in cypress/ are SDIO/PCIe variants for non-Pi SBCs
-	if [[ -d "/lib/firmware/cypress" ]]; then
-		log "Removing unused Cypress FMAC firmware" "info"
-		rm -rf "/lib/firmware/cypress"
-	fi
+	# NOTE: /lib/firmware/cypress/ is NOT removed here despite appearing unused.
+	# Debian's firmware-brcm80211 creates symlinks from /lib/firmware/brcm/ into
+	# cypress/ (e.g. brcmfmac43455-sdio.bin -> ../cypress/cyfmac43455-sdio.bin).
+	# Removing cypress/ breaks WiFi. The directory is ~7M - not worth the
+	# complexity of selective symlink resolution for that saving.
 
 	local fw_post_size
 	fw_post_size=$(du -sm /lib/firmware 2>/dev/null | cut -f1)
