@@ -116,7 +116,9 @@ function fetch_volumio_from_repo() {
   mkdir "${ROOTFS}/volumio"
 
   log "Cloning Volumio from ${VOL_BE_REPO} - ${VOL_BE_REPO_BRANCH}"
-  git clone --depth 10 -b "${VOL_BE_REPO_BRANCH}" --single-branch "${VOL_BE_REPO}" "${ROOTFS}/volumio"
+  # Shallow clone: depth 3 keeps enough history for emergency on-device reverts
+  # while reducing .git size from ~9.5M (depth 10) to ~3M
+  git clone --depth 3 -b "${VOL_BE_REPO_BRANCH}" --single-branch "${VOL_BE_REPO}" "${ROOTFS}/volumio"
   if [[ -n ${VOL_BE_REPO_SHA} ]]; then
     log "Setting BE_REPO to commit" "${VOL_BE_REPO_SHA}"
     git -C "${ROOTFS}/volumio/" reset --hard "${VOL_BE_REPO_SHA}"

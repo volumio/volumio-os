@@ -64,6 +64,19 @@ rm -rf "${ROOTFSMNT}"/usr/share/lintian/* "${ROOTFSMNT}"/usr/share/linda/* "${RO
 rm -rf "${ROOTFSMNT}"/var/lib/apt/lists/*
 rm -rf "${ROOTFSMNT}"/var/cache/apt/*
 
+# Remove MIDI SoundFont banks but KEEP ALSA test sounds
+# WHY: /usr/share/sounds/sf2 and sf3 contain SoundFont files for MIDI
+# synthesis (~5.6M). Volumio does not use MIDI synthesis.
+# KEEP: /usr/share/sounds/alsa/ - speaker-test uses these wav files
+# for channel identification (Front_Left.wav, etc.). Essential for
+# audio hardware diagnostics.
+for sfdir in "${ROOTFSMNT}/usr/share/sounds/sf2" "${ROOTFSMNT}/usr/share/sounds/sf3"; do
+  if [[ -d "${sfdir}" ]]; then
+    log "Removing unused MIDI SoundFonts" "info" "$(basename "${sfdir}") $(check_size "${sfdir}")"
+    rm -rf "${sfdir}"
+  fi
+done
+
 log "Final /usr/share/" "$(check_size /usr/share)"
 for path in "${share_dirs[@]}"; do
   log "${path}:" "Pre: ${pre_size[$path]} Post: $(check_size "/usr/share/${path}")"
