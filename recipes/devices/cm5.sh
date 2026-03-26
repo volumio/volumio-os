@@ -597,6 +597,74 @@ device_chroot_tweaks_pre() {
 		cp -rp * "${ROOTFS}"/usr && cd - && rm -rf "/tmp/$key"
 	done
 
+	# ============================================================================
+	# FIRMWARE CLEANUP - CM5 SPECIFIC
+	# ============================================================================
+	# CONTEXT: /lib/firmware is populated by three sources:
+	#   1. VolumioBase.conf [Firmware] - firmware-atheros, firmware-brcm80211,
+	#      firmware-ralink, firmware-realtek, firmware-linux-free,
+	#      firmware-misc-nonfree (all builds)
+	#   2. arm.conf [RaspberryPi] - firmware-libertas, firmware-mediatek,
+	#      firmware-marvell-prestera- (Pi/CM builds only)
+	#   3. rpi-update - bootloader images in /lib/firmware/raspberrypi,
+	#      plus brcm firmware additions
+	#
+	# PROBLEM: The combined result is ~181M of firmware, of which CM5 uses
+	# only /lib/firmware/brcm (onboard WiFi/BT) at runtime. The rest is
+	# pre-compiled binary data that compresses poorly under gzip, directly
+	# inflating the squashfs image. See: https://github.com/volumio/volumio-os/issues/368
+	#
+	# APPROACH: Remove firmware for chipsets that are PCIe/platform-only and
+	# physically cannot appear as USB peripherals on CM5 hardware.
+	# Firmware for chipsets with USB variants is retained to support
+	# user-attached USB WiFi/BT dongles.
+	#
+	# ALSO: Remove Pi 4/CM4 EEPROM bootloader images (BCM2711) - CM5 is BCM2712.
+	# Remove cypress directory - Pi uses brcmfmac from /lib/firmware/brcm/,
+	# not the Cypress FMAC alternate path.
+	# ============================================================================
+
+	log "Firmware cleanup: removing unused firmware from /lib/firmware" "info"
+	local fw_pre_size
+	fw_pre_size=$(du -sm /lib/firmware 2>/dev/null | cut -f1)
+
+	# Tier 1: PCIe/platform-only chipsets - no USB variants exist
+	# These chipsets physically cannot be connected to CM5 via USB
+	local -a FW_REMOVE_PCIE=(
+		"ath11k"    # Qualcomm WiFi 6/6E - PCIe only (~43M)
+		"ath10k"    # Qualcomm WiFi 5 - PCIe/SDIO only (~19M)
+		"ath12k"    # Qualcomm WiFi 7 - PCIe only (~6M)
+		"rtw89"     # Realtek WiFi 6 - PCIe only (~8M)
+		"cxgb4"     # Chelsio 10/25GbE server NICs - PCIe only (~2M)
+		"cnm"       # Chips&Media video codec IP - SoC only (~1M)
+	)
+
+	for fwdir in "${FW_REMOVE_PCIE[@]}"; do
+		if [[ -d "/lib/firmware/${fwdir}" ]]; then
+			log "Removing PCIe-only firmware: ${fwdir}" "info"
+			rm -rf "/lib/firmware/${fwdir}"
+		fi
+	done
+
+	# CM5-specific: remove Pi 4/CM4 EEPROM bootloader images (BCM2711)
+	# CM5 is BCM2712 and uses bootloader-2712
+	if [[ -d "/lib/firmware/raspberrypi/bootloader-2711" ]]; then
+		log "Removing Pi 4/CM4 EEPROM bootloader images (BCM2711)" "info"
+		rm -rf "/lib/firmware/raspberrypi/bootloader-2711"
+	fi
+
+	# Remove Cypress FMAC alternate firmware directory
+	# Pi/CM5 brcmfmac driver loads from /lib/firmware/brcm/, not /lib/firmware/cypress/
+	# All files in cypress/ are SDIO/PCIe variants for non-Pi SBCs
+	if [[ -d "/lib/firmware/cypress" ]]; then
+		log "Removing unused Cypress FMAC firmware" "info"
+		rm -rf "/lib/firmware/cypress"
+	fi
+
+	local fw_post_size
+	fw_post_size=$(du -sm /lib/firmware 2>/dev/null | cut -f1)
+	log "Firmware cleanup completed" "okay" "${fw_pre_size}M -> ${fw_post_size}M"
+
 	# Rename gpiomem in udev rules if kernel is equal or greater than 6.1.54
 	if [[ "${KERNEL_SEMVER[0]}" -gt 6 ]] ||
 		[[ "${KERNEL_SEMVER[0]}" -eq 6 && "${KERNEL_SEMVER[1]}" -gt 1 ]] ||
