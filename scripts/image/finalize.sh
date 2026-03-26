@@ -64,6 +64,29 @@ rm -rf "${ROOTFSMNT}"/usr/share/lintian/* "${ROOTFSMNT}"/usr/share/linda/* "${RO
 rm -rf "${ROOTFSMNT}"/var/lib/apt/lists/*
 rm -rf "${ROOTFSMNT}"/var/cache/apt/*
 
+# Remove backend .git directory from squashfs
+# WHY: build.sh removes .git from www and www3 UI repos but not from the
+# backend. The backend .git (~9.5M) serves no purpose at runtime.
+# All git rev info is already written to /etc/os-release by fetch_volumio_from_repo().
+# The VOLUMIO_HASH above uses md5deep, not git.
+if [[ -d "${ROOTFSMNT}/volumio/.git" ]]; then
+  log "Removing backend .git from squashfs" "info" "$(check_size "${ROOTFSMNT}/volumio/.git")"
+  rm -rf "${ROOTFSMNT}/volumio/.git"
+fi
+
+# Remove MIDI SoundFont banks but KEEP ALSA test sounds
+# WHY: /usr/share/sounds/sf2 and sf3 contain SoundFont files for MIDI
+# synthesis (~5.6M). Volumio does not use MIDI synthesis.
+# KEEP: /usr/share/sounds/alsa/ - speaker-test uses these wav files
+# for channel identification (Front_Left.wav, etc.). Essential for
+# audio hardware diagnostics.
+for sfdir in "${ROOTFSMNT}/usr/share/sounds/sf2" "${ROOTFSMNT}/usr/share/sounds/sf3"; do
+  if [[ -d "${sfdir}" ]]; then
+    log "Removing unused MIDI SoundFonts" "info" "$(basename "${sfdir}") $(check_size "${sfdir}")"
+    rm -rf "${sfdir}"
+  fi
+done
+
 log "Final /usr/share/" "$(check_size /usr/share)"
 for path in "${share_dirs[@]}"; do
   log "${path}:" "Pre: ${pre_size[$path]} Post: $(check_size "/usr/share/${path}")"
