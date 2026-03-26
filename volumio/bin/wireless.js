@@ -175,6 +175,8 @@ var stage2Failed = false;  // Stage 2 connection failure flag
 var transitionStartTime = 0;  // Track transition timing for diagnostics
 var watchDebounceTimer = null;  // Debounce timer for fs.watch events
 var WATCH_DEBOUNCE_MS = 1000;   // Prevent rapid re-triggering from inotify events
+// Restart Avahi when wireless state/IP changes (default: off)
+var RESTART_AVAHI_ON_WIRELESS_CHANGE = false;
 
 // WPA State machine context (Stage 2)
 var wpaStateContext = {
@@ -2115,6 +2117,10 @@ function wstatus(param) {
 // Restart Avahi mDNS service for network discovery
 // Avahi needs restart after IP change to broadcast correctly
 function restartAvahi() {
+    if (!RESTART_AVAHI_ON_WIRELESS_CHANGE) {
+        loggerDebug('Skipping avahi restart (RESTART_AVAHI_ON_WIRELESS_CHANGE=false)');
+        return;
+    }
     try {
         loggerInfo('Restarting avahi-daemon...');
         execSync(SUDO + ' ' + SYSTEMCTL + ' restart avahi-daemon', { encoding: 'utf8' });
