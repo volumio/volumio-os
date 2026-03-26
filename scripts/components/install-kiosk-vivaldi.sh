@@ -53,9 +53,12 @@ rm /etc/apt/sources.list.d/vivaldi.list
 
 
 log "Creating ${CMP_NAME} dirs and scripts"
-mkdir /data/volumiokiosk
+mkdir -p /data/volumiokiosk/Default
 
-log " Creating Vivaldi kiosk start script" 
+log "Disabling password save popup in Vivaldi preferences"
+echo '{"credentials_enable_service": false, "profile": {"password_manager_enabled": false}}' > /data/volumiokiosk/Default/Preferences
+
+log " Creating Vivaldi kiosk start script"
 
 echo '#!/bin/bash 
 
@@ -69,8 +72,9 @@ if [ -L /data/volumiokiosk/SingletonCookie ]; then
 fi
 
 [[ -e /data/volumiokiosk/Default/Preferences ]] && {
-  sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' /data/volumiokiosk/Default/Preferences 
-  sed -i 's/"exit_type":"Crashed"/"exit_type":"None"/' /data/volumiokiosk/Default/Preferences 
+  sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' /data/volumiokiosk/Default/Preferences
+  sed -i 's/"exit_type":"Crashed"/"exit_type":"None"/' /data/volumiokiosk/Default/Preferences
+  sed -i 's/"credentials_enable_service":true/"credentials_enable_service":false/' /data/volumiokiosk/Default/Preferences
 }
 
 if [ ! -f /data/volumiokiosk/firststartdone ]; then
