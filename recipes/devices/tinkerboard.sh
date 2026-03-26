@@ -34,6 +34,7 @@ KIOSKBROWSER=vivaldi
 ## Partition info
 BOOT_START=1
 BOOT_END=64
+IMAGE_END=4352         # BOOT_END + 4288 MiB (/img squashfs)
 BOOT_TYPE=msdos          # msdos or gpt
 BOOT_USE_UUID=yes        # Add UUID to fstab
 INIT_TYPE="initv3" 

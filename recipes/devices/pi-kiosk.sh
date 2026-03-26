@@ -13,6 +13,7 @@ source "${SRC}"/recipes/devices/pi.sh
 KIOSKMODE=yes
 KIOSKBROWSER=chromium
 
-# We need a bigger image size
-BOOT_END=180
-IMAGE_END=3800
+## Partition info (same as pi.sh)
+BOOT_START=1
+BOOT_END=385           # 384 MiB boot partition, aligned
+IMAGE_END=4673         # BOOT_END + 4288 MiB (/img squashfs)
