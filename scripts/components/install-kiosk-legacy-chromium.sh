@@ -15,14 +15,21 @@ BrowerPckg="chromium"
 CMP_PACKAGES=(
   # Keyboard config
   "keyboard-configuration"
-  # Display stuff
-  "openbox" "unclutter" "xorg" "xinit"
+  # X server - targeted packages instead of the "xorg" metapackage
+  # WHY: "xorg" pulls in xserver-xorg-video-all (amdgpu, ati, radeon, nouveau,
+  # vesa, fbdev), xterm, and xorg-docs - none of which are needed.
+  # See: https://github.com/volumio/volumio-os/issues/368
+  "xserver-xorg-core"           # X server with built-in modesetting DDX
+  "xserver-xorg-input-libinput" # Touch, mouse, and keyboard input
+  "x11-xserver-utils"           # xset, xrandr - used by kiosk start script
+  "xinit"                       # startx
+  # Window manager and display utilities
+  "openbox" "unclutter"
   # Browser
   # TODO: Why not firefox? it seems to work OTB on most devices with less hassle?
   "${BrowerPckg}" "chromium-l10n"
-  # Fonts
+  # CJK and international font support for kiosk UI
   "fonts-arphic-ukai" "fonts-arphic-gbsn00lp" "fonts-unfonts-core"
-  # Fonts for Japanese and Thai languages
   "fonts-ipafont" "fonts-vlgothic" "fonts-thai-tlwg-ttf"
 )
 
