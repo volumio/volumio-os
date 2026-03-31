@@ -18,7 +18,7 @@
 // Debug flag - set via DEBUG_WIRELESS=true in /volumio/.env
 var debug = false;
 var settleTime = 3000;
-var totalSecondsForConnection = 30;
+var totalSecondsForConnection = 60*10;
 var pollingTime = 1;
 var hostapdExitDelay = 500; // Delay after hostapd exits before IP notification (ms)
 
