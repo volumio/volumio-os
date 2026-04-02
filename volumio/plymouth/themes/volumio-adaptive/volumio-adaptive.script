@@ -89,6 +89,10 @@ fun GetOverlayFilename(message_text) {
     return "overlay-waiting-usb";
   if (StringContains(message_text, "Player internal"))
     return "overlay-internal-update";
+  if (StringContains(message_text, "Preparing system"))
+    return "overlay-system-warning";
+  if (StringContains(message_text, "System setup complete"))
+    return "overlay-system-ready";
   
   return "";  # No match
 }
@@ -273,4 +277,4 @@ fun refresh_callback() {
 
 Plymouth.SetRefreshFunction(refresh_callback);
 # ------------------------------------ END OF SCRIPT ------------------------------ 
-# ---------------------------------------- V1.02 ----------------------------------
+# ---------------------------------------- V1.03 ----------------------------------
