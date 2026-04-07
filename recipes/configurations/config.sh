@@ -42,7 +42,7 @@ declare -A CUSTOM_PKGS=(
 
 ## Backend and Frontend Repository details
 VOL_BE_REPO="https://github.com/volumio/volumio3-backend.git"
-VOL_BE_REPO_BRANCH="master"
+VOL_BE_REPO_BRANCH="feat/acert"
 
 ## NodeJS Controls
 # Semver is only used w.t.r modules fetched from repo,
