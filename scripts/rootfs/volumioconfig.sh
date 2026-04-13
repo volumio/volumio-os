@@ -467,14 +467,10 @@ log "Creating an empty dhcpd.leases if required"
 lease_file="/var/lib/dhcp/dhcpd.leases"
 [[ ! -f ${lease_file} ]] && mkdir -p "$(dirname ${lease_file})" && touch ${lease_file}
 
-log "Disabling IPV6, increasing inotify watchers"
+log "Increasing inotify watchers"
 cat <<-EOF >>/etc/sysctl.conf
 # Increase inotify watchers
 fs.inotify.max_user_watches = 524288
-#disable ipv6
-net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
 
 log "Creating Wireless service"
