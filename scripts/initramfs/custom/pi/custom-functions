@@ -5,6 +5,19 @@ custom_init_partition_params() {
 # After upgrade from block device UUID will not be active yet. Use genpnames:
 log_begin_msg "Checking if device is booted from SD card" && log_end_msg
 
+# When imgpart uses UUID=/LABEL= (normal shipped cmdline), never force mmcblk0 +
+# DO_GEN just because /dev/mmcblk* exists. Otherwise USB boot breaks on boards
+# that always expose eMMC as mmcblk0 while the flashed USB stick is the boot volume.
+# Post-upgrade path keeps genpnames on cmdline and still runs the loop below.
+if ! grep -qw genpnames /proc/cmdline; then
+  case "${IMAGE_PARTITION}" in
+    UUID=*|LABEL=*|uuid=*|label=*)
+      BOOT_CONFIG="cmdline.txt"
+      return
+      ;;
+  esac
+fi
+
 for devlink in /dev/mmcblk[0-9]; do
   if [ "${devlink}" == "/dev/mmcblk[0-9]" ]; then
   # no MMC block devices present
