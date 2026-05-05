@@ -23,7 +23,11 @@ CMP_PACKAGES=(
   # Wayland compositor
   "labwc"                 # Compositor (wlroots based)
   "wlr-randr"             # Output transform / rotation tool
-  "wlopm"                 # Output power management - target of /usr/bin/xset shim
+  "wlopm"                 # Output power off/on - target of /usr/bin/xset shim
+  "swayidle"              # Wake-on-input helper (NOT an idle blanker - see
+                          # session script). Backend owns idle detection;
+                          # swayidle only restores the panel when the user
+                          # touches the screen after backend turned it off.
   "wtype"                 # Send synthetic key events (used to fire HideCursor)
   "dbus-user-session"     # Per-session dbus required by labwc/vivaldi
   # Browser GTK / a11y / nss runtime deps
@@ -141,6 +145,19 @@ esac
 
 # Hide the cursor by firing the F24 keybind that labwc rc.xml maps to HideCursor
 wtype -k F24 &
+
+# Wake-on-input bridge.
+# X.Org DPMS auto-wakes the display on any input event; wayland's wlopm does
+# not. The Volumio backend turns the panel OFF via /usr/bin/xset (our shim ->
+# wlopm --off) but has no equivalent for "wake on touch". swayidle here is
+# NOT an idle daemon - it does NOT blank the screen on idle. Backend retains
+# full ownership of the off-side. swayidle's only job is: when input activity
+# returns after a brief idle window, call wlopm --on. If the screen is
+# already on, wlopm --on is a no-op. If backend turned it off, the next
+# tap restores it - matching the X.Org behaviour the backend was written for.
+swayidle -w \
+  timeout 1 'true' \
+    resume 'wlopm --on "*"' &
 
 SCALE_FACTOR=1.2
 [ -f /data/browserargs ] && . /data/browserargs
