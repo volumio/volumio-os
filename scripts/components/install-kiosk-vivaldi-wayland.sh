@@ -23,6 +23,7 @@ CMP_PACKAGES=(
   # Wayland compositor
   "labwc"                 # Compositor (wlroots based)
   "wlr-randr"             # Output transform / rotation tool
+  "wlopm"                 # Output power management - target of /usr/bin/xset shim
   "wtype"                 # Send synthetic key events (used to fire HideCursor)
   "dbus-user-session"     # Per-session dbus required by labwc/vivaldi
   # Browser GTK / a11y / nss runtime deps
@@ -397,6 +398,65 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 PRELOAD
+
+# ----------------------------------------------------------------------------
+# /usr/bin/xset shim for wayland
+# ----------------------------------------------------------------------------
+# The Volumio backend (system_controller/system/index.js) shells out to
+# /usr/bin/xset with hardcoded absolute path to drive its screen-saver feature:
+#   enableHDMIDisplayStandby   -> xset dpms force off
+#   disableHDMIDisplayStandby  -> xset dpms force on
+#   disableScreenStandby       -> xset dpms 0 0 0
+# Under wayland there is no X server and no real xset. Backend MUST stay
+# unmodified, so we provide a shim at /usr/bin/xset that translates these
+# three invocations to wlopm. Sudoers already permits /usr/bin/xset for the
+# volumio user (path is identical to the X.Org build), so no sudoers change
+# is required.
+#
+# x11-xserver-utils is intentionally NOT in the package list for this kiosk
+# variant, so there is no real /usr/bin/xset to clash with. dpkg-divert is
+# used as a defence-in-depth measure: if x11-xserver-utils is ever pulled
+# in by another package, the shim survives and the real xset gets parked
+# at /usr/bin/xset.real where it stays out of the way.
+# ----------------------------------------------------------------------------
+log "Installing /usr/bin/xset wayland shim"
+dpkg-divert --add --rename --divert /usr/bin/xset.real /usr/bin/xset
+cat > /usr/bin/xset <<'XSETSHIM'
+#!/bin/sh
+# Wayland xset shim. Translates the dpms invocations issued by the Volumio
+# backend's screen-saver feature to wlopm. Installed by
+# install-kiosk-vivaldi-wayland.sh - do not edit by hand.
+
+# Backend invokes via sudo, which sanitises env. The kiosk session runs as
+# root with its wayland socket at /run/user/0/wayland-0; point the shim at it.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/0}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+
+# If the compositor isn't up (e.g. backend fires before kiosk has launched),
+# exit cleanly - matches xset's behaviour of being a no-op on a dead display.
+if [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+  exit 0
+fi
+
+case "$*" in
+  "dpms force off")
+    exec /usr/bin/wlopm --off '*'
+    ;;
+  "dpms force on")
+    exec /usr/bin/wlopm --on '*'
+    ;;
+  "dpms 0 0 0"|"s off"|"-dpms")
+    # No-op: under wayland labwc, no idle/screensaver runs unless explicitly
+    # started. The default state already matches "DPMS disabled".
+    exit 0
+    ;;
+  *)
+    # Anything else is unsupported - exit silently rather than break callers.
+    exit 0
+    ;;
+esac
+XSETSHIM
+chmod 0755 /usr/bin/xset
 
 # ----------------------------------------------------------------------------
 # Drop-ins for plymouth-quit / plymouth-quit-wait
