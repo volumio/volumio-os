@@ -183,6 +183,11 @@ exec /usr/bin/vivaldi \
   --load-extension=/data/volumiokioskextensions/VirtualKeyboard/ \
   --no-first-run \
   --default-background-color=000000 \
+  --disable-sync \
+  --disable-cloud-management-status-checks \
+  --no-default-browser-check \
+  --no-pings \
+  --disable-component-update \
   --app=file:///opt/volumio-splash.html
 SESSION
 chmod +x /opt/volumiokiosk-session.sh
