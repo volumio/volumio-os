@@ -189,7 +189,79 @@ html, body {
   width: 100vw;
   overflow: hidden;
   background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #fff;
 }
+
+.bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(60, 90, 130, 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse at 70% 70%, rgba(120, 60, 100, 0.30) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(40, 110, 100, 0.28) 0%, transparent 60%),
+    #000;
+  background-size: 200% 200%, 200% 200%, 200% 200%, 100% 100%;
+  animation: drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes drift {
+  0%   { background-position:   0% 20%, 100% 80%, 50%  0%, 0 0; }
+  33%  { background-position:  60% 50%,  30% 60%, 80% 40%, 0 0; }
+  66%  { background-position:  20% 80%,  70% 20%, 30% 90%, 0 0; }
+  100% { background-position: 100% 30%,   0% 70%, 60% 50%, 0 0; }
+}
+
+.slogans {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.slogans span {
+  position: absolute;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.brand { font-size: 14vmin; font-weight: 100; }
+.line  { font-size: 6vmin;  font-weight: 200; }
+
+.slogans span:nth-child(1) {
+  animation: firstCycle 12s ease-in-out infinite;
+  opacity: 1;
+}
+.slogans span:nth-child(2) {
+  animation: cycle 12s ease-in-out infinite;
+  animation-delay: 4s;
+}
+.slogans span:nth-child(3) {
+  animation: cycle 12s ease-in-out infinite;
+  animation-delay: 8s;
+}
+
+@keyframes firstCycle {
+  0%, 25%   { opacity: 1; }
+  33%, 92%  { opacity: 0; }
+  100%      { opacity: 1; }
+}
+
+@keyframes cycle {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  25%  { opacity: 1; }
+  33%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
 iframe {
   display: block;
   width: 100%;
@@ -201,11 +273,18 @@ iframe {
   transition: opacity 600ms ease;
   position: absolute;
   inset: 0;
+  z-index: 10;
 }
 iframe.ready { visibility: visible; opacity: 1; }
 </style>
 </head>
 <body>
+<div class="bg"></div>
+<div class="slogans">
+<span class="brand">VOLUMIO</span>
+<span class="line">Bit Perfect Audio</span>
+<span class="line">Music Reborn</span>
+</div>
 <iframe id="k" src="http://127.0.0.1:3000"></iframe>
 <script>
 const f = document.getElementById("k");
