@@ -1,2 +1,2 @@
-# This udev rule restarts the triggerhappy service when a Bluetooth HID device is added or removed.
+# This udev rule restarts the triggerhappy service when a Bluetooth or USB HID device is added or removed.
 ACTION=="add|remove", SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_BUS}=="bluetooth|usb", RUN+="/bin/systemctl restart triggerhappy"
