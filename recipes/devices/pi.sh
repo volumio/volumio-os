@@ -711,6 +711,9 @@ device_chroot_tweaks_pre() {
 		# Firmware auto-remaps overlay to board-specific variant
 		[pi2]
 		dtoverlay=vc4-kms-v3d
+		# Before applying to [pi3], disable for Pi 3A+ (0x9020e0) specifically
+		[0x9020e0]
+		dtoverlay=
 		[pi3]
 		dtoverlay=vc4-kms-v3d
 		[pi4]
