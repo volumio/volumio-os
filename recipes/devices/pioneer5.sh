@@ -48,7 +48,10 @@ write_device_files() {
 
   cp -dR "${PLTDIR}/${DEVICE}/boot" "${ROOTFSMNT}"
   cp -pdR "${PLTDIR}/${DEVICE}/lib/modules" "${ROOTFSMNT}/lib"
-  cp -pdR "${PLTDIR}/${DEVICE}/lib/firmware" "${ROOTFSMNT}/lib"
+  # rsync --force handles dir/file type collisions with Debian firmware-* packages
+  # (e.g. /lib/firmware/ath11k/WCN6855/hw2.1 ships as a directory in Debian but
+  # as a single blob in platform-sstar).
+  rsync -a --force "${PLTDIR}/${DEVICE}/lib/firmware/" "${ROOTFSMNT}/lib/firmware/"
 }
 
 write_device_bootloader() {
