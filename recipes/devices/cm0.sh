@@ -286,6 +286,16 @@ device_chroot_tweaks_pre() {
 		[RPiUserlandTools]="https://github.com/volumio/volumio3-os-static-assets/raw/master/tools/rpi-softfp-vc.tar.gz"
 	)
 
+	# Infineon CYW4373E WiFi/BT module - only shipped on some
+	# variants. Add any future variant using the same module to this list.
+	CYW4373E_VARIANTS=("spc0vara")
+	cyw4373eVariant=no
+	if [[ " ${CYW4373E_VARIANTS[*]} " == *" ${VARIANT} "* ]]; then
+		cyw4373eVariant=yes
+		log "Adding Infineon CYW4373E firmware for variant" "info" "${VARIANT}"
+		CustomFirmware[Cyw4373eCustom]="https://github.com/volumio/volumio-cyw4373e-drivers/raw/master/output/modules-rpi-${KERNEL_VERSION}-updates.tar.gz"
+	fi
+
 	# Define the kernel version (already parsed earlier)
 
 	# ============================================================================
@@ -510,6 +520,31 @@ device_chroot_tweaks_pre() {
 		log "Adding $key update" "info"
 		cp -rp * "${ROOTFS}"/usr && cd - && rm -rf "/tmp/$key"
 	done
+
+	# ============================================================================
+	# EZURIO CERTIFIED WIFI STACK (summit_supplicant)
+	# ============================================================================
+	# Ezurio's patched wpa_supplicant + hostapd (linking libsdcsupp.so) are the
+	# Wi-Fi Alliance-certified stack for the CYW4373E and are required for proper
+	# WPA3/SAE on this FullMAC chip. Ezurio ships only source (summit_supplicant-src)
+	# + libsdcsupp.so, so the armhf binaries are built from that and mirrored in
+	# volumio-cyw4373e-drivers/output. Tarball is rootfs-rooted (usr/sbin, usr/lib,
+	# etc) and extracts at /. Missing package is non-fatal: build keeps stock
+	# wpa_supplicant/hostapd so unrelated builds don't break before the artifact lands.
+	if [[ "${cyw4373eVariant}" == yes ]]; then
+		SupplicantPkg="https://github.com/volumio/volumio-cyw4373e-drivers/raw/master/output/summit-supplicant-armhf.tar.gz"
+		log "Installing Ezurio summit_supplicant (wpa_supplicant/hostapd) for variant" "info" "${VARIANT}"
+		if wget -nv "${SupplicantPkg}" -O /tmp/summit-supplicant.tar.gz; then
+			tar -xzf /tmp/summit-supplicant.tar.gz -C / && rm -f /tmp/summit-supplicant.tar.gz
+			ldconfig
+			# Enable the adaptive regulatory daemon only if the package ships it.
+			[[ -f /lib/systemd/system/adaptive_ww.service ]] && systemctl enable adaptive_ww.service
+			log "Ezurio summit_supplicant installed" "okay"
+		else
+			log "Ezurio summit_supplicant package not available yet - keeping stock wpa_supplicant/hostapd" "wrn"
+			rm -f /tmp/summit-supplicant.tar.gz
+		fi
+	fi
 
 	# ============================================================================
 	# FIRMWARE CLEANUP - CM0 SPECIFIC
