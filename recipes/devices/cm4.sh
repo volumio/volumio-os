@@ -597,9 +597,13 @@ device_chroot_tweaks_pre() {
 		SupplicantPkg="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/summit-supplicant/summit-supplicant_13.98.12.4_armhf.deb"
 		log "Installing Ezurio summit_supplicant .deb for variant" "info" "${VARIANT}"
 		if wget -nv "${SupplicantPkg}" -O /tmp/summit-supplicant.deb; then
-			dpkg -i /tmp/summit-supplicant.deb || log "summit_supplicant dpkg -i failed" "wrn"
+			# pulls them. Only log success if the package is actually configured.
+			if dpkg -i /tmp/summit-supplicant.deb || apt-get install -f -y; then
+				log "Ezurio summit_supplicant installed" "okay"
+			else
+				log "summit_supplicant install failed (unmet deps)" "err"
+			fi
 			rm -f /tmp/summit-supplicant.deb
-			log "Ezurio summit_supplicant installed" "okay"
 		else
 			log "Ezurio summit_supplicant package not available yet - keeping stock wpa_supplicant/hostapd" "wrn"
 			rm -f /tmp/summit-supplicant.deb
