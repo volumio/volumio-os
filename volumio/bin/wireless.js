@@ -110,6 +110,7 @@ var iwgetid = SUDO + " " + IWGETID + " -r";
 var wpacli = WPA_CLI + " -i " + wlan;
 var iwRegGet = SUDO + " " + IW + " reg get";
 var iwScan = SUDO + " " + IW + " " + wlan + " scan";
+var iwLink = SUDO + " " + IW + " " + wlan + " link";
 var iwRegSet = SUDO + " " + IW + " reg set";
 var iwList = IW + " list";
 var ipLink = IP + " link show " + wlan;
@@ -568,6 +569,24 @@ function startHotspotFallbackSafe(retry = 0) {
 // ===================================================================
 // WIFI CLIENT (STATION MODE) FUNCTIONS
 // ===================================================================
+
+// Get the currently-connected SSID in a driver-compatible way.
+// Legacy wireless-tools (iwgetid) work on older drivers but return nothing on
+// newer drivers, which only answers the modern `iw` interface.
+// Run both in parallel and take the first that responds with an SSID (no error).
+// Returns '' when not connected (or neither tool answers).
+function getConnectedSSID() {
+    // Both commands run concurrently; stderr is discarded so an erroring tool
+    // just yields no output and the other wins. grep -m1 returns the first
+    // non-empty line and exits (non-zero only when neither produced an SSID).
+    var bothInParallel = "{ " + iwgetid + " 2>/dev/null & " +
+        iwLink + " 2>/dev/null | sed -n 's/^[[:space:]]*SSID: //p' & } | grep -m1 .";
+    try {
+        return execSync(bothInParallel, { encoding: 'utf8', timeout: EXEC_TIMEOUT_SHORT }).replace('\n', '').trim();
+    } catch (e) {
+        return '';
+    }
+}
 
 // Check if wlan0 is a USB WiFi adapter
 // Returns true if USB, false if onboard or check fails
@@ -1052,7 +1071,7 @@ function afterAPStart() {
             // Determine reason for connection failure
             var failureReason = "unknown";
             try {
-                var ssidCheck = execSync(iwgetid, { uid: 1000, gid: 1000, encoding: 'utf8' }).replace('\n','');
+                var ssidCheck = getConnectedSSID();
                 if (ssidCheck && ssidCheck.length > 0) {
                     failureReason = "SSID associated but no IP address received from DHCP";
                 } else {
@@ -1154,12 +1173,8 @@ function afterAPStart() {
             }
 
             // Try to get SSID but don't depend on it (RTL8822BU has iwgetid issues)
-            try {
-                SSID = execSync(iwgetid, { uid: 1000, gid: 1000, encoding: 'utf8' }).replace('\n','');
-                loggerDebug('iwgetid returned: ----' + SSID + '----');
-            } catch (e) {
-                loggerDebug('iwgetid returned nothing (may be driver issue, checking IP instead)');
-            }
+            SSID = getConnectedSSID();
+            loggerDebug('getConnectedSSID returned: ----' + SSID + '----');
 
             // ALWAYS check IP regardless of iwgetid result
             ifconfig.status(wlan, function (err, ifstatus) {
@@ -2572,7 +2587,7 @@ function checkWiredNetworkStatus(isFirstStart) {
                 if (!isFirstStart && singleNetworkMode) {
                     // Check if WiFi is already connected
                     try {
-                        var wifiSSID = execSync(iwgetid, { uid: 1000, gid: 1000, encoding: 'utf8' }).replace('\n','');
+                        var wifiSSID = getConnectedSSID();
                         if (wifiSSID && wifiSSID.length > 0) {
                             loggerInfo('SNM: WiFi already connected to: ' + wifiSSID);
                             return;
