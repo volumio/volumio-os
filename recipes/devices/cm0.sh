@@ -522,27 +522,24 @@ device_chroot_tweaks_pre() {
 	done
 
 	# ============================================================================
-	# EZURIO CERTIFIED WIFI STACK (summit_supplicant)
+	# CYW4373E STACK
 	# ============================================================================
-	# Ezurio's patched wpa_supplicant + hostapd (linking libsdcsupp.so) are the
-	# Wi-Fi Alliance-certified stack for the CYW4373E and are required for proper
-	# WPA3/SAE on this FullMAC chip. Ezurio ships only source (summit_supplicant-src)
-	# + libsdcsupp.so, so the armhf binaries are built from that and mirrored in
-	# volumio-cyw4373e-drivers/output. Tarball is rootfs-rooted (usr/sbin, usr/lib,
-	# etc) and extracts at /. Missing package is non-fatal: build keeps stock
-	# wpa_supplicant/hostapd so unrelated builds don't break before the artifact lands.
 	if [[ "${cyw4373eVariant}" == yes ]]; then
-		SupplicantPkg="https://github.com/volumio/volumio-cyw4373e-drivers/raw/master/output/summit-supplicant-armhf.tar.gz"
-		log "Installing Ezurio summit_supplicant (wpa_supplicant/hostapd) for variant" "info" "${VARIANT}"
-		if wget -nv "${SupplicantPkg}" -O /tmp/summit-supplicant.tar.gz; then
-			tar -xzf /tmp/summit-supplicant.tar.gz -C / && rm -f /tmp/summit-supplicant.tar.gz
-			ldconfig
-			# Enable the adaptive regulatory daemon only if the package ships it.
-			[[ -f /lib/systemd/system/adaptive_ww.service ]] && systemctl enable adaptive_ww.service
-			log "Ezurio summit_supplicant installed" "okay"
+		# Ezurio certified wpa_supplicant/hostapd .deb (drop-in for stock wpasupplicant/
+		# hostapd; postinst handles ldconfig + adaptive_ww).
+		SupplicantPkg="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/summit-supplicant/summit-supplicant_13.98.12.4_armhf.deb"
+		log "Installing Ezurio summit_supplicant .deb for variant" "info" "${VARIANT}"
+		if wget -nv "${SupplicantPkg}" -O /tmp/summit-supplicant.deb; then
+			# pulls them. Only log success if the package is actually configured.
+			if dpkg -i /tmp/summit-supplicant.deb || apt-get install -f -y; then
+				log "Ezurio summit_supplicant installed" "okay"
+			else
+				log "summit_supplicant install failed (unmet deps)" "err"
+			fi
+			rm -f /tmp/summit-supplicant.deb
 		else
 			log "Ezurio summit_supplicant package not available yet - keeping stock wpa_supplicant/hostapd" "wrn"
-			rm -f /tmp/summit-supplicant.tar.gz
+			rm -f /tmp/summit-supplicant.deb
 		fi
 	fi
 
