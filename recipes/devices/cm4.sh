@@ -352,6 +352,16 @@ device_chroot_tweaks_pre() {
 		[RPiUserlandTools]="https://github.com/volumio/volumio3-os-static-assets/raw/master/tools/rpi-softfp-vc.tar.gz"
 	)
 
+	# Ezurio Sterling (Infineon CYW4373E) WiFi/BT module - only shipped on some
+	# variants. Add any future variant using the same module to this list.
+	CYW4373E_VARIANTS=("primo3airplay")
+	cyw4373eVariant=no
+	if [[ " ${CYW4373E_VARIANTS[*]} " == *" ${VARIANT} "* ]]; then
+		cyw4373eVariant=yes
+		log "Adding Ezurio Sterling (CYW4373E) firmware for variant" "info" "${VARIANT}"
+		CustomFirmware[Cyw4373eCustom]="https://github.com/volumio/volumio-cyw4373e-drivers/raw/master/output/modules-rpi-${KERNEL_VERSION}-updates.tar.gz"
+	fi
+
 	# Define the kernel version (already parsed earlier)
 
 	# ============================================================================
@@ -577,6 +587,24 @@ device_chroot_tweaks_pre() {
 		log "Adding $key update" "info"
 		cp -rp * "${ROOTFS}"/usr && cd - && rm -rf "/tmp/$key"
 	done
+
+	# ============================================================================
+	# CYW4373E STACK
+	# ============================================================================
+	if [[ "${cyw4373eVariant}" == yes ]]; then
+		# Ezurio certified wpa_supplicant/hostapd .deb (drop-in for stock wpasupplicant/
+		# hostapd; postinst handles ldconfig + adaptive_ww).
+		SupplicantPkg="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/summit-supplicant/summit-supplicant_13.98.12.4_armhf.deb"
+		log "Installing Ezurio summit_supplicant .deb for variant" "info" "${VARIANT}"
+		if wget -nv "${SupplicantPkg}" -O /tmp/summit-supplicant.deb; then
+			dpkg -i /tmp/summit-supplicant.deb || log "summit_supplicant dpkg -i failed" "wrn"
+			rm -f /tmp/summit-supplicant.deb
+			log "Ezurio summit_supplicant installed" "okay"
+		else
+			log "Ezurio summit_supplicant package not available yet - keeping stock wpa_supplicant/hostapd" "wrn"
+			rm -f /tmp/summit-supplicant.deb
+		fi
+	fi
 
 	# ============================================================================
 	# FIRMWARE CLEANUP - CM4 SPECIFIC
