@@ -19,9 +19,8 @@ BOOT_END=385           # 384 MiB boot partition, aligned
 IMAGE_END=4673         # BOOT_END + 4288 MiB (/img squashfs)
 
 # =========================================================================
-# KERNEL SLIMMING — keep only Pi 3 (v7+) and Pi 5 (v8+)
-# pi-kiosk images ship on Pi 3 and Pi 5 hardware only.
-# the squashfs (/lib/modules).
+# KERNEL SLIMMING — keep the boards pi-kiosk actually ships on:
+# Pi 3 (v7+), CM4/Pi4 (v8+, BCM2711) and Pi 5 (v8+). Custom DTB and GPU firmware MUST be kept for CM4/Pi4 (bcm2711) and Pi5 (bcm2712).
 # =========================================================================
 
 # Keep a reference to the stock Pi post-tweaks (plymouth services,
@@ -41,7 +40,7 @@ device_image_tweaks_post() {
 		[[ ! -d "$kdir" ]] && continue
 		kbase=$(basename "$kdir")
 		case "$kbase" in
-		*-v7+ | *-v8+) ;; # keep: Pi3 (32bit userland) and Pi5 (64bit kernel)
+		*-v7+ | *-v8+) ;; # keep: Pi3 (v7+), CM4/Pi5 (v8+, 64-bit kernel)
 		*)
 			log "pi-kiosk: removing kernel modules ${kbase}" "info"
 			rm -rf "$kdir"
@@ -54,27 +53,24 @@ device_image_tweaks_post() {
 	rm -f "${ROOTFSMNT}"/boot/kernel.img   # Pi 0/1
 	rm -f "${ROOTFSMNT}"/boot/kernel7l.img # Pi 4/400/CM4
 
-	# Device trees: keep Pi3 (bcm2710-rpi-3-*) and Pi5 (bcm2712*-rpi-5-*)
+	# Device trees: keep Pi3 (bcm2710-rpi-3-*), CM4/Pi4 (bcm2711-*) and Pi5 (bcm2712*-rpi-5-*)
 	log "pi-kiosk: trimming device trees" "info"
 	for dtb in "${ROOTFSMNT}"/boot/*.dtb; do
 		[[ ! -f "$dtb" ]] && continue
 		dtbase=$(basename "$dtb")
 		case "$dtbase" in
-		bcm2710-rpi-3-*.dtb | bcm2712*-rpi-5-*.dtb) ;; # keep
+		bcm2710-rpi-3-*.dtb | bcm2711-*.dtb | bcm2712*-rpi-5-*.dtb) ;; # keep (bcm2711 = CM4/Pi4)
 		*)
 			rm -f "$dtb"
 			;;
 		esac
 	done
 
-	# Pi4-only GPU firmware (Pi3 uses start.elf/start_x.elf/fixup*.dat,
-	# Pi5 does not use start*.elf at all) — 9.6 MB in the OTA payload
-	log "pi-kiosk: removing Pi4 GPU firmware" "info"
-	rm -f "${ROOTFSMNT}"/boot/start4*.elf "${ROOTFSMNT}"/boot/fixup4*.dat
+	# KEEP start4*.elf / fixup4*.dat — this IS the GPU firmware for CM4/Pi4
+	# (BCM2711).
+	# removing it leaves the device     with no GPU firmware -> black screen + no audio.
 
-	# Pi4-only EEPROM bootloader images (Pi5 uses bootloader-2712)
-	log "pi-kiosk: removing Pi4 bootloader firmware" "info"
-	rm -rf "${ROOTFSMNT}"/lib/firmware/raspberrypi/bootloader-2711
+	# KEEP bootloader-2711 — required for CM4 (BCM2711) EEPROM updates.
 
 	log "pi-kiosk kernel slimming done" "okay" "$(du -sh "${ROOTFSMNT}"/boot | cut -f1) in /boot"
 }
