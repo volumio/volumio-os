@@ -688,6 +688,12 @@ device_chroot_tweaks_pre() {
 	kernel_params+=("dwc_otg.fiq_enable=1" "dwc_otg.fiq_fsm_enable=1" "dwc_otg.fiq_fsm_mask=0xF" "dwc_otg.nak_holdoff=1")
 	# Hide kernel's stdio
 	kernel_params+=("${KERNEL_QUIET}")
+	# Output console: tty1 only.
+	# The UART (GPIO14/15, serial0) is reserved for the MCU serial API, so no
+	# serial console here. Without an explicit console= the kernel falls back
+	# to the DT stdout-path (serial0) and boot output plus a login getty
+	# would claim the port. Debug images re-add the serial console below.
+	kernel_params+=("console=tty1")
 	# Image params
 	kernel_params+=("imgpart=UUID=${UUID_IMG} imgfile=/volumio_current.sqsh bootpart=UUID=${UUID_BOOT} datapart=UUID=${UUID_DATA} uuidconfig=cmdline.txt")
 	# Wait for root device
@@ -715,6 +721,8 @@ device_chroot_tweaks_pre() {
 			# Enable serial console for boot debugging
 			enable_uart=1
 		EOF
+		log "Adding serial console for debug image" "dbg"
+		kernel_params+=("console=serial0,115200")
 		log "Enabling SSH" "dbg"
 		touch /boot/ssh
 		if [[ -f /boot/bootcode.bin ]]; then
