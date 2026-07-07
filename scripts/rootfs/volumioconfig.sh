@@ -45,7 +45,7 @@ path-exclude /usr/share/groff/*
 path-exclude /usr/share/info/*
 # lintian stuff is small, but really unnecessary
 path-exclude /usr/share/lintian/*
-path-exclude /usr/share/linda/*"
+path-exclude /usr/share/linda/*
 EOF
 
 export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true
