@@ -133,8 +133,8 @@ if [ ! -f /data/volumiokiosk/firststartdone ]; then
   touch /data/volumiokiosk/firststartdone
 fi
 
-# Wait for Volumio webUI to be available
-while true; do timeout 5 bash -c "</dev/tcp/127.0.0.1/3000" >/dev/null 2>&1 && break; done
+# Wait for the Volumio REST API to actually serve (not just the port to be bound)
+while ! curl -fsS -m 5 -o /dev/null http://127.0.0.1:3000/api/v1/ping; do sleep 1; done
 echo "Waited \$((\$(date +%s) - start)) sec for Volumio UI"
 
 # Start Openbox
