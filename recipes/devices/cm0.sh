@@ -640,6 +640,8 @@ device_chroot_tweaks_pre() {
 		dtparam=audio=off
 		disable_splash=1
 		enable_tvout=0
+		dtparam=i2c=on
+		dtparam=i2c_baudrate=400000
 		include volumioconfig.txt
 	EOF
 
