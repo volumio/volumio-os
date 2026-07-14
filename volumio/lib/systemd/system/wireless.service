@@ -6,6 +6,7 @@ Before=volumio.service
 Type=notify
 ExecStartPost=-/sbin/iw dev wlan0 set power_save off
 ExecStartPost=-/sbin/iwconfig wlan0 power off
+ExecStartPost=-/usr/bin/ip link set wlan0 promisc on
 ExecStart=/volumio/app/plugins/system_controller/network/wireless.js start
 KillMode=mixed
 
