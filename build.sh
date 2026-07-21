@@ -177,7 +177,7 @@ function setup_multistrap() {
 
   mkdir -p "${DirEtcparts}"
   mkdir -p "${DirEtctrustedparts}"
-  echo -e 'Dpkg::Progress-Fancy "1";\nAPT::Color "1";' > \
+  echo -e 'Dpkg::Progress-Fancy "1";\nAPT::Color "1";\nAcquire::http::Timeout "30";\nAcquire::Retries "3";\nAcquire::http::Pipeline-Depth "0";' > \
     "${DirEtcparts}"/01progress
 
   if [[ -n "${APT_CACHE}" ]] && ! curl -sSf "${APT_CACHE}" >/dev/null; then
@@ -208,7 +208,7 @@ function patch_multistrap_conf() {
     log "Patching multistrap config to point to Raspbian sources" "info"
     export RASPBIANCONF=recipes/base/arm-raspbian.conf
     debian_source=http://deb.debian.org/debian
-    rapsbian_source=http://mirrordirector.raspbian.org/raspbian
+    rapsbian_source=http://archive.raspbian.org/raspbian
     upmpdcli_source=http://www.lesbonscomptes.com/upmpdcli/downloads
 
     cat <<-EOF >"${SRC}/${RASPBIANCONF}"
