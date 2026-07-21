@@ -74,19 +74,6 @@ CHROMIUM_FLAGS=(
   "--load-extension='/data/volumiokioskextensions/VirtualKeyboard/'"
 )
 
-if [[ ${BUILD:0:3} != 'arm' ]]; then
-  log "Adding additional chromium flags for x86"
-  # Again, these flags probably need to be revisited and checked!
-  CHROMIUM_FLAGS+=(
-    #GPU
-    "--ignore-gpu-blacklist"
-    "--use-gl=desktop"
-    "--disable-gpu-compositing"
-    "--force-gpu-rasterization"
-    "--enable-zero-copy"
-  )
-fi
-
 log "Adding ${#CHROMIUM_FLAGS[@]} Chromium flags"
 
 #TODO: Instead of all this careful escaping, make a simple template and add in CHROMIUM_FLAGS?
