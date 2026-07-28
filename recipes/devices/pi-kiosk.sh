@@ -11,7 +11,7 @@ source "${SRC}"/recipes/devices/pi.sh
 
 # Enable kiosk
 KIOSKMODE=yes
-KIOSKBROWSER=chromium
+KIOSKBROWSER=vivaldi
 
 ## Partition info (same as pi.sh)
 BOOT_START=1
