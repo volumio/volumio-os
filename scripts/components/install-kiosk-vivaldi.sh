@@ -91,7 +91,7 @@ SCALE_FACTOR=1.2
 source /data/browserargs
 
 # Wait for Volumio webUI to be available
-while [[ $(curl -Is http://localhost:3000 | head -n 1 | cut -d " " -f 2) != 200 ]]; do sleep 2; done &
+while ! curl -fsS -m 5 -o /dev/null http://127.0.0.1:3000/api/v1/ping; do sleep 1; done
 
 openbox-session & 
 sleep 4 
