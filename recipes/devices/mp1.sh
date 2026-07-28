@@ -14,6 +14,8 @@ DEVICENAME="Volumio MP1"
 DEVICE="mp1"
 KHADASBOARDNAME="VIM3L"
 
+PACKAGES+=("xserver-xorg-video-fbdev")
+
 # Called by the image builder for mp1 (VIM3L) overrides default declaration
 device_image_tweaks() {
 
