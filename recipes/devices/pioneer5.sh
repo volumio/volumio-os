@@ -95,6 +95,11 @@ device_chroot_tweaks_pre() {
 abi.cp15_barrier=2
 EOF
 
+  log "Disable io-uring in userspace to fix MPD issue"
+  cat <<-EOF >>/etc/sysctl.conf
+kernel.io_uring_disabled=2
+EOF
+
   log "Creating boot parameters from template"
   sed -i "s/rootdev=UUID=/rootdev=UUID=${UUID_BOOT}/g" /boot/extlinux/extlinux.conf
   sed -i "s/imgpart=UUID=/imgpart=UUID=${UUID_IMG}/g" /boot/extlinux/extlinux.conf
