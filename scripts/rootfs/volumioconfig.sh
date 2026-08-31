@@ -193,8 +193,19 @@ volumio ALL=(ALL) NOPASSWD: /usr/bin/xset, /usr/bin/xinput, /usr/bin/tee
 volumio ALL=(ALL) NOPASSWD: /opt/vc/bin/tvservice, /opt/vc/bin/vcgencmd
 volumio ALL=(ALL) NOPASSWD: /bin/sh /volumio/app/plugins/system_controller/volumio_command_line_client/commands/kernelsource.sh, /bin/sh /volumio/app/plugins/system_controller/volumio_command_line_client/commands/pull.sh
 volumio ALL=(ALL) NOPASSWD: /usr/local/bin/x86Installer.sh,/usr/local/bin/PiInstaller.sh
+volumio ALL=(ALL) NOPASSWD: /usr/local/bin/volumio-scope-mount
 EOF
 chmod 0440 ${SUDOERS_FILE}
+
+SCOPE_MOUNT="/usr/local/bin/volumio-scope-mount"
+mkdir -p /usr/local/bin
+cat <<'EOF' >${SCOPE_MOUNT}
+#!/bin/sh
+# Run mount(8) in a transient systemd scope so a FUSE helper
+# (mount.ntfs) is not a child of volumio.service.
+exec /usr/bin/systemd-run --scope --quiet -- /bin/mount "$@"
+EOF
+chmod 0755 ${SCOPE_MOUNT}
 
 # Fix qmeu 64 bit host issues for 32bit binaries
 # TODO: This is just one manifestation of the underlying error,
