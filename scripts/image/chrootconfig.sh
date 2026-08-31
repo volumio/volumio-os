@@ -95,6 +95,12 @@ if [[ -d "/volumio/customPkgs" ]] && [[ $(ls /volumio/customPkgs/*.deb 2>/dev/nu
   done
 fi
 
+if [[ -x /usr/bin/alsacap ]] && [[ ! -e /usr/local/bin/alsacap ]]; then
+  log "Linking alsacap into /usr/local/bin" "info"
+  mkdir -p /usr/local/bin
+  ln -s /usr/bin/alsacap /usr/local/bin/alsacap
+fi
+
 # MPD systemd file
 log "Copying MPD custom systemd file"
 [[ -d /usr/lib/systemd/system/ ]] || mkdir -p /usr/lib/systemd/system/
