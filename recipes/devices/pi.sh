@@ -715,6 +715,8 @@ device_chroot_tweaks_pre() {
 		# Pi 3A+ has only 512MB RAM and suffers boot issues otherwise
 		[0x9020e0]
 		dtoverlay=vc4-kms-v3d,cma-128
+		[0x9020e1]
+		dtoverlay=vc4-kms-v3d,cma-128
 		[pi3]
 		dtoverlay=vc4-kms-v3d
 		[pi4]
