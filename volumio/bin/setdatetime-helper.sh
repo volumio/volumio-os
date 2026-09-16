@@ -115,8 +115,14 @@ SMALL_DRIFT=1          # No adjust if |drift| <= 1s
 BACKWARD_ALLOW=120     # Avoid backward steps unless >= 120s
 
 get_date_hdr() {
-  local url="$1"
-  curl -sI --max-time 3 --retry 1 "$url" 2>/dev/null | grep -i '^Date:' | sed 's/^[Dd]ate:[[:space:]]*//'
+  local url="$1" hdr
+  # Normal cert-validated probe first (when the clock is already roughly right).
+  hdr="$(curl -sI --max-time 3 --retry 1 "$url" 2>/dev/null | grep -i '^Date:' | sed 's/^[Dd]ate:[[:space:]]*//')"
+  if [ -z "$hdr" ]; then
+    # Wrong clock (no RTC + NTP down) makes every TLS cert read "not yet valid"; -k still gets a Date to bootstrap a rough clock (drift guard + ntpsec refine after).
+    hdr="$(curl -sI -k --max-time 3 --retry 1 "$url" 2>/dev/null | grep -i '^Date:' | sed 's/^[Dd]ate:[[:space:]]*//')"
+  fi
+  printf '%s' "$hdr"
 }
 
 abs() { local v="$1"; [ "${v#-}" = "$v" ] && echo "$v" || echo "${v#-}"; }
