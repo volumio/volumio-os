@@ -1,18 +1,9 @@
 #!/bin/bash
 
-# MPD AFFINITY CONTROL
-CORES=`cat /proc/cpuinfo | awk '/^processor/{print $3}' | tail -1`
-MPD_PID=`/bin/pidof mpd`
-
-echo "Setting RT Priority for mpd"
-/usr/bin/chrt -f -p -a 35 $MPD_PID
-
-if [ "$CORES" -gt 2 ]; then
-   echo "Setting MPD Affinity"
-   /usr/bin/taskset -p 3 $MPD_PID
-     else
-   echo "Not enough cores to set MPD affinity"
-fi
+# MPD scheduling and affinity are deliberately not managed here.
+# MPD may establish its own per-thread scheduling within the
+# LimitRTPRIO ceiling configured by mpd.service. The former
+# chrt --all-tasks override could replace those policies with FIFO/35.
 
 # CPU GOVERNOR CONTROL
 
@@ -36,6 +27,6 @@ if [ -f /sys/firmware/devicetree/base/model ]; then
 fi
 
 echo "VOLUMIO CPU TWEAK: Setting CPU Governor: $GOVERNOR"
-/usr/bin/cpufreq-set -g $GOVERNOR
+/usr/bin/cpufreq-set -g "$GOVERNOR"
 
 exit 0
