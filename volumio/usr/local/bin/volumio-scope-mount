@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run mount(8) in a transient systemd scope so a FUSE helper
+# (mount.ntfs) is not a child of volumio.service.
+exec /usr/bin/systemd-run --scope --quiet -- /bin/mount "$@"
