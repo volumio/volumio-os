@@ -594,9 +594,6 @@ ln -s /lib/systemd/system/setdatetime-helper.timer /etc/systemd/system/timers.ta
 #UDEV RULES#-----------------------------------------
 #####################
 log "Fixing mismatched udev rules"  "info"
-log "Enable Volumio Triggerhappy Rebind Service"
-ln -s /lib/systemd/system/th-udev-rebind.service /etc/systemd/system/multi-user.target.wants/th-udev-rebind.service
-
 log "Adding nobody user to input group for triggerhappy"  "info"
 usermod -a -G input nobody
 
