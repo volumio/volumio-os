@@ -40,6 +40,12 @@ if ! grep "VOLUMIO_HARDWARE" "${ROOTFSMNT}"/etc/os-release; then
   cat "${ROOTFSMNT}"/etc/os-release
   exit 10 # Bail!
 fi
+log "Pinning base-files: on a device an upgrade would replace /etc/os-release" "info"
+cat <<-EOF >"${ROOTFSMNT}"/etc/apt/preferences.d/volumio-base-files
+	Package: base-files
+	Pin: release *
+	Pin-Priority: -1
+EOF
 log "Cleaning rootfs to save space" "info"
 # Remove our apt cache proxy
 [[ -e "${ROOTFSMNT}/etc/apt/apt.conf.d/02cache" ]] && rm "${ROOTFSMNT}/etc/apt/apt.conf.d/02cache"
