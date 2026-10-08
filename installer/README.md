@@ -33,8 +33,16 @@ sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm5.img
 - With the CM5 powered off, plug the stick into a USB port
 - Power on
 - On its first boot from the stick, the bootloader updates its EEPROM and restarts on its own
-- The installer writes the eMMC, then powers the CM5 off
-- Powered off = done: remove the stick and power on
+- The two LEDs alternate, green then red, while the eMMC is being written
+- Both LEDs steady = done: cut the power, remove the stick and power on
+
+**LED states**
+
+| LEDs | Meaning |
+|---|---|
+| both off | the installer has not started, or it stopped before reaching the eMMC |
+| alternating green / red, 1 Hz | writing the eMMC |
+| both steady | finished, safe to power off |
 
 **Boot order**
 

@@ -1,23 +1,51 @@
 
+# Board functions Raspberry Pi CM5
+LED_GREEN=/sys/class/leds/ACT
+LED_RED=/sys/class/leds/PWR
+LED_BLINK_PID=
+
 #mandatory function
 write_device_bootloader()
 {
    :
 }
 
+led_set()
+{
+   [ -e "$1/brightness" ] && echo "$2" > "$1/brightness"
+}
+
 led_show_init_signal()
 {
-   :
+   for led in ${LED_GREEN} ${LED_RED}; do
+      [ -e "${led}/trigger" ] && echo none > "${led}/trigger"
+      led_set "${led}" 0
+   done
 }
 
 led_show_start_signal()
 {
-   :
+   [ -e "${LED_GREEN}/brightness" ] || return 0
+   [ -e "${LED_RED}/brightness" ] || return 0
+   while true; do
+      led_set "${LED_GREEN}" 1
+      led_set "${LED_RED}" 0
+      sleep 1
+      led_set "${LED_GREEN}" 0
+      led_set "${LED_RED}" 1
+      sleep 1
+   done &
+   LED_BLINK_PID=$!
 }
 
 led_show_finish_signal()
 {
-   echo "[info] Installation finished, powering off" >> /dev/kmsg
+   if [ -n "${LED_BLINK_PID}" ]; then
+      kill "${LED_BLINK_PID}" 2>/dev/null
+      wait "${LED_BLINK_PID}" 2>/dev/null
+   fi
+   led_set "${LED_GREEN}" 1
+   led_set "${LED_RED}" 1
+   echo "[info] Installation finished, both LEDs steady" >> /dev/kmsg
    sync
-   poweroff -f
 }
