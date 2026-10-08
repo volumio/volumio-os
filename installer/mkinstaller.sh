@@ -51,7 +51,12 @@ while getopts ":i:" opt; do
   esac
 done
 
-. ${SRC}/installer/board-config/${PLAYER}/mkinstall_config.sh
+BOARD_CONFIG="${SRC}/installer/board-config/${PLAYER}/mkinstall_config.sh"
+if [ ! -f "${BOARD_CONFIG}" ]; then
+  log "No installer board config for ${PLAYER} (${BOARD_CONFIG})" "err"
+  exit 1
+fi
+. "${BOARD_CONFIG}"
 
 log "+------EXTRA STEP: Building Auto Installer "
 log "       Variant:    $VARIANT"
