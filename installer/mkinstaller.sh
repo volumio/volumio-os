@@ -95,7 +95,7 @@ VOLMNT=/mnt/volumio
 
 log "[Stage 1] Creating AutoFlash Image File ${IMG_FILE}"
 
-dd if=/dev/zero of=${IMG_FILE} bs=1M count=1000
+dd if=/dev/zero of=${IMG_FILE} bs=1M count=${INSTALLER_SIZE:-1000}
 
 log "[Stage 1] Creating Image Bed" "info"
 LOOP_DEV=$(losetup -f --show "${IMG_FILE}")

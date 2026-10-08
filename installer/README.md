@@ -6,7 +6,7 @@
 ./mkinstaller.sh -i <location of the volumio image>
 ```
 
-where currently supported devices are  **Volumio Rivo/Primo/Integro**, **Khadas VIM1S**, **Odroid N2** **Odroid M1S** and **RockPi 4B**
+where currently supported devices are  **Volumio Rivo/Primo/Integro**, **Raspberry Pi CM5**, **Khadas VIM1S**, **Odroid N2** **Odroid M1S** and **RockPi 4B**
 
 NOTE: Due to limited image filename parsing options, the board name is only allowed to have a maximum of one single dash, like "rockpi-4b".
 With more than one, the installer will not work!
@@ -18,6 +18,34 @@ With more than one, the installer will not work!
 - Power the target device
 - Wait until finished (after 30-40 secs the devices leds should be steady)
 
+
+## CM5 USB installer
+
+**Create**
+
+Build the `cm5` image first, so `build/bookworm/arm_rootfs.lz4` exists, then:
+```
+sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm5.img
+```
+
+**Flash**
+- Write `Autoinstaller-*-cm5.img` to a USB stick (8 GB or larger)
+- With the CM5 powered off, plug the stick into a USB port
+- Power on
+- On its first boot from the stick, the bootloader updates its EEPROM and restarts on its own
+- The installer writes the eMMC, then powers the CM5 off
+- Powered off = done: remove the stick and power on
+
+**Boot order**
+
+`board-config/cm5/pieeprom.upd` is the `rpi-eeprom` `v2026.09.25-2712` default bootloader with `BOOT_ORDER=0xf614` (USB, then eMMC, then NVMe) and `USB_MSD_DISCOVER_TIMEOUT=3000`, built with:
+```
+rpi-eeprom-config --config bootconf.txt --out pieeprom.upd firmware-2712/default/pieeprom-2026-09-25.bin
+rpi-eeprom-digest -i pieeprom.upd -o pieeprom.sig
+```
+A CM5 with a blank eMMC boots the stick with the factory EEPROM.
+A CM5 with an installed eMMC boots the stick only once its EEPROM has this boot order: flash it with `rpiboot` first.
+A bootable USB stick present at power on boots before the eMMC, so remove the installer stick after flashing.
 
 ## How it works
 
