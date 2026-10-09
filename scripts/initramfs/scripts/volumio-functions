@@ -578,6 +578,25 @@ resize_imgpartition() {
   log_end_msg
 }
 
+clean_overlay_blacklist() {
+  local list=/mnt/static/etc/volumio-overlay-blacklist
+  local entry
+
+  [ -f "${list}" ] || return 0
+  log_begin_msg "Removing blacklisted paths from the overlay"
+  while IFS= read -r entry || [ -n "${entry}" ]; do
+    entry="${entry#/}"
+    case "${entry}" in
+      "" | "#"* | . | .. | ../* | */.. | */../*) continue ;;
+    esac
+    if [ -e "/mnt/ext/dyn/${entry}" ] || [ -L "/mnt/ext/dyn/${entry}" ]; then
+      rm -rf "/mnt/ext/dyn/${entry}"
+      log_success_msg "Removed ${entry} from the overlay"
+    fi
+  done <"${list}"
+  log_end_msg
+}
+
 mount_overlay_fs() {
 
   log_begin_msg "Starting mount overlay filesystem"
@@ -611,6 +630,8 @@ mount_overlay_fs() {
   [ -d /mnt/ext/dyn ] || mkdir -m 777 /mnt/ext/dyn
   [ -d /mnt/ext/union ] || mkdir -m 777 /mnt/ext/union
   log_end_msg
+
+  clean_overlay_blacklist
 
   log_begin_msg "Starting mount overlay"
   [ -d /mnt/ext/work ] || mkdir -m 777 /mnt/ext/work
