@@ -84,7 +84,7 @@ write_device_bootloader()
 
 copy_device_bootloader_files()
 {
-   cp ${SRC}/installer/board-config/${PLAYER}/pieeprom.upd ${SRC}/installer/board-config/${PLAYER}/pieeprom.sig $ROOTFSMNT/boot
+   :
 }
 
 write_boot_parameters()
