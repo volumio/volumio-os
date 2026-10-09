@@ -32,7 +32,6 @@ sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm5.img
 - Write `Autoinstaller-*-cm5.img` to a USB stick (8 GB or larger)
 - With the CM5 powered off, plug the stick into a USB port
 - Power on
-- On its first boot from the stick, the bootloader updates its EEPROM and restarts on its own
 - The two LEDs alternate, green then red, while the eMMC is being written
 - Both LEDs steady = done: cut the power, remove the stick and power on
 
@@ -46,14 +45,17 @@ sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm5.img
 
 **Boot order**
 
-`board-config/cm5/pieeprom.upd` is the `rpi-eeprom` `v2026.09.25-2712` default bootloader with `BOOT_ORDER=0xf614` (USB, then eMMC, then NVMe) and `USB_MSD_DISCOVER_TIMEOUT=3000`, built with:
+The installer never writes the bootloader EEPROM. It writes the eMMC and nothing else, so whatever boot order a module arrives with is the boot order it keeps.
+
+A CM5 with a blank eMMC boots the stick on its factory EEPROM, which falls through to USB when the eMMC has nothing to offer. That is the case this installer is for.
+
+A CM5 that already has a working install boots the eMMC and ignores the stick. To reflash one, put USB ahead of eMMC in its EEPROM yourself, once, with `rpiboot`:
 ```
-rpi-eeprom-config --config bootconf.txt --out pieeprom.upd firmware-2712/default/pieeprom-2026-09-25.bin
-rpi-eeprom-digest -i pieeprom.upd -o pieeprom.sig
+rpi-eeprom-config --config bootconf.txt --out pieeprom.bin firmware-2712/default/pieeprom-<date>.bin
 ```
-A CM5 with a blank eMMC boots the stick with the factory EEPROM.
-A CM5 with an installed eMMC boots the stick only once its EEPROM has this boot order: flash it with `rpiboot` first.
-A bootable USB stick present at power on boots before the eMMC, so remove the installer stick after flashing.
+with `BOOT_ORDER=0xf614` (USB, then eMMC, then NVMe) and `USB_MSD_DISCOVER_TIMEOUT=3000` in `bootconf.txt`.
+
+A bootable USB stick present at power on then boots before the eMMC, so remove the installer stick after flashing.
 
 ## How it works
 
