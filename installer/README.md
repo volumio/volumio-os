@@ -6,7 +6,7 @@
 ./mkinstaller.sh -i <location of the volumio image>
 ```
 
-where currently supported devices are  **Volumio Rivo/Primo/Integro**, **Raspberry Pi CM5**, **Khadas VIM1S**, **Odroid N2** **Odroid M1S** and **RockPi 4B**
+where currently supported devices are  **Volumio Rivo/Primo/Integro**, **Raspberry Pi CM4/CM5**, **Khadas VIM1S**, **Odroid N2** **Odroid M1S** and **RockPi 4B**
 
 NOTE: Due to limited image filename parsing options, the board name is only allowed to have a maximum of one single dash, like "rockpi-4b".
 With more than one, the installer will not work!
@@ -54,6 +54,44 @@ A CM5 that already has a working install boots the eMMC and ignores the stick. T
 rpi-eeprom-config --config bootconf.txt --out pieeprom.bin firmware-2712/default/pieeprom-<date>.bin
 ```
 with `BOOT_ORDER=0xf614` (USB, then eMMC, then NVMe) and `USB_MSD_DISCOVER_TIMEOUT=3000` in `bootconf.txt`.
+
+A bootable USB stick present at power on then boots before the eMMC, so remove the installer stick after flashing.
+
+## CM4 USB installer
+
+**Create**
+
+Build the `cm4` image first, so `build/bookworm/arm_rootfs.lz4` exists, then:
+```
+sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm4.img
+```
+
+**Flash**
+- Write `Autoinstaller-*-cm4.img` to a USB stick (8 GB or larger)
+- With the CM4 powered off, plug the stick into a USB port
+- Power on
+- The two LEDs alternate, green then red, while the eMMC is being written
+- Both LEDs steady = done: cut the power, remove the stick and power on
+
+**LED states**
+
+| LEDs | Meaning |
+|---|---|
+| both off | the installer has not started, or it stopped before reaching the eMMC |
+| alternating green / red, 1 Hz | writing the eMMC |
+| both steady | finished, safe to power off |
+
+**Boot order**
+
+The installer never writes the bootloader EEPROM. It writes the eMMC and nothing else, so whatever boot order a module arrives with is the boot order it keeps.
+
+A CM4 with a blank eMMC boots the stick on its factory EEPROM, whose default boot order already falls through to USB. That is the case this installer is for.
+
+A CM4 that already has a working install boots the eMMC and ignores the stick. To reflash one, put USB ahead of eMMC in its EEPROM yourself, once, with `rpiboot`:
+```
+rpi-eeprom-config --config bootconf.txt --out pieeprom.bin firmware-2711/default/pieeprom-<date>.bin
+```
+with `BOOT_ORDER=0xf14` (USB, then eMMC) and `USB_MSD_DISCOVER_TIMEOUT=3000` in `bootconf.txt`.
 
 A bootable USB stick present at power on then boots before the eMMC, so remove the installer stick after flashing.
 
