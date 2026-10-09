@@ -62,7 +62,7 @@ non_standard_repo()
 fetch_bootpart_uuid()
 {
 echo "[info] replace BOOTPART device by ${FLASH_PART} UUID value"
-UUIDBOOT=$(blkid -s UUID -o value ${FLASH_PART})
+UUIDBOOT=$(blkid -s UUID -o value "${FLASH_PART}")
 BOOTPART="UUID=${UUIDBOOT}"
 }
 
@@ -73,8 +73,8 @@ is_dataquality_ok()
 
 write_device_files()
 {
-   cp -R "${PLTDIR}/${BOARDFAMILY}/boot/." $ROOTFSMNT/boot
-   rm -f $ROOTFSMNT/boot/volumio.initrd
+   cp -R "${PLTDIR}/${BOARDFAMILY}/boot/." "$ROOTFSMNT"/boot
+   rm -f "$ROOTFSMNT"/boot/volumio.initrd
 }
 
 write_device_bootloader()
@@ -89,5 +89,5 @@ copy_device_bootloader_files()
 
 write_boot_parameters()
 {
-   echo "console=serial0,115200 console=tty1 loglevel=4 use_kmsg=yes hwdevice=${HWDEVICE}" > $ROOTFSMNT/boot/cmdline.txt
+   echo "console=serial0,115200 console=tty1 loglevel=4 use_kmsg=yes hwdevice=${HWDEVICE}" > "$ROOTFSMNT"/boot/cmdline.txt
 }
