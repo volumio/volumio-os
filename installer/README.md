@@ -43,6 +43,17 @@ sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm5.img
 | alternating green / red, 1 Hz | writing the eMMC |
 | both steady | finished, safe to power off |
 
+**Install log**
+
+The installer writes two files to the stick, every 5 seconds and once more at the end:
+
+| File | Content |
+|---|---|
+| `install.log` | the kernel log: each installer step, error messages, USB and eMMC errors |
+| `install-io.log` | uptime, then the `/proc/diskstats` lines of the stick (`sda`) and the eMMC (`mmcblk0`), and the dirty and writeback memory |
+
+Read them from any computer. In `install-io.log`, sector counters that keep growing mean a slow copy; counters that stop mean a hang, and the last lines of `install.log` show the step it stopped in.
+
 **Boot order**
 
 The installer never writes the bootloader EEPROM. It writes the eMMC and nothing else, so whatever boot order a module arrives with is the boot order it keeps.
