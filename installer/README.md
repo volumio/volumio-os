@@ -35,6 +35,8 @@ sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm5.img
 - The two LEDs alternate, green then red, while the eMMC is being written
 - Both LEDs steady = done: cut the power, remove the stick and power on
 
+The screen stays black while the installer runs: its log goes to the serial console only, so no static text is left on a display panel.
+
 **LED states**
 
 | LEDs | Meaning |
