@@ -58,9 +58,13 @@ The installer writes three files to the stick, every 5 seconds and once more at 
 Read them from any computer. In `install-io.log`, sector counters that keep growing mean a slow copy; counters that stop mean a hang, and the last lines of `install.log` show the step it stopped in. The last sample in `install-mmc.log` shows whether the stuck request is still waiting in the queue or already with the eMMC.
 **Installer-only boot settings**
 
-If the image's boot partition has an `installer-config.txt`, its lines are put at the top of the installer's `config.txt`, ahead of any overlay, so they apply to the base device tree. Only the installer boots with them; the installed system does not. A board whose module LEDs are wired opposite to the CM5 device tree ships `dtparam=act_led_activelow=off` there, so the progress signal still alternates.
+If the image's boot partition has an `installer-config.txt`, its lines are put at the top of the installer's `config.txt`, ahead of any overlay, so they apply to the base device tree. Only the installer boots with them; the installed system does not.
 
-The installer's `config.txt` always starts with `dtparam=sd_cqe=0`: eMMC command queueing is off while installing, at no measurable cost to the copy speed. The installed system keeps it on.
+The installer's `config.txt` always starts with:
+- `dtparam=sd_cqe=0`: eMMC command queueing is off while installing, at no measurable cost to the copy speed
+- `dtparam=act_led_activelow=off`: the green LED is driven active high, so the progress signal alternates with the red one
+
+The installed system keeps the defaults.
 
 **Boot order**
 
