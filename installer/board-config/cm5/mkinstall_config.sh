@@ -75,6 +75,10 @@ write_device_files()
 {
    cp -R "${PLTDIR}/${BOARDFAMILY}/boot/." $ROOTFSMNT/boot
    rm -f $ROOTFSMNT/boot/volumio.initrd
+   if [ -f $ROOTFSMNT/boot/installer-config.txt ]; then
+      cat $ROOTFSMNT/boot/installer-config.txt $ROOTFSMNT/boot/config.txt > $ROOTFSMNT/boot/config.txt.new
+      mv $ROOTFSMNT/boot/config.txt.new $ROOTFSMNT/boot/config.txt
+   fi
 }
 
 write_device_bootloader()
@@ -89,5 +93,5 @@ copy_device_bootloader_files()
 
 write_boot_parameters()
 {
-   echo "console=serial0,115200 console=tty1 loglevel=4 use_kmsg=yes hwdevice=${HWDEVICE}" > $ROOTFSMNT/boot/cmdline.txt
+   echo "console=serial0,115200 loglevel=4 use_kmsg=yes hwdevice=${HWDEVICE} logo.nologo vt.global_cursor_default=0" > $ROOTFSMNT/boot/cmdline.txt
 }
