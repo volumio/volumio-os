@@ -75,6 +75,10 @@ write_device_files()
 {
    cp -R "${PLTDIR}/${BOARDFAMILY}/boot/." $ROOTFSMNT/boot
    rm -f $ROOTFSMNT/boot/volumio.initrd
+   if [ -f $ROOTFSMNT/boot/installer-config.txt ]; then
+      cat $ROOTFSMNT/boot/installer-config.txt $ROOTFSMNT/boot/config.txt > $ROOTFSMNT/boot/config.txt.new
+      mv $ROOTFSMNT/boot/config.txt.new $ROOTFSMNT/boot/config.txt
+   fi
 }
 
 write_device_bootloader()
