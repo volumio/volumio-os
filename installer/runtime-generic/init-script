@@ -56,6 +56,7 @@ led_show_start_signal
 [ -d /mnt ] || mkdir /mnt
 mkdir ${BOOT}
 mount -t vfat ${BOOTPART} ${BOOT}
+command -v install_log_start >/dev/null && install_log_start
 
 clear_target_device
 create_volumio_partitions
@@ -89,6 +90,7 @@ sync
 echo "[info] Remove temp folders" >> /dev/kmsg
 umount $BOOT/temp/boot
 umount $BOOT/temp/image
+command -v install_log_stop >/dev/null && install_log_stop
 umount $BOOT
 rm -r $BOOT
 sync

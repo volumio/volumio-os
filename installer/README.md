@@ -45,6 +45,16 @@ The screen stays black while the installer runs: its log goes to the serial cons
 | alternating green / red, 1 Hz | writing the eMMC |
 | both steady | finished, safe to power off |
 
+**Install log**
+
+The installer writes two files to the stick, every 5 seconds and once more at the end:
+
+| File | Content |
+|---|---|
+| `install.log` | the kernel log: each installer step, error messages, USB and eMMC errors |
+| `install-io.log` | uptime, then the `/proc/diskstats` lines of the stick (`sda`) and the eMMC (`mmcblk0`), and the dirty and writeback memory |
+
+Read them from any computer. In `install-io.log`, sector counters that keep growing mean a slow copy; counters that stop mean a hang, and the last lines of `install.log` show the step it stopped in.
 **Installer-only boot settings**
 
 If the image's boot partition has an `installer-config.txt`, its lines are put at the top of the installer's `config.txt`, ahead of any overlay, so they apply to the base device tree. Only the installer boots with them; the installed system does not. A board whose module LEDs are wired opposite to the CM5 device tree ships `dtparam=act_led_activelow=off` there, so the progress signal still alternates.
