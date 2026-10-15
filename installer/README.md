@@ -43,6 +43,10 @@ sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm5.img
 | alternating green / red, 1 Hz | writing the eMMC |
 | both steady | finished, safe to power off |
 
+**Installer-only boot settings**
+
+If the image's boot partition has an `installer-config.txt`, its lines are put at the top of the installer's `config.txt`, ahead of any overlay, so they apply to the base device tree. Only the installer boots with them; the installed system does not. A board whose module LEDs are wired opposite to the CM5 device tree ships `dtparam=act_led_activelow=off` there, so the progress signal still alternates.
+
 **Boot order**
 
 The installer never writes the bootloader EEPROM. It writes the eMMC and nothing else, so whatever boot order a module arrives with is the boot order it keeps.
