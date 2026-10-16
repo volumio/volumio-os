@@ -3,6 +3,7 @@
 LED_GREEN=/sys/class/leds/ACT
 LED_RED=/sys/class/leds/PWR
 LED_BLINK_PID=
+LOG_PID=
 
 #mandatory function
 write_device_bootloader()
@@ -48,4 +49,35 @@ led_show_finish_signal()
    led_set "${LED_RED}" 1
    echo "[info] Installation finished, both LEDs steady" >> /dev/kmsg
    sync
+}
+
+install_log_write()
+{
+   dmesg | dd of="${BOOT}/install.log" conv=fsync 2>/dev/null
+   { cut -d' ' -f1 /proc/uptime; grep -E ' (sda|mmcblk0) ' /proc/diskstats; grep -E '^(Dirty|Writeback):' /proc/meminfo; } |
+      dd of="${BOOT}/install-io.log" oflag=append conv=notrunc,fsync 2>/dev/null
+   q=/sys/kernel/debug/block/mmcblk0
+   { cut -d' ' -f1 /proc/uptime; grep -H . $q/state $q/requeue_list $q/hctx0/state $q/hctx0/busy $q/hctx0/dispatch $q/hctx0/dispatch_busy $q/hctx0/tags /sys/kernel/debug/mmc*/err_state /sys/kernel/debug/mmc*/err_stats; } 2>/dev/null |
+      dd of="${BOOT}/install-mmc.log" oflag=append conv=notrunc,fsync 2>/dev/null
+}
+
+install_log_start()
+{
+   exec 2>/dev/kmsg
+   mount -t debugfs none /sys/kernel/debug
+   while [ ! -e /install-log-stop ]; do
+      install_log_write
+      sleep 5
+   done &
+   LOG_PID=$!
+}
+
+install_log_stop()
+{
+   if [ -n "${LOG_PID}" ]; then
+      touch /install-log-stop
+      wait "${LOG_PID}" 2>/dev/null
+   fi
+   echo "[info] Writing the final install log" >> /dev/kmsg
+   install_log_write
 }
