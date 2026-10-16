@@ -79,6 +79,7 @@ write_device_files()
       cat $ROOTFSMNT/boot/installer-config.txt $ROOTFSMNT/boot/config.txt > $ROOTFSMNT/boot/config.txt.new
       mv $ROOTFSMNT/boot/config.txt.new $ROOTFSMNT/boot/config.txt
    fi
+   sed -i -e '1i dtparam=sd_cqe=0' -e '1i dtparam=act_led_activelow=off' $ROOTFSMNT/boot/config.txt
 }
 
 write_device_bootloader()
