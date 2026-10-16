@@ -104,6 +104,8 @@ sudo ./installer/mkinstaller.sh -i Volumio-<version>-<date>-cm4.img
 | alternating green / red, 1 Hz | writing the eMMC |
 | both steady | finished, safe to power off |
 
+The screen stays black and the install log goes to the stick, as on CM5.
+
 **Boot order**
 
 The installer never writes the bootloader EEPROM. It writes the eMMC and nothing else, so whatever boot order a module arrives with is the boot order it keeps.
