@@ -88,6 +88,14 @@ Board-specific functions and/ or overrides are placed in script file ```custom-f
 
 The customized ```mkinitramfs``` build script for Volumio has been modified to replace the standard initramfs hook scripts by the above used scripts for volumio, see function ```build_initrd()```.
 
+# Overlay blacklist
+
+At every boot, before the overlay is mounted, `clean_overlay_blacklist` removes from the upper layer (`/mnt/ext/dyn`) every path listed in `/etc/volumio-overlay-blacklist`, so the image's copy wins. Use it for files that only the image may own, like `os-release`: a copy written on the device would otherwise hide the one of every later OTA image.
+
+- One path per line, relative to `/`; files, folders, symlinks and whiteouts are removed. Empty lines and `#` comments are ignored; `/` and `..` entries are refused.
+- The list is read from the squashfs (`/mnt/static`), never from the overlay.
+- Source: `volumio/etc/volumio-overlay-blacklist`, copied by `makeimage.sh`. A device recipe or a patch can append entries.
+
 # Debugging
 
 ## **1. Using ```debug``` and ```use_kmsg``` cmdline parameters**
