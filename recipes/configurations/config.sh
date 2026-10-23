@@ -3,7 +3,6 @@
 
 declare -A SecureApt=(
   [debian_12.gpg]="https://ftp-master.debian.org/keys/archive-key-12.asc"
-  [lesbonscomptes.gpg]="https://www.lesbonscomptes.com/pages/lesbonscomptes.gpg"
   #TODO Not needed for arm64 and x86
   [raspbian.gpg]="https://archive.raspbian.org/raspbian.public.key"
   [raspberrypi.gpg]="http://archive.raspberrypi.com/debian/raspberrypi.gpg.key"
@@ -38,6 +37,9 @@ declare -A CUSTOM_PKGS=(
     [libbluetooth3]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/bluez/libbluetooth3_5.83-1volumio5"
     [bluez-alsa-utils]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/alsa-utils/bluez-alsa-utils_4.3.1volumio1"
     [libasound2-plugin]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/bluetooth/alsa-utils/libasound2-plugin-bluez_4.3.1volumio1"
+    [libnpupnp13]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/upmpdcli/libnpupnp13_6.3.0-1"
+    [libupnpp17]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/upmpdcli/libupnpp17_1.0.4-1"
+    [upmpdcli]="https://github.com/volumio/volumio3-os-static-assets/raw/refs/heads/master/custom-packages/upmpdcli/upmpdcli_1.9.17-1"
 )
 
 ## Backend and Frontend Repository details
