@@ -36,6 +36,7 @@ device_image_tweaks() {
   log "Add missing config file for AP6359SA and AP6398S"
   cp "${ROOTFSMNT}/lib/firmware/brcm/config.txt" "${ROOTFSMNT}/lib/firmware/brcm/config_bcm4359c0_ag.txt"
   sed -i "s/ccode=CN/ccode=ALL/g" "${ROOTFSMNT}/lib/firmware/brcm/config_bcm4359c0_ag.txt"
+  echo "PM=0" >> "${ROOTFSMNT}/lib/firmware/brcm/config_bcm4359c0_ag.txt"
 
   log "With VIM2/ VIM3/ MP1(VIM3L): adding fan services"
   cp "${PLTDIR}/${DEVICEBASE}/lib/systemd/system/fan.service" "${ROOTFSMNT}/lib/systemd/system"
