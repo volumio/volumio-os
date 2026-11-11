@@ -188,7 +188,7 @@ function setup_multistrap() {
 
   log "Adding SecureApt keys to rootfs"
   for key in "${!SecureApt[@]}"; do
-    curl -sS "${SecureApt[$key]}" | gpg --dearmor > "${DirEtctrustedparts}/${key}"
+    gpg --dearmor < "${SRC}/${SecureApt[$key]}" > "${DirEtctrustedparts}/${key}"
     log "Added: ${key}"
   done
   if [[ ${ARCH} == $(dpkg --print-architecture) ]]; then

@@ -2,10 +2,10 @@
 # Location for configuration(s) for rootfs and image creation
 
 declare -A SecureApt=(
-  [debian_12.gpg]="https://ftp-master.debian.org/keys/archive-key-12.asc"
+  [debian_12.gpg]="recipes/base/keys/debian_12.asc" # https://ftp-master.debian.org/keys/archive-key-12.asc
   #TODO Not needed for arm64 and x86
-  [raspbian.gpg]="https://archive.raspbian.org/raspbian.public.key"
-  [raspberrypi.gpg]="http://archive.raspberrypi.com/debian/raspberrypi.gpg.key"
+  [raspbian.gpg]="recipes/base/keys/raspbian.asc" # https://archive.raspbian.org/raspbian.public.key
+  [raspberrypi.gpg]="recipes/base/keys/raspberrypi.asc" # https://archive.raspberrypi.com/debian/raspberrypi.gpg.key
 )
 
 # Repo locations that are utilised to create source.list in the rootfs
