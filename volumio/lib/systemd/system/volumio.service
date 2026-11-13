@@ -10,6 +10,10 @@ SyslogIdentifier=volumio
 User=volumio
 Group=volumio
 Environment=NODE_ENV=production
+# Node 20 bundles libuv 1.46, which uses io_uring by default. On a 32-bit
+# Pi 4 its io_uring threads keep all cores busy for minutes after boot.
+# Newer libuv disables io_uring on 32-bit ARM, see libuv issue 4158.
+Environment=UV_USE_IO_URING=0
 
 [Install]
 WantedBy=multi-user.target
