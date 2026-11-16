@@ -717,6 +717,9 @@ device_chroot_tweaks_pre() {
 		dtoverlay=vc4-kms-v3d,cma-128
 		[0x9020e1]
 		dtoverlay=vc4-kms-v3d,cma-128
+		# Release serial scope
+		[all]
+		# Continue after releasing serial scope
 		[pi3]
 		dtoverlay=vc4-kms-v3d
 		[pi4]
