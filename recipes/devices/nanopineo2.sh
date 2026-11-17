@@ -18,6 +18,7 @@ DEVICEFAMILY="nanopi"
 # tarball from DEVICEFAMILY repo to use
 DEVICEBASE="nanopi-neo2"
 DEVICEREPO="https://github.com/volumio/platform-${DEVICEFAMILY}"
+DEVICEREPO_BRANCH="master"
 
 ### What features do we want to target
 # TODO: Not fully implement
