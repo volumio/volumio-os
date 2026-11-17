@@ -50,7 +50,11 @@ write_device_files() {
 
   cp -dR "${PLTDIR}/${DEVICEBASE}/boot" "${ROOTFSMNT}"
   cp -pdR "${PLTDIR}/${DEVICEBASE}/lib/modules" "${ROOTFSMNT}/lib"
+  rm -f "${ROOTFSMNT}/lib/firmware/regulatory.db" "${ROOTFSMNT}/lib/firmware/regulatory.db.p7s"
   cp -pdR "${PLTDIR}/${DEVICEBASE}/firmware" "${ROOTFSMNT}/lib"
+  # mkinitramfs reads /boot/config-<kernel version>
+  kver=$(ls "${PLTDIR}/${DEVICEBASE}/lib/modules")
+  cp "${ROOTFSMNT}/boot/config-${kver}"-* "${ROOTFSMNT}/boot/config-${kver}"
 }
 
 write_device_bootloader() {
