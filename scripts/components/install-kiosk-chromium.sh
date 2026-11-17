@@ -72,6 +72,8 @@ CHROMIUM_FLAGS=(
   "--enable-tcp-fast-open"
   "--autoplay-policy=no-user-gesture-required"
   "--load-extension='/data/volumiokioskextensions/VirtualKeyboard/'"
+  "--force-device-scale-factor=\$SCALE_FACTOR"
+  "--user-agent='volumiokiosk-touch'"
 )
 
 log "Adding ${#CHROMIUM_FLAGS[@]} Chromium flags"
@@ -124,6 +126,11 @@ fi
 while ! curl -fsS -m 5 -o /dev/null http://127.0.0.1:3000/api/v1/ping; do sleep 1; done
 echo "Waited \$((\$(date +%s) - start)) sec for Volumio UI"
 
+SCALE_FACTOR=1.2
+if [ -f /data/browserargs ]; then
+  source /data/browserargs
+fi
+
 # Start Openbox
 openbox-session &
   /usr/bin/chromium \\
@@ -132,6 +139,20 @@ openbox-session &
 EOF
 
 chmod +x /opt/volumiokiosk.sh
+
+log "Creating start script for X and Kiosk"
+cat <<-'EOF' >/opt/startkiosk.sh
+	#!/bin/bash
+
+	echo "Starting Volumio Kiosk with arguments for cursor display"
+
+	KIOSK_ARGUMENTS_FILE=/data/kioskargs
+	[[ -f $KIOSK_ARGUMENTS_FILE ]] && ARGS=$(<$KIOSK_ARGUMENTS_FILE) || ARGS=""
+
+	/usr/bin/startx /etc/X11/Xsession /opt/volumiokiosk.sh -- -keeptty $ARGS
+EOF
+
+chmod +x /opt/startkiosk.sh
 
 log "Creating Systemd Unit for ${CMP_NAME}"
 cat <<-EOF >/lib/systemd/system/volumio-kiosk.service
@@ -143,7 +164,7 @@ After=volumio.service
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/bin/startx /etc/X11/Xsession /opt/volumiokiosk.sh -- -keeptty
+ExecStart=/opt/startkiosk.sh
 Restart=always
 RestartSec=5
 [Install]
@@ -173,4 +194,10 @@ if [[ ${VOLUMIO_HARDWARE} != motivo ]]; then
   # Should be okay right?
   #shellcheck disable=SC2094
   cat <<<"$(jq '.hdmi_enabled={value:true, type:"boolean"}' ${config_path})" >${config_path}
+fi
+
+if [[ ${VOLUMIO_HARDWARE} = cm4 || ${VOLUMIO_HARDWARE} = pi-kiosk ]]; then
+  log "Disabling cursor by default on touchscreen devices"
+  echo '-- -nocursor' >/data/kioskargs
+  chmod 777 /data/kioskargs
 fi
