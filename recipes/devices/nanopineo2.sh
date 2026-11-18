@@ -49,6 +49,9 @@ write_device_files() {
 
   cp -pdR "${PLTDIR}/${DEVICEBASE}/lib/modules" "${ROOTFSMNT}/lib"
   cp -pdR "${PLTDIR}/${DEVICEBASE}/lib/firmware" "${ROOTFSMNT}/lib"
+  # mkinitramfs reads /boot/config-<kernel version>
+  kver=$(ls "${PLTDIR}/${DEVICEBASE}/lib/modules")
+  cp "${ROOTFSMNT}/boot/config-${kver}"-* "${ROOTFSMNT}/boot/config-${kver}"
 
   # Volumio needs predictable device naming switched off
   # Use a volumio-specific version which adds "net.ifnames=0" to the kernel parameters
