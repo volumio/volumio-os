@@ -99,7 +99,7 @@ check_size() {
 
 pause() {
 	local timeout=${1:=30}	
-	read -rp "Waiting ${timeout} secs or press any key to continue..."; echo
+	read -t "${timeout}" -rp "Waiting ${timeout} secs or press any key to continue..."; echo
 	log "Continuing.."
 }
 
