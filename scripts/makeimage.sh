@@ -225,6 +225,9 @@ if [[ ${DISABLE_DISPLAY:-no} == "yes" ]]; then
   KIOSKMODE="no"
 fi
 
+log "Copying the overlay blacklist" "info"
+cp "${SRC}/volumio/etc/volumio-overlay-blacklist" "${ROOTFSMNT}/etc/volumio-overlay-blacklist"
+
 if [[ -n "${PLYMOUTH_THEME}" ]]; then
   log "Copying selected plymouth ${PLYMOUTH_THEME} theme" "info"
   cp -dR "${SRC}/volumio/plymouth/themes/${PLYMOUTH_THEME}" "${ROOTFSMNT}"/usr/share/plymouth/themes/"${PLYMOUTH_THEME}"
